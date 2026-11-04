@@ -8,6 +8,7 @@
 
 import type { Manifest, ShardItem } from '../format/manifest.ts';
 import { DEFAULT_WEIGHTS, rank, recency, type ScoreWeights } from '../rank/rank.ts';
+import { normalize } from '../rank/vector.ts';
 import { Catalog, type Entry, type Fetch } from './catalog.ts';
 import { buildProfile, profileSimilarity, type Profile } from './profile.ts';
 import {
@@ -74,6 +75,18 @@ export interface RelatedOptions extends RankingOptions {
   sections?: readonly string[] | 'same';
   /** Section of the item, if known: its shard is fetched first. */
   sectionHint?: string;
+}
+
+export interface SearchOptions extends RankingOptions {
+  /** Restrict results to these sections (only their shards are fetched). */
+  sections?: readonly string[];
+  /**
+   * How much the visitor's profile counts, in [0, 1] (default 0: the query alone). Needs
+   * consent; without a profile the query decides.
+   */
+  personalize?: number;
+  /** Leave out items the visitor has already seen (default false: search shows everything). */
+  excludeSeen?: boolean;
 }
 
 export interface RecommendOptions extends RankingOptions {
@@ -337,6 +350,45 @@ export class Inkling {
   }
 
   /**
+   * Ranks the catalog by similarity to a query vector, such as one from
+   * `@swissspidy/inkling/query`, which embeds text with the catalog's own model on the device.
+   * The vector is truncated to the catalog's dimensions and normalized. Hidden items never
+   * appear. With `personalize`, the visitor's profile is blended in.
+   */
+  async search(query: ArrayLike<number>, options: SearchOptions = {}): Promise<Recommendation[]> {
+    const { dims, model } = this.catalog.manifest;
+    if (query.length !== dims && query.length !== model.nativeDims) {
+      throw new RangeError(
+        `Inkling: a query vector has ${dims} or ${model.nativeDims} dims (${model.id}), not ${query.length}`,
+      );
+    }
+    const components = Array.prototype.slice.call(query, 0, dims) as number[];
+    if (!components.every(Number.isFinite)) {
+      throw new RangeError('Inkling: a query vector has a non-finite component');
+    }
+    const vector = normalize(components);
+    const requested = options.personalize ?? 0;
+    const personalize = Number.isNaN(requested) ? 0 : Math.min(1, Math.max(0, requested));
+    // Signals (with consent) for hidden and seen items, and the profile when personalizing.
+    const personal = await this.personal(personalize > 0);
+    await this.catalog.loadSections(options.sections);
+    const exclude = new Set(options.exclude);
+    const pool = this.candidates(options.sections, (e) => {
+      const agg = personal.aggregates.get(e.item.id);
+      return !exclude.has(e.item.id) && !agg?.hidden && !(options.excludeSeen && agg?.seen);
+    });
+    const weight = personal.profile.positive ? personalize : 0;
+    return this.rankEntries(
+      pool,
+      (e) =>
+        (1 - weight) * this.catalog.cosine(vector, e) +
+        weight * this.profileSimilarity(personal.profile, e),
+      1,
+      { diversity: 0, ...options, weights: { recency: 0, ...options.weights } },
+    );
+  }
+
+  /**
    * Records activity now (with consent, unless paused) and returns when the visitor's previous
    * visit ended, or `undefined` on a first visit. A visit ends after `visitGapMinutes` without
    * activity; calling this again in the same visit changes nothing.
@@ -505,8 +557,11 @@ export class Inkling {
     await this.store.updateState((state) => ({ ...state, paused }));
   }
 
-  /** Signals, aggregated, and the profile they make with the current catalog's vectors. */
-  private async personal(): Promise<Personal> {
+  /**
+   * Signals, aggregated, and the profile they make with the current catalog's vectors. Without
+   * `withProfile`, only the aggregates: no shard is loaded for the profile.
+   */
+  private async personal(withProfile = true): Promise<Personal> {
     const none: Personal = { aggregates: new Map(), profile: NO_PROFILE, signals: 0 };
     if (!(await this.consented())) return none;
     let signals: Signal[];
@@ -517,6 +572,7 @@ export class Inkling {
     }
     if (signals.length === 0) return none;
     const aggregates = aggregate(signals, this.now(), this.options.signalHalfLifeDays ?? 21);
+    if (!withProfile) return { aggregates, profile: NO_PROFILE, signals: signals.length };
     // The shards of every item with signals, so the profile sees all of them.
     const entries = new Map<string, Entry | undefined>();
     await Promise.all(

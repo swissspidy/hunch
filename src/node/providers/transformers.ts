@@ -13,6 +13,7 @@ export const EMBEDDING_GEMMA = {
   nativeDims: 768,
   matryoshkaDims: [768, 512, 256, 128],
   documentPrompt: 'title: {title} | text: {text}',
+  queryPrompt: 'task: search result | query: {query}',
 } as const;
 
 export interface TransformersOptions {
@@ -23,6 +24,8 @@ export interface TransformersOptions {
   /** Required for models other than EmbeddingGemma. */
   nativeDims?: number;
   documentPrompt?: string;
+  /** Template for search queries (`{query}`), published for the browser's query embedder. */
+  queryPrompt?: string;
   /** Inputs per forward pass (default 8). */
   batchSize?: number;
   /** Truncate inputs to this many tokens (default 2048, EmbeddingGemma's context). */
@@ -81,6 +84,7 @@ export function transformersProvider(options: TransformersOptions = {}): Embeddi
       nativeDims,
       documentPrompt:
         options.documentPrompt ?? (isGemma ? EMBEDDING_GEMMA.documentPrompt : '{title}\n{text}'),
+      queryPrompt: options.queryPrompt ?? (isGemma ? EMBEDDING_GEMMA.queryPrompt : '{query}'),
     },
     matryoshkaDims: isGemma ? EMBEDDING_GEMMA.matryoshkaDims : undefined,
     async embed(inputs) {

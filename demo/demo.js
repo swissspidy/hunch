@@ -125,3 +125,65 @@ for (const list of document.querySelectorAll('inkling-related, inkling-for-you')
     );
   });
 }
+
+// Search: the query is embedded on this device with the catalog's own model (Transformers.js,
+// loaded on the first search), then ranked by inkling.search().
+const TRANSFORMERS =
+  'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/dist/transformers.min.js';
+const assets = new URL('.', document.currentScript.src);
+let embedder;
+let searches = 0;
+const searchForm = $('search');
+if (searchForm) {
+  /** The embedder, loaded once: concurrent searches share the same load. */
+  const loadEmbedder = (inkling) => {
+    embedder ??= (async () => {
+      const { createQueryEmbedder } = await import(new URL('inkling-query.js', assets).href);
+      // q4 weights: a fifth of the download of q8, with the same results (ADR 0005).
+      return createQueryEmbedder(inkling.manifest, {
+        transformers: () => import(TRANSFORMERS),
+        dtype: 'q4',
+      });
+    })();
+    return embedder;
+  };
+  on(searchForm, 'submit', async (event) => {
+    event.preventDefault();
+    const search = ++searches;
+    const query = String(new FormData(searchForm).get('q'));
+    const status = $('search-status');
+    const inkling = await Inkling.shared(manifest);
+    let vector;
+    try {
+      if (search === searches) status.value = 'Embedding the query on this device…';
+      vector = await (await loadEmbedder(inkling)).embed(query);
+    } catch (error) {
+      embedder = undefined;
+      if (search === searches) status.value = 'Search could not load its model in this browser.';
+      throw error;
+    }
+    let results;
+    try {
+      results = await inkling.search(vector, { n: 5 });
+    } catch (error) {
+      if (search === searches) status.value = 'Search could not rank the articles.';
+      throw error;
+    }
+    // A newer search has started: its results win.
+    if (search !== searches) return;
+    $('results').replaceChildren(
+      ...results.map((r) => {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = r.url;
+        a.textContent = r.title;
+        li.append(a, ` (${r.section})`);
+        return li;
+      }),
+    );
+    status.value = `Ranked on this device. "${query}" was not sent anywhere.`;
+  });
+  // The form is disabled in the markup, so it can't submit natively (sending the query to the
+  // server) before this handler exists.
+  for (const control of searchForm.elements) control.disabled = false;
+}

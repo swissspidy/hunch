@@ -19,7 +19,7 @@ import { hashProvider } from '../src/node/providers/hash.ts';
 import { transformersProvider } from '../src/node/providers/transformers.ts';
 import { loadSource } from '../src/node/sources/index.ts';
 import type { CatalogItem } from '../src/node/types.ts';
-import { bundleGlobal } from './bundle.ts';
+import { bundleEsm, bundleGlobal } from './bundle.ts';
 
 const OUT = 'demo/dist';
 const SLOTS = 4;
@@ -54,6 +54,8 @@ const result = await build({
 });
 await provider.dispose?.();
 await bundleGlobal(join(OUT, 'inkling.js'));
+// The query embedder, loaded only when a visitor searches.
+await writeFile(join(OUT, 'inkling-query.js'), await bundleEsm('src/query/index.ts'));
 await cp('demo/style.css', join(OUT, 'style.css'));
 await cp('demo/demo.js', join(OUT, 'demo.js'));
 
@@ -104,8 +106,17 @@ ${list.map((item) => `    <li><a href="${esc(item.url)}">${esc(item.title)}</a> 
     .slice(0, SLOTS)
     .map((item) => slot(item, '      '))
     .join('\n');
-  return `<header><h1>Field Notes</h1><p class="lede">A demo publication for <a href="https://github.com/swissspidy/inkling">Inkling</a>. Everything below is ranked in your browser from precomputed vectors, with no model, no server-side profile and no tracking.</p></header>
+  return `<header><h1>Field Notes</h1><p class="lede">A demo publication for <a href="https://github.com/swissspidy/inkling">Inkling</a>. Recommendations are ranked in your browser from precomputed vectors, with no model. Search embeds your query with a model in your browser. There is no server-side profile and no tracking.</p></header>
 <main>
+  <section aria-labelledby="search-heading">
+    <h2 id="search-heading">Search</h2>
+    <form id="search" class="search" role="search">
+      <input type="search" name="q" aria-label="Search the articles" placeholder="e.g. trains through the mountains" required disabled>
+      <button type="submit" disabled>Search on this device</button>
+    </form>
+    <p class="status"><output id="search-status">Your query never leaves this browser. The first search downloads EmbeddingGemma (about 200 MB, once) from Hugging Face.</output></p>
+    <ol id="results" class="cards"></ol>
+  </section>
   <section aria-labelledby="digest-heading">
     <h2 id="digest-heading">Since your last visit</h2>
     <inkling-digest manifest="${base}inkling/manifest.json" context="Headlines of a publication about food, science, technology and travel, published since the reader's last visit.">

@@ -23,6 +23,11 @@ export interface ModelInfo {
   nativeDims: number;
   /** Template used to turn an item into the model's input, `{title}` and `{text}` replaced. */
   documentPrompt: string;
+  /**
+   * Template for a search query, `{query}` replaced (EmbeddingGemma's is
+   * `task: search result | query: {query}`). Optional: older manifests have none.
+   */
+  queryPrompt?: string;
 }
 
 export interface ShardRef {
