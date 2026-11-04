@@ -41,7 +41,11 @@ test('a text search is embedded and ranked in the browser, and the query is not 
   const context = await site.browser.newContext(DESKTOP);
   const page = await context.newPage();
   const requests: string[] = [];
-  page.on('request', (r) => requests.push(r.url()));
+  const payloads: string[] = [];
+  page.on('request', (r) => {
+    requests.push(r.url());
+    payloads.push(`${r.postData() ?? ''}\n${JSON.stringify(r.headers())}`);
+  });
   const fake = await fakeTransformers();
   await page.route('https://cdn.jsdelivr.net/**', (route) =>
     route.fulfill({
@@ -79,5 +83,6 @@ test('a text search is embedded and ranked in the browser, and the query is not 
     !requests.some((u) => /cold|drink/.test(decodeURIComponent(u)) && !u.includes(TARGET)),
     requests.join('\n'),
   );
+  assert.ok(!payloads.some((p) => /cold|drink/.test(p)), payloads.join('\n'));
   await context.close();
 });

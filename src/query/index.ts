@@ -44,8 +44,10 @@ export interface TransformersModule {
 
 export interface QueryEmbedderOptions {
   /**
-   * Transformers.js, or a function that imports it (default: `import('@huggingface/transformers')`,
-   * which a bundler resolves). Script-tag sites pass e.g.
+   * Transformers.js, or a function that imports it. The default imports the bare specifier
+   * `@huggingface/transformers` at run time, which bundlers leave alone: it works in Node and
+   * with an import map, so bundled sites pass `() => import('@huggingface/transformers')`.
+   * Script-tag sites pass e.g.
    * `() => import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2')`.
    */
   transformers?: TransformersModule | (() => Promise<TransformersModule>);
@@ -69,7 +71,7 @@ export async function createQueryEmbedder(
 ): Promise<QueryEmbedder> {
   const { model, dims } = manifest;
   const prompt = model.queryPrompt ?? '{query}';
-  const input = (query: string) => prompt.replaceAll('{query}', query.trim());
+  const input = (query: string) => prompt.replaceAll('{query}', () => query.trim());
   let embedFull: (text: string) => Promise<Float32Array>;
   let dispose: () => Promise<void> = () => Promise.resolve();
 
@@ -89,10 +91,18 @@ export async function createQueryEmbedder(
       dtype: options.dtype ?? model.dtype,
     };
     if (options.device) settings.device = options.device;
-    const [tokenizer, net] = await Promise.all([
+    const [tokenizerResult, netResult] = await Promise.allSettled([
       mod.AutoTokenizer.from_pretrained(model.id, { revision: model.revision }),
       mod.AutoModel.from_pretrained(model.id, settings),
     ]);
+    if (tokenizerResult.status === 'rejected') {
+      // Release a model that loaded anyway, then report the tokenizer's error.
+      if (netResult.status === 'fulfilled') await netResult.value.dispose?.();
+      throw tokenizerResult.reason;
+    }
+    if (netResult.status === 'rejected') throw netResult.reason;
+    const tokenizer = tokenizerResult.value;
+    const net = netResult.value;
     embedFull = async (text) => {
       const result = await net(tokenizer([text], { padding: true, truncation: true }));
       const tensor = result.sentence_embedding;
@@ -121,7 +131,10 @@ export async function createQueryEmbedder(
         vector = embedFull(text).then((full) =>
           normalize(Array.prototype.slice.call(full, 0, dims) as number[]),
         );
-        vector.catch(() => cache.delete(text));
+        const pending = vector;
+        pending.catch(() => {
+          if (cache.get(text) === pending) cache.delete(text);
+        });
         cache.set(text, vector);
         if (cache.size > cacheSize) cache.delete(cache.keys().next().value!);
       }

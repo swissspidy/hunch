@@ -43,6 +43,13 @@ test('search() takes full or truncated vectors, filters and personalizes', async
   const embedder = await createQueryEmbedder(ink.manifest);
   const query = await embedder.embed('night trains rail travel');
   await assert.rejects(ink.search(new Float32Array(7)), /query vector has 256 or 512 dims/);
+  await assert.rejects(ink.search(query.map((x, i) => (i ? x : NaN))), /non-finite/);
+  // A native-size vector is truncated to the catalog's dims: extra components don't count.
+  const native = new Float32Array(ink.manifest.model.nativeDims);
+  native.set(query);
+  native.fill(0.05, query.length);
+  const ids = (list: { id: string }[]) => list.map((r) => r.id);
+  assert.deepEqual(ids(await ink.search(native, { n: 5 })), ids(await ink.search(query, { n: 5 })));
   const travel = await ink.search(query, { n: 3, sections: ['Travel'] });
   assert.ok(travel.every((r) => r.section === 'Travel'));
   await ink.record('hide', travel[0]!.id);
@@ -83,6 +90,7 @@ test('Transformers.js gets the pinned model, revision and weights; the query pro
           const data = new Float32Array(1024);
           data[0] = 3;
           data[300] = 4;
+          data[600] = 12; // beyond the 512 kept dims
           return Promise.resolve({ sentence_embedding: { dims: [1, 1024], data } });
         };
         return Promise.resolve(model);
@@ -117,4 +125,42 @@ test('Transformers.js gets the pinned model, revision and weights; the query pro
   // Truncated to 512 dims (the component at 300 kept), renormalized.
   assert.equal(v.length, 512);
   assert.ok(Math.abs(v[0]! - 0.6) < 1e-6 && Math.abs(v[300]! - 0.8) < 1e-6);
+  assert.ok(Math.abs(Math.hypot(...v) - 1) < 1e-6);
+  // Dollar patterns in the query are inserted literally.
+  await embedder.embed('price $& $$');
+  assert.equal(calls.at(-1), 'embed ["query: price $& $$"]');
+});
+
+test('a model that loads when the tokenizer fails is released', async () => {
+  const ink = await load();
+  let disposed = false;
+  const fake: TransformersModule = {
+    AutoTokenizer: { from_pretrained: () => Promise.reject(new Error('no tokenizer')) },
+    AutoModel: {
+      from_pretrained: () =>
+        Promise.resolve(
+          Object.assign(() => Promise.resolve({}), {
+            dispose: () => {
+              disposed = true;
+              return Promise.resolve();
+            },
+          }),
+        ),
+    },
+  };
+  const manifest = { ...ink.manifest, model: { ...ink.manifest.model, id: 'acme/embed' } };
+  await assert.rejects(createQueryEmbedder(manifest, { transformers: fake }), /no tokenizer/);
+  assert.ok(disposed);
+});
+
+test('search() treats a NaN personalize as 0 and loads no profile without it', async () => {
+  const ink = await load({ consent: true, store: new MemoryStore() });
+  const query = await (await createQueryEmbedder(ink.manifest)).embed('night trains');
+  for (const id of ['sourdough-starter', 'rye-bread']) await ink.record('follow', id);
+  const scores = (list: { id: string; score: number }[]) =>
+    list.map((r) => `${r.id} ${r.score.toFixed(6)}`);
+  assert.deepEqual(
+    scores(await ink.search(query, { n: 5, personalize: NaN })),
+    scores(await ink.search(query, { n: 5 })),
+  );
 });

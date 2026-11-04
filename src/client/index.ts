@@ -362,10 +362,15 @@ export class Inkling {
         `Inkling: a query vector has ${dims} or ${model.nativeDims} dims (${model.id}), not ${query.length}`,
       );
     }
-    const vector = normalize(Array.prototype.slice.call(query, 0, dims) as number[]);
-    const personalize = Math.min(1, Math.max(0, options.personalize ?? 0));
+    const components = Array.prototype.slice.call(query, 0, dims) as number[];
+    if (!components.every(Number.isFinite)) {
+      throw new RangeError('Inkling: a query vector has a non-finite component');
+    }
+    const vector = normalize(components);
+    const requested = options.personalize ?? 0;
+    const personalize = Number.isNaN(requested) ? 0 : Math.min(1, Math.max(0, requested));
     // Signals (with consent) for hidden and seen items, and the profile when personalizing.
-    const personal = await this.personal();
+    const personal = await this.personal(personalize > 0);
     await this.catalog.loadSections(options.sections);
     const exclude = new Set(options.exclude);
     const pool = this.candidates(options.sections, (e) => {
@@ -552,8 +557,11 @@ export class Inkling {
     await this.store.updateState((state) => ({ ...state, paused }));
   }
 
-  /** Signals, aggregated, and the profile they make with the current catalog's vectors. */
-  private async personal(): Promise<Personal> {
+  /**
+   * Signals, aggregated, and the profile they make with the current catalog's vectors. Without
+   * `withProfile`, only the aggregates: no shard is loaded for the profile.
+   */
+  private async personal(withProfile = true): Promise<Personal> {
     const none: Personal = { aggregates: new Map(), profile: NO_PROFILE, signals: 0 };
     if (!(await this.consented())) return none;
     let signals: Signal[];
@@ -564,6 +572,7 @@ export class Inkling {
     }
     if (signals.length === 0) return none;
     const aggregates = aggregate(signals, this.now(), this.options.signalHalfLifeDays ?? 21);
+    if (!withProfile) return { aggregates, profile: NO_PROFILE, signals: signals.length };
     // The shards of every item with signals, so the profile sees all of them.
     const entries = new Map<string, Entry | undefined>();
     await Promise.all(
