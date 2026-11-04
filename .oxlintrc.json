@@ -55,7 +55,8 @@
         "src/rank/**",
         "src/client/**",
         "src/elements/**",
-        "src/digest/**"
+        "src/digest/**",
+        "src/query/**"
       ],
       "rules": {
         "eslint/no-restricted-imports": [

@@ -131,3 +131,16 @@ time {
 .time-travel {
   font-size: 0.9rem;
 }
+.search {
+  display: flex;
+  gap: 0.5rem;
+}
+.search input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  padding: 0.3rem 0.5rem;
+}
+.search button {
+  font: inherit;
+}

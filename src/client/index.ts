@@ -8,6 +8,7 @@
 
 import type { Manifest, ShardItem } from '../format/manifest.ts';
 import { DEFAULT_WEIGHTS, rank, recency, type ScoreWeights } from '../rank/rank.ts';
+import { normalize } from '../rank/vector.ts';
 import { Catalog, type Entry, type Fetch } from './catalog.ts';
 import { buildProfile, profileSimilarity, type Profile } from './profile.ts';
 import {
@@ -74,6 +75,18 @@ export interface RelatedOptions extends RankingOptions {
   sections?: readonly string[] | 'same';
   /** Section of the item, if known: its shard is fetched first. */
   sectionHint?: string;
+}
+
+export interface SearchOptions extends RankingOptions {
+  /** Restrict results to these sections (only their shards are fetched). */
+  sections?: readonly string[];
+  /**
+   * How much the visitor's profile counts, in [0, 1] (default 0: the query alone). Needs
+   * consent; without a profile the query decides.
+   */
+  personalize?: number;
+  /** Leave out items the visitor has already seen (default false: search shows everything). */
+  excludeSeen?: boolean;
 }
 
 export interface RecommendOptions extends RankingOptions {
@@ -334,6 +347,40 @@ export class Inkling {
       return !exclude.has(e.item.id) && !agg?.hidden && (options.includeSeen || !agg?.seen);
     });
     return this.rankPersonal(pool, personal, options);
+  }
+
+  /**
+   * Ranks the catalog by similarity to a query vector, such as one from
+   * `@swissspidy/inkling/query`, which embeds text with the catalog's own model on the device.
+   * The vector is truncated to the catalog's dimensions and normalized. Hidden items never
+   * appear. With `personalize`, the visitor's profile is blended in.
+   */
+  async search(query: ArrayLike<number>, options: SearchOptions = {}): Promise<Recommendation[]> {
+    const { dims, model } = this.catalog.manifest;
+    if (query.length !== dims && query.length !== model.nativeDims) {
+      throw new RangeError(
+        `Inkling: a query vector has ${dims} or ${model.nativeDims} dims (${model.id}), not ${query.length}`,
+      );
+    }
+    const vector = normalize(Array.prototype.slice.call(query, 0, dims) as number[]);
+    const personalize = Math.min(1, Math.max(0, options.personalize ?? 0));
+    // Signals (with consent) for hidden and seen items, and the profile when personalizing.
+    const personal = await this.personal();
+    await this.catalog.loadSections(options.sections);
+    const exclude = new Set(options.exclude);
+    const pool = this.candidates(options.sections, (e) => {
+      const agg = personal.aggregates.get(e.item.id);
+      return !exclude.has(e.item.id) && !agg?.hidden && !(options.excludeSeen && agg?.seen);
+    });
+    const weight = personal.profile.positive ? personalize : 0;
+    return this.rankEntries(
+      pool,
+      (e) =>
+        (1 - weight) * this.catalog.cosine(vector, e) +
+        weight * this.profileSimilarity(personal.profile, e),
+      1,
+      { diversity: 0, ...options, weights: { recency: 0, ...options.weights } },
+    );
   }
 
   /**

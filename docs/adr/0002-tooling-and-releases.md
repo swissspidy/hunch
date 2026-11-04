@@ -21,7 +21,7 @@ configuration, and keep the two apart. It follows
   the size check.
 - **oxlint with type-aware rules** (`oxlint-tsgolint`), and **knip** for unused files, exports and
   dependencies (`npm run lint`). oxlint also enforces the client's boundary: files under
-  `src/format`, `src/rank`, `src/client`, `src/elements` and `src/digest` can import neither `node:*` modules
+  `src/format`, `src/rank`, `src/client`, `src/elements`, `src/digest` and `src/query` can import neither `node:*` modules
   nor the build step's dependencies (ADR 0001: no dependencies, no model in the browser).
 - **oxfmt** formats everything (`npm run format`; CI runs `format:check`).
 - **Tests use `node:test`.** Unit tests in `test/unit` (with the `hash` provider, no network or

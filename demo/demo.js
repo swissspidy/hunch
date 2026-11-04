@@ -125,3 +125,47 @@ for (const list of document.querySelectorAll('inkling-related, inkling-for-you')
     );
   });
 }
+
+// Search: the query is embedded on this device with the catalog's own model (Transformers.js,
+// loaded on the first search), then ranked by inkling.search().
+const TRANSFORMERS =
+  'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/dist/transformers.min.js';
+const assets = new URL('.', document.currentScript.src);
+let embedder;
+const searchForm = $('search');
+if (searchForm) {
+  on(searchForm, 'submit', async (event) => {
+    event.preventDefault();
+    const query = new FormData(searchForm).get('q');
+    const status = $('search-status');
+    const inkling = await Inkling.shared(manifest);
+    if (!embedder) {
+      status.value = 'Loading the model on this device…';
+      const { createQueryEmbedder } = await import(new URL('inkling-query.js', assets).href);
+      // q4 weights: a fifth of the download of q8, with the same results (ADR 0005).
+      embedder = createQueryEmbedder(inkling.manifest, {
+        transformers: () => import(TRANSFORMERS),
+        dtype: 'q4',
+      });
+    }
+    try {
+      const vector = await (await embedder).embed(String(query));
+      const results = await inkling.search(vector, { n: 5 });
+      $('results').replaceChildren(
+        ...results.map((r) => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = r.url;
+          a.textContent = r.title;
+          li.append(a, ` (${r.section})`);
+          return li;
+        }),
+      );
+      status.value = `Ranked on this device. "${query}" was not sent anywhere.`;
+    } catch (error) {
+      embedder = undefined;
+      status.value = 'Search could not load its model in this browser.';
+      throw error;
+    }
+  });
+}

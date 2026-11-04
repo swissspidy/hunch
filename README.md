@@ -3,11 +3,12 @@
 First-party, on-device personalization for websites. Inkling ranks your catalog in the
 visitor's browser: related items, "for you" modules and "since your last visit" digests. Your
 build step publishes a vector for each item, and the browser ranks them with plain arithmetic:
-the ranking runs no model. The optional digest summary uses the browser's built-in Summarizer,
-whose model runs on the device. There is no server-side profile, and nothing about the visitor
+the ranking runs no model. Two optional extras do run one on the device: free-text search
+embeds the query with the catalog's own model, and the digest summary uses the browser's
+built-in Summarizer. There is no server-side profile, and nothing about the visitor
 leaves the device.
 
-**Status: milestones 1–4 of 5, and the first half of 5.** The CLI builds a manifest and vector
+**Status: milestones 1–5.** The CLI builds a manifest and vector
 shards from a feed. The client ranks related items, and, with the site's consent, "for you"
 and "since your last visit" from signals kept on the device, with `explain()` and the
 visitor's controls. See the [roadmap](#roadmap). The format,
@@ -22,7 +23,7 @@ the signals and the ranking function are specified in
    [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) through Transformers.js. It
    writes `manifest.json` and one small binary shard per section: 256-dimensional int8 vectors,
    about 260 KB gzipped per 1,000 items.
-2. **In the browser**, the client (7.0 KB gzipped, no dependencies) fetches the manifest and
+2. **In the browser**, the client (7.2 KB gzipped, no dependencies) fetches the manifest and
    the shards it needs. It ranks by cosine similarity, a small recency boost and diversity (MMR).
    For "for you", similarity is to a profile derived from the visitor's signals (what they read,
    followed or hid), which stay in the site's own IndexedDB.
@@ -141,6 +142,24 @@ In code: `await inkling.sinceLastVisit({ n: 5 })`, and `summarize(items)` from
 `@swissspidy/inkling/digest`. A visit ends after 30 minutes without activity
 ([ADR 0004](docs/adr/0004-since-your-last-visit.md)).
 
+### Search
+
+`@swissspidy/inkling/query` embeds a query on the device with the catalog's own pinned model
+(Transformers.js, loaded on the first search), and `inkling.search()` ranks the catalog against
+it. The query text is never sent ([ADR 0005](docs/adr/0005-query-embedding.md)):
+
+```js
+import { createQueryEmbedder } from '@swissspidy/inkling/query';
+
+const embedder = await createQueryEmbedder(inkling.manifest, {
+  transformers: () => import('@huggingface/transformers'),
+  dtype: 'q4', // the same model in smaller weights: ~200 MB, once, then cached
+});
+const results = await inkling.search(await embedder.embed('night trains'), { n: 5 });
+```
+
+`personalize: 0.3` blends in the visitor's profile; hidden items never appear.
+
 Every result has `why`: `similarity`, `relevance`, `recency`, `prior`, `redundancy`,
 `confidence`, `similarityShare` (how much of the score the profile accounts for: low means an
 editors' pick) and `because` (the visitor's items it leans on).
@@ -162,7 +181,8 @@ each item's similarity. On the home page, turn on personalization under "Your da
 articles, and "For you" follows. "More like this" and "Not interested" on an article are
 explicit signals, and pause, export and forget are on the home page. To try "since your last
 visit", follow the home page's link to visit as if it were 15 September 2026, then come back
-today. The browser tests check
+today. The search box embeds your query in the browser with EmbeddingGemma (a one-time
+download of about 200 MB) and ranks the articles against it. The browser tests check
 that the pages fetch only `manifest.json` and the shards, that nothing is stored without
 consent, and that the layout shift is 0 on desktop and phone viewports.
 
@@ -210,8 +230,8 @@ and baselines, not for production.
 3. ✅ Model switch: profiles recompute from signals with no migration, and the evaluation shows
    no quality loss ([docs/evaluation.md](docs/evaluation.md)).
 4. ✅ Offline evaluation: on MIND, nDCG@10 0.390 vs 0.308 for popularity.
-5. Optional: a "since your last visit" digest with the built-in Summarizer (done), and query
-   embedding in the browser (next).
+5. ✅ Optional: a "since your last visit" digest with the built-in Summarizer, and free-text
+   search with the catalog's model in the browser.
 
 ## Evaluation
 
