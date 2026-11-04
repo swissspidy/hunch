@@ -17,12 +17,12 @@ popularity's, or if any ranking differs after a model switch.
 | ----------------------------------------- | --------- | --------- | --------- | --------- | --------- |
 | Random                                    | 0.498     | 0.178     | 0.186     | 0.284     | 0.499     |
 | Popularity                                | 0.553     | 0.219     | 0.246     | 0.340     | 0.559     |
-| Inkling, model A: profile only            | 0.844     | 0.499     | 0.655     | 0.717     | 0.877     |
-| **Inkling, model A: default weights**     | **0.847** | **0.500** | **0.658** | **0.721** | **0.887** |
-| Inkling, model A: default + diversity 0.2 | 0.846     | 0.498     | 0.655     | 0.719     | 0.890     |
-| Inkling, model B: profile only            | 0.825     | 0.471     | 0.621     | 0.684     | 0.863     |
-| **Inkling, model B: default weights**     | **0.829** | **0.479** | **0.630** | **0.693** | **0.868** |
-| Inkling, model B: default + diversity 0.2 | 0.822     | 0.473     | 0.617     | 0.684     | 0.861     |
+| Inkling, model A: profile only            | 0.843     | 0.497     | 0.655     | 0.719     | 0.888     |
+| **Inkling, model A: default weights**     | **0.847** | **0.502** | **0.661** | **0.723** | **0.892** |
+| Inkling, model A: default + diversity 0.2 | 0.842     | 0.498     | 0.655     | 0.716     | 0.885     |
+| Inkling, model B: profile only            | 0.826     | 0.476     | 0.629     | 0.690     | 0.866     |
+| **Inkling, model B: default weights**     | **0.829** | **0.478** | **0.630** | **0.692** | **0.870** |
+| Inkling, model B: default + diversity 0.2 | 0.824     | 0.473     | 0.620     | 0.688     | 0.873     |
 
 **Model switch:** signals recorded on model A's catalog and then ranked on model B's gave the same
 ranking as a fresh profile on model B in **1,230 of 1,230** impressions. The device stores only

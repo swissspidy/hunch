@@ -3,6 +3,7 @@
  *
  * The server renders the site's own order (the cold start). Without consent or signals the
  * slots stay exactly as they are; with a profile, they are replaced by its recommendations.
+ * If the visitor hid an item the fallback shows, the catalog's own order without it is shown.
  * `data-inkling-personalized` says which happened.
  *
  *   <inkling-for-you manifest="/inkling/manifest.json">
@@ -22,7 +23,11 @@ export class InklingForYouElement extends SlotsElement {
     return ['manifest', 'sections', 'exclude', 'include-seen', 'diversity'];
   }
 
-  protected async recommend(inkling: Inkling, n: number): Promise<Recommendation[] | null> {
+  protected async recommend(
+    inkling: Inkling,
+    n: number,
+    fallback: readonly string[],
+  ): Promise<Recommendation[] | null> {
     const recommendations = await inkling.recommend({
       n,
       sections: this.list('sections'),
@@ -32,6 +37,10 @@ export class InklingForYouElement extends SlotsElement {
     });
     const personalized = recommendations.some((r) => r.why.confidence > 0);
     this.dataset.inklingPersonalized = String(personalized);
-    return personalized ? recommendations : null;
+    if (personalized) return recommendations;
+    // No profile yet, but an item the visitor hid must not stay in the fallback: show the
+    // site's own order without it instead.
+    const states = await Promise.all(fallback.map((id) => inkling.explain(id)));
+    return states.some((state) => state?.hidden) ? recommendations : null;
   }
 }

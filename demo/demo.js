@@ -92,8 +92,15 @@ for (const button of document.querySelectorAll('[data-signal]')) {
 const percent = (x) => `${Math.round(x * 100)}%`;
 for (const list of document.querySelectorAll('inkling-related, inkling-for-you')) {
   list.addEventListener('inkling:ready', ({ detail }) => {
-    if (detail.recommendations.length === 0) return;
-    $('why-list').replaceChildren(
+    const why = $('why-list');
+    if (detail.recommendations.length === 0) {
+      // A refresh without results (after forget, or consent withdrawn): no stale reasons. On
+      // the first ranking, the placeholder stays.
+      if (list.dataset.inklingRanked) why.replaceChildren();
+      return;
+    }
+    list.dataset.inklingRanked = 'true';
+    why.replaceChildren(
       ...detail.recommendations.map((r) => {
         const li = document.createElement('li');
         const { why } = r;

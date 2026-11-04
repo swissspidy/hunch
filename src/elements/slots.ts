@@ -8,6 +8,9 @@
  * on their text (clamp titles to a fixed number of lines). Listeners attached to a slot do not
  * carry over to its copy: delegate them to the element.
  *
+ * Each refresh starts again from the server-rendered slots. When there are fewer results than
+ * slots, the remaining slots are hidden rather than left showing a fallback item.
+ *
  * State: `data-inkling-state` is `loading`, `ready` or `error`. Events: `inkling:ready` (detail:
  * `{ recommendations }`) and `inkling:error` (detail: `{ error }`). A click on a slot whose
  * `data-inkling-id` is set records a `click` signal (with consent).
@@ -22,9 +25,18 @@ export const Base: typeof HTMLElement =
 export abstract class SlotsElement extends Base {
   private run = 0;
   private listening = false;
+  /** Copies of the server-rendered slots, taken before the first replacement. */
+  private original: HTMLElement[] | undefined;
 
-  /** Ranks `n` items, or returns `null` to keep the fallback as it is. */
-  protected abstract recommend(inkling: Inkling, n: number): Promise<Recommendation[] | null>;
+  /**
+   * Ranks `n` items, or returns `null` to show the server-rendered fallback (whose item ids
+   * are `fallback`) as it is.
+   */
+  protected abstract recommend(
+    inkling: Inkling,
+    n: number,
+    fallback: readonly string[],
+  ): Promise<Recommendation[] | null>;
 
   connectedCallback(): void {
     if (!this.listening) {
@@ -74,14 +86,22 @@ export abstract class SlotsElement extends Base {
 
   private async update(run: number): Promise<void> {
     const slots = [...this.querySelectorAll<HTMLElement>('[data-inkling-slot]')];
+    // Every refresh starts from the server's markup, not from an earlier ranking's.
+    this.original ??= slots.map((slot) => slot.cloneNode(true) as HTMLElement);
+    const original = this.original;
     try {
       if (slots.length === 0) throw new Error(`<${this.localName}> has no [data-inkling-slot]`);
-      const recommendations = await this.recommend(await this.inkling(), slots.length);
+      const fallback = original.map((slot) => slot.dataset.inklingId ?? '').filter(Boolean);
+      const recommendations = await this.recommend(await this.inkling(), slots.length, fallback);
       if (run !== this.run) return;
-      recommendations?.forEach((rec, i) => {
-        const slot = slots[i]!;
-        const copy = slot.cloneNode(true) as HTMLElement;
-        fill(copy, rec);
+      slots.forEach((slot, i) => {
+        const copy = original[i]!.cloneNode(true) as HTMLElement;
+        if (recommendations) {
+          const rec = recommendations[i];
+          if (rec) fill(copy, rec);
+          // Fewer results than slots: an unfilled slot would show a stale or repeated item.
+          else copy.hidden = true;
+        }
         slot.replaceWith(copy);
       });
       this.dataset.inklingState = 'ready';
@@ -111,7 +131,11 @@ export abstract class SlotsElement extends Base {
 function fill(slot: HTMLElement, rec: Recommendation): void {
   slot.dataset.inklingId = rec.id;
   const link = slot.matches('a') ? slot : slot.querySelector('[data-inkling-href], a');
-  link?.setAttribute('href', rec.url);
+  if (link) {
+    // Only web URLs: a javascript: URL from a catalog would run script when clicked.
+    if (isWebUrl(rec.url)) link.setAttribute('href', rec.url);
+    else link.removeAttribute('href');
+  }
   setText(slot, '[data-inkling-title]', rec.title);
   setText(slot, '[data-inkling-section]', rec.section ?? '');
   const date = slot.querySelector('[data-inkling-date]');
@@ -120,9 +144,19 @@ function fill(slot: HTMLElement, rec: Recommendation): void {
     if (date.matches('time')) date.setAttribute('datetime', rec.date ?? '');
   }
   const image = slot.querySelector('img[data-inkling-image]');
-  if (image && rec.image) {
-    image.setAttribute('src', rec.image);
+  if (image) {
+    if (rec.image && isWebUrl(rec.image)) image.setAttribute('src', rec.image);
+    else image.removeAttribute('src');
     image.setAttribute('alt', '');
+  }
+}
+
+function isWebUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url, document.baseURI);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
   }
 }
 

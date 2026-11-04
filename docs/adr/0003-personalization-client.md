@@ -103,7 +103,7 @@ instead of skipping the check. A stale or mixed-up shard is refused on every sit
 
 ## Consequences
 
-- The core grows from 2.5 KB to 6.4 KB gzipped (7.6 KB with the three components), still under
+- The core grows from 2.5 KB to 6.6 KB gzipped (7.9 KB with the three components), still under
   the 10 KB budget.
 - A site that integrates only related items, or never configures consent, stores nothing.
 - The first page after consent shows the editors' order. "For you" changes only after the

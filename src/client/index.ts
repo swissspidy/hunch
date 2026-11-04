@@ -165,8 +165,6 @@ export class Inkling {
   private readonly options: InklingOptions;
   private readonly store: SignalStore;
   private readonly now: () => number;
-  private pruned = false;
-
   private constructor(catalog: Catalog, options: InklingOptions) {
     this.catalog = catalog;
     this.options = options;
@@ -180,6 +178,12 @@ export class Inkling {
 
   /** Fetches the manifest. Shards are fetched on first use. */
   static async load(options: InklingOptions): Promise<Inkling> {
+    for (const name of ['signalHalfLifeDays', 'maxSignals', 'maxSignalAgeDays'] as const) {
+      const value = options[name];
+      if (value !== undefined && !(Number.isFinite(value) && value > 0)) {
+        throw new RangeError(`Inkling: ${name} must be a positive number, not ${value}`);
+      }
+    }
     const fetchFn = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
     const catalog = await Catalog.load(options.manifest, fetchFn);
     return new Inkling(catalog, options);
@@ -404,7 +408,8 @@ export class Inkling {
       await this.store.destroy();
       return;
     }
-    if (!(await this.consented())) return;
+    // Deleting needs no consent, but must not create a database that does not exist yet.
+    if (!(await this.consented()) && !(await this.store.exists())) return;
     const signals = await this.store.all();
     await this.store.delete(signals.filter((s) => s.itemId === itemId).map((s) => s.seq!));
   }
@@ -427,17 +432,17 @@ export class Inkling {
     if (!(await this.consented())) return false;
     try {
       if ((await this.store.getState()).paused) return false;
+      // Again: consent may have been withdrawn while the state was read.
+      if (!(await this.consented())) return false;
       await this.store.add(signal);
-      if (!this.pruned) {
-        this.pruned = true;
-        const drop = toPrune(
-          await this.store.all(),
-          this.now(),
-          this.options.maxSignals ?? 2000,
-          this.options.maxSignalAgeDays ?? 180,
-        );
-        await this.store.delete(drop);
-      }
+      // On every write, so a long-lived page stays within the limits too (at most 2,000 reads).
+      const drop = toPrune(
+        await this.store.all(),
+        this.now(),
+        this.options.maxSignals ?? 2000,
+        this.options.maxSignalAgeDays ?? 180,
+      );
+      await this.store.delete(drop);
       return true;
     } catch {
       return false;

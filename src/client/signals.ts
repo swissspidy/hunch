@@ -28,6 +28,8 @@ export interface SignalStore {
   delete(seqs: readonly number[]): Promise<void>;
   /** Removes everything this store holds, including its database. */
   destroy(): Promise<void>;
+  /** Whether the store holds anything (without creating it if not). */
+  exists(): Promise<boolean>;
   getState(): Promise<SignalState>;
   setState(state: SignalState): Promise<void>;
 }
@@ -120,6 +122,9 @@ export class MemoryStore implements SignalStore {
     this.signals = this.signals.filter((s) => !set.has(s.seq!));
     return Promise.resolve();
   }
+  exists(): Promise<boolean> {
+    return Promise.resolve(this.signals.length > 0);
+  }
   destroy(): Promise<void> {
     this.signals = [];
     this.state = { paused: false };
@@ -168,6 +173,13 @@ export class IndexedDbStore implements SignalStore {
     await request(indexedDB.deleteDatabase(this.name));
   }
 
+  async exists(): Promise<boolean> {
+    if (this.opening) return true;
+    // Without indexedDB.databases() (older browsers), assume it does.
+    if (typeof indexedDB.databases !== 'function') return true;
+    return (await indexedDB.databases()).some((db) => db.name === this.name);
+  }
+
   async getState(): Promise<SignalState> {
     const row = await this.tx(
       'meta',
@@ -199,7 +211,11 @@ export class IndexedDbStore implements SignalStore {
         };
         resolve(open.result);
       };
-      open.onerror = () => reject(open.error ?? new Error('IndexedDB open failed'));
+      open.onerror = () => {
+        // A later call may try again (a blocked upgrade, a transient quota error).
+        this.opening = undefined;
+        reject(open.error ?? new Error('IndexedDB open failed'));
+      };
     });
     return this.opening;
   }

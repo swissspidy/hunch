@@ -28,6 +28,13 @@ const { values } = parseArgs({
 const count = Number(values.items);
 const dims = Number(values.dims);
 const sections = Number(values.sections);
+if (!(sections >= 1 && count >= sections)) {
+  throw new RangeError(`--sections must be from 1 to --items (${count}), not ${values.sections}`);
+}
+// Every section has at least this many items; benchmark ids stay within them.
+const perSection = Math.floor(count / sections);
+/** The i-th benchmark item: sections in turn, so every id exists. */
+const itemId = (i: number) => `s${i % sections}-item-${Math.floor(i / sections) % perSection}`;
 
 if (values.browser) await browser();
 else for (const q of ['int8', 'float32'] as Quantization[]) await node(q);
@@ -57,8 +64,8 @@ async function node(quantization: Quantization): Promise<void> {
   const firstSection = performance.now() - start;
   await ink.related('s0-item-0');
   const allLoaded = performance.now() - start;
-  const related = await time(20, (i) => ink.related(`s${i % sections}-item-${i}`, { n: 10 }));
-  for (let i = 0; i < 50; i++) await ink.record('view', `s${i % sections}-item-${i * 7}`);
+  const related = await time(20, (i) => ink.related(itemId(i), { n: 10 }));
+  for (let i = 0; i < 50; i++) await ink.record('view', itemId(i * 7));
   const recommend = await time(20, () => ink.recommend({ n: 10 }));
   const heap = process.memoryUsage();
   console.log(`${count} items, ${dims} dims, ${quantization}, ${sections} shards (Node)`);
@@ -111,7 +118,9 @@ async function browser(): Promise<void> {
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await cdp.send('Performance.enable');
     const result = await page.evaluate(
-      async ({ sections }) => {
+      async ({ sections, perSection }) => {
+        // As itemId() below: an id that exists whatever the catalog's size.
+        const id = (i: number) => `s${i % sections}-item-${Math.floor(i / sections) % perSection}`;
         const I = (window as unknown as { Inkling: typeof Inkling }).Inkling;
         const t0 = performance.now();
         const ink = await I.load({ manifest: '/manifest.json', consent: true });
@@ -120,16 +129,16 @@ async function browser(): Promise<void> {
         await ink.related('s0-item-0');
         const all = performance.now() - t0;
         const t1 = performance.now();
-        for (let i = 0; i < 10; i++) await ink.related(`s${i % sections}-item-${i}`, { n: 10 });
+        for (let i = 0; i < 10; i++) await ink.related(id(i), { n: 10 });
         const related = (performance.now() - t1) / 10;
-        for (let i = 0; i < 50; i++) await ink.record('view', `s${i % sections}-item-${i * 7}`);
+        for (let i = 0; i < 50; i++) await ink.record('view', id(i * 7));
         const t2 = performance.now();
         for (let i = 0; i < 10; i++) await ink.recommend({ n: 10 });
         const recommend = (performance.now() - t2) / 10;
         await ink.forget();
         return { first, all, related, recommend };
       },
-      { sections },
+      { sections, perSection },
     );
     const metrics = await cdp.send('Performance.getMetrics').catch(() => ({ metrics: [] }));
     console.log(`${count} items, ${dims} dims, int8, ${sections} shards (Chromium, CPU 4× slower)`);

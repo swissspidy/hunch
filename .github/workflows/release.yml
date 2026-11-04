@@ -13,15 +13,21 @@
 #    token instead (changesets/action's github-token) would start the usual pull_request CI.
 # 2. pack (a release only): installs, tests and packs the package. It cannot request an OIDC token.
 # 3. publish (a release only): stages that tarball on npm with the job's OIDC token (npm adds
-#    provenance), then tags the version and creates its GitHub release. It installs nothing, so no
-#    dependency's install script or test code runs where it could publish. A staged version goes
-#    public only once a maintainer approves it with 2FA, on npmjs.com (Staged Packages) or with
-#    `npm stage approve <stage-id>`.
+#    provenance). It installs nothing, so no dependency's install script or test code runs where
+#    it could publish. A staged version goes public only once a maintainer approves it with 2FA,
+#    on npmjs.com (Staged Packages) or with `npm stage approve <stage-id>`.
+# 4. tag (once npm has the version): tags the commit that set the version and creates its GitHub
+#    release. It runs on the next push to main after the approval, or at once when a maintainer
+#    starts this workflow by hand (workflow_dispatch). A rejected stage is never tagged, so the
+#    next push to main stages that version again.
+# 0.0.0 is the placeholder before the first "Version packages" pull request, never a release.
 name: Release
 
 on:
   push:
     branches: [main]
+  # After approving a staged version, to tag it without waiting for the next push.
+  workflow_dispatch:
 
 permissions: {}
 
@@ -40,6 +46,7 @@ jobs:
       pull-requests: write # open and update its pull request
     outputs:
       release: ${{ steps.release.outputs.release }}
+      tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
       pr-number: ${{ steps.changesets.outputs.pr-number }}
     steps:
@@ -55,16 +62,19 @@ jobs:
       - run: npm ci --ignore-scripts
       # Before changesets/action, which leaves the checkout on its version branch with the
       # pending changesets applied: the check has to read main's version, not the next one.
+      # release: stage it (not tagged, not on npm). tag: npm has it (approved), the tag is missing.
       - name: Is package.json's version unreleased?
         id: release
         run: |
           version="$(node -p 'require("./package.json").version')"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
-            echo "release=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "release=true" >> "$GITHUB_OUTPUT"
+          release=false
+          tag=false
+          if [ "$version" != 0.0.0 ] && ! git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            if npm view "@swissspidy/inkling@$version" version >/dev/null 2>&1; then tag=true; else release=true; fi
           fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Create or update the "Version packages" pull request
         id: changesets
         uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
@@ -135,15 +145,10 @@ jobs:
     # staged publishes.
     environment: npm
     permissions:
-      contents: write # the version's tag and GitHub release
       id-token: write # npm trusted publishing and provenance
     env:
       VERSION: ${{ needs.version.outputs.version }}
     steps:
-      # For CHANGELOG.md only: nothing from the checkout is installed or run.
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: package
@@ -174,12 +179,32 @@ jobs:
             cat stage.log
             stage_id="$(sed -n 's/.*(staged with id \(.*\))$/\1/p' stage.log)"
             echo "Staged @swissspidy/inkling@$VERSION: approve it under Staged Packages on npmjs.com, or with \`npm stage approve ${stage_id:-<stage-id>}\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "Then run this workflow (Actions, Release, Run workflow) to tag it, or wait for the next push to main." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  tag:
+    name: Tag and create the GitHub release
+    needs: version
+    if: needs.version.outputs.tag == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # the version's tag and GitHub release
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      # For the history and CHANGELOG.md only: nothing from the checkout is installed or run.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Tag and create the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The commit that set this version in package.json (the merged "Version packages" one).
+          target="$(git log -1 --format=%H -G "\"version\": \"$VERSION\"" -- package.json)"
           # The version's section of CHANGELOG.md, or GitHub's generated notes without one.
           awk -v v="$VERSION" '$0 == "## " v { on = 1; next } on && /^## / { exit } on' CHANGELOG.md 2>/dev/null > notes.md || true
           if [ -s notes.md ]; then notes=(--notes-file notes.md); else notes=(--generate-notes); fi
-          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "v$VERSION" "${notes[@]}"
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --target "${target:-$GITHUB_SHA}" --title "v$VERSION" "${notes[@]}"

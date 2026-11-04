@@ -112,7 +112,11 @@ export function synthetic(options: SyntheticOptions = {}): Synthetic {
         Promise.resolve(
           inputs.map((itemId) => {
             const v = latent.get(itemId)!;
-            return Float32Array.from(matrix, (row) => dot(row, v) + noise * gauss());
+            // Noise from the model and the item alone: the same vector in any call order and
+            // cache state.
+            const r = rng(hash(`${id}:${itemId}`));
+            const g = () => Math.sqrt(-2 * Math.log(r() || 1e-12)) * Math.cos(2 * Math.PI * r());
+            return Float32Array.from(matrix, (row) => dot(row, v) + noise * g());
           }),
         ),
     };
@@ -126,6 +130,12 @@ export function synthetic(options: SyntheticOptions = {}): Synthetic {
       b: projection(96, 1.2, 'synthetic/model-b'),
     },
   };
+}
+
+function hash(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
 }
 
 function sigmoid(x: number): number {

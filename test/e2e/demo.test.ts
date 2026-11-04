@@ -4,7 +4,10 @@
  */
 
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { decodeShard, encodeShard } from '../../src/format/shard.ts';
 import type { BrowserContextOptions, Page } from 'playwright-core';
 import {
   DESKTOP,
@@ -100,6 +103,48 @@ test('no animation when the visitor prefers reduced motion', async () => {
   const animations = await page.evaluate(() => document.getAnimations().length);
   assert.equal(animations, 0);
   await close();
+});
+
+test('a javascript: URL in the catalog never becomes a link', async () => {
+  // The Food shard, re-encoded with a script URL for every item, and the manifest to match.
+  const manifest = JSON.parse(await readFile('demo/dist/inkling/manifest.json', 'utf8'));
+  const ref = manifest.shards.find((s: { section: string }) => s.section === 'Food');
+  const shard = decodeShard(new Uint8Array(await readFile(`demo/dist/inkling/${ref.url}`)).buffer);
+  const vectors = shard.items.map((_, i) => {
+    const row = Float32Array.from(shard.vectors.subarray(i * shard.dims, (i + 1) * shard.dims));
+    return row.map((x) => x * shard.invNorms[i]!);
+  });
+  const bytes = encodeShard(
+    {
+      space: shard.space,
+      items: shard.items.map((item) => ({ ...item, url: 'javascript:alert(1)' })),
+    },
+    vectors,
+    shard.dims,
+    'int8',
+  );
+  ref.sha256 = createHash('sha256').update(bytes).digest('hex');
+  ref.bytes = bytes.length;
+  const context = await site.browser.newContext(DESKTOP);
+  const page = await context.newPage();
+  await page.route('**/inkling/manifest.json', (route) => route.fulfill({ json: manifest }));
+  await page.route(`**/inkling/${ref.url}`, (route) => route.fulfill({ body: Buffer.from(bytes) }));
+  await page.goto(`${site.origin}/items/cold-brew.html`);
+  await ready(page);
+  const links = await page.$$eval('inkling-related [data-inkling-slot]', (els) =>
+    els.map((el) => [
+      el.querySelector('[data-inkling-section]')?.textContent,
+      el.querySelector('a')?.getAttribute('href') ?? null,
+    ]),
+  );
+  const food = links.filter(([section]) => section === 'Food');
+  assert.ok(food.length > 0, JSON.stringify(links));
+  assert.ok(
+    food.every(([, href]) => href === null),
+    JSON.stringify(links),
+  );
+  assert.ok(links.every(([, href]) => !href?.startsWith('javascript:')));
+  await context.close();
 });
 
 test('the server-rendered fallback stays when the manifest cannot load', async () => {

@@ -238,3 +238,32 @@ test('the signal store is pruned to its cap', async () => {
 test('documentInput fills the prompt (topic provider sanity)', () => {
   assert.equal(documentInput('{title}', 'bread 3', ''), 'bread 3');
 });
+
+test('forget(itemId) works without consent, but creates nothing', async () => {
+  const store = new MemoryStore();
+  await store.add({ itemId: 'rail-0', kind: 'hide', weight: -5, at: now() });
+  const ink = await load({ store, consent: false });
+  await ink.forget('rail-0');
+  assert.deepEqual(await store.all(), []);
+  // An empty store is not touched (IndexedDB would be created by reading it).
+  let reads = 0;
+  const empty = new MemoryStore();
+  const all = empty.all.bind(empty);
+  empty.all = () => (reads++, all());
+  await (await load({ store: empty, consent: false })).forget('rail-0');
+  assert.equal(reads, 0);
+});
+
+test('pruning runs on every write, and options are checked', async () => {
+  const store = new MemoryStore();
+  const ink = await load({ store, maxSignals: 2 });
+  for (let i = 0; i < 5; i++) await ink.record('view', `rail-${i % 4}`);
+  assert.equal((await store.all()).length, 2);
+  for (const bad of [0, -1, Number.NaN]) {
+    await assert.rejects(
+      load({ signalHalfLifeDays: bad }),
+      /signalHalfLifeDays must be a positive number/,
+    );
+  }
+  await assert.rejects(load({ maxSignals: 0 }), /maxSignals/);
+});

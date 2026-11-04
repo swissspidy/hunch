@@ -117,6 +117,24 @@ test('manifests of another format are refused', async () => {
     }),
     /format version 2/,
   );
+  const base = {
+    format: 'inkling/manifest',
+    formatVersion: 1,
+    space: 's',
+    dims: 4,
+    quantization: 'int8',
+  };
+  await assert.rejects(
+    Inkling.load({ manifest: MANIFEST, fetch: bad({ ...base, shards: [] }) }),
+    /missing space, dims, model or shard URLs/,
+  );
+  await assert.rejects(
+    Inkling.load({
+      manifest: MANIFEST,
+      fetch: bad({ ...base, model: {}, shards: [{ section: 'x' }] }),
+    }),
+    /missing space, dims, model or shard URLs/,
+  );
   await assert.rejects(
     Inkling.load({
       manifest: MANIFEST,

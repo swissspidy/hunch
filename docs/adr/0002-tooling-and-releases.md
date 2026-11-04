@@ -36,10 +36,13 @@ configuration, and keep the two apart. It follows
 - **Dependabot** updates npm and GitHub Actions weekly, grouped, after a 7-day cooldown.
 - **Releases use Changesets and npm trusted publishing** (`.github/workflows/release.yml`), as in
   Sandburg: pull requests add changesets, and Changesets keeps a "Version packages" pull request
-  open. When `main`'s version has no tag yet, the workflow tests and packs the package in one
-  job, then stages the tarball on npm in another. That job installs nothing and holds the OIDC
-  token, and npm adds provenance. A staged version goes public once a maintainer approves it
-  with 2FA. Then the version is tagged and its GitHub release is created from the changelog.
+  open. When `main`'s version has no tag and isn't on npm, the workflow tests and packs the
+  package in one job, then stages the tarball on npm in another. That job installs nothing and
+  holds the OIDC token, and npm adds provenance. A staged version goes public once a maintainer
+  approves it with 2FA. **Only then is it tagged**: the next run (the next push to `main`, or
+  starting the workflow by hand) finds the version on npm without a tag, and tags the commit
+  that set it and creates its GitHub release from the changelog. A rejected stage is never
+  tagged, so it is staged again. The `0.0.0` placeholder is never released.
 - **The package is `@swissspidy/inkling`** (`inkling` is taken on npm), and the version stays
   0.x while the API settles.
 - **GitHub Pages hosts the demo** (`.github/workflows/pages.yml`), built from `demo/` on every push

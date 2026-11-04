@@ -171,6 +171,13 @@ test('splits large sections and checks its input', async () => {
     build({ items: [], outDir: out, provider: countingProvider(), cacheDir: false }),
     /empty/,
   );
+  const broken = countingProvider(8);
+  broken.embed = (inputs) =>
+    Promise.resolve(inputs.map(() => Float32Array.of(1, Number.NaN, 0, 0, 0, 0, 0, 0)));
+  await assert.rejects(
+    build({ items, outDir: out, provider: broken, cacheDir: false, dims: 4 }),
+    /non-finite component/,
+  );
   await assert.rejects(
     build({
       items: [items[0]!, items[0]!],

@@ -100,6 +100,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
           `${model.id} returned a vector of ${v?.length} dims, not ${model.nativeDims}`,
         );
       }
+      // A NaN or Infinity would normalize into a row that never ranks.
+      if (!v.every((x) => Number.isFinite(x))) {
+        throw new Error(`${model.id} returned a vector with a non-finite component`);
+      }
       cache.set(key, v);
     });
   }

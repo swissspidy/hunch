@@ -99,8 +99,15 @@ export function assertManifest(value: unknown): asserts value is Manifest {
       `Inkling manifest: format version ${m.formatVersion} is not supported (expected ${MANIFEST_FORMAT_VERSION})`,
     );
   }
-  if (typeof m.space !== 'string' || typeof m.dims !== 'number' || !Array.isArray(m.shards)) {
-    throw new TypeError('Inkling manifest: missing space, dims or shards');
+  if (
+    typeof m.space !== 'string' ||
+    typeof m.dims !== 'number' ||
+    typeof m.model !== 'object' ||
+    m.model === null ||
+    !Array.isArray(m.shards) ||
+    !m.shards.every((shard: Partial<ShardRef> | null) => typeof shard?.url === 'string')
+  ) {
+    throw new TypeError('Inkling manifest: missing space, dims, model or shard URLs');
   }
   if (m.quantization !== 'int8' && m.quantization !== 'float32') {
     throw new TypeError(`Inkling manifest: unknown quantization ${JSON.stringify(m.quantization)}`);

@@ -139,6 +139,16 @@ test('"Not interested" hides an item for good; "Forget everything" starts over',
   await page.waitForFunction(() =>
     document.getElementById('status')!.textContent.startsWith('0 signals'),
   );
+  // Without a reload: the refreshed list is the server's again, and so are its reasons.
+  const editorial = (await loadSource('demo/feed.xml')).slice(0, 4).map((item) => item.id);
+  await page.waitForFunction(
+    (ids) =>
+      [...document.querySelectorAll<HTMLElement>('inkling-for-you [data-inkling-slot]')]
+        .map((el) => el.dataset.inklingId)
+        .join() === ids.join(),
+    editorial,
+  );
+  assert.equal(await page.locator('#why-list li').count(), 0);
   await page.reload();
   await ready(page, 'inkling-for-you');
   assert.equal(await page.getAttribute('inkling-for-you', 'data-inkling-personalized'), 'false');
@@ -203,5 +213,31 @@ test('staying on an article records dwell time', async () => {
     weight: number;
   };
   assert.ok(dwell.weight > 0.9 && dwell.weight <= 1.1, String(dwell.weight));
+  await ctx.close();
+});
+
+test('an item hidden before there is a profile leaves the fallback', async () => {
+  const ctx = await context(true);
+  const page = await ctx.newPage();
+  await home(page);
+  const editorial = (await loadSource('demo/feed.xml')).slice(0, 5).map((item) => item.id);
+  // Only a hide: no profile, but the editors' first pick must go.
+  await page.evaluate(async (id) => {
+    const shared = (
+      window as unknown as {
+        Inkling: {
+          shared(m: string): Promise<{ record(k: string, id: string): Promise<boolean> }>;
+        };
+      }
+    ).Inkling.shared;
+    await (await shared(document.body.dataset.manifest!)).record('hide', id);
+  }, editorial[0]!);
+  await page.reload();
+  await ready(page, 'inkling-for-you');
+  assert.equal(await page.getAttribute('inkling-for-you', 'data-inkling-personalized'), 'false');
+  assert.deepEqual(
+    (await slots(page, 'inkling-for-you')).map((s) => s.id),
+    editorial.slice(1),
+  );
   await ctx.close();
 });
