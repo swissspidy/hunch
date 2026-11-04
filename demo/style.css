@@ -1,0 +1,103 @@
+:root {
+  color-scheme: light dark;
+  --fg: #1c1b1a;
+  --muted: #6b6863;
+  --bg: #fbfaf7;
+  --card: #ffffff;
+  --line: #e4e1da;
+  --accent: #3b5bdb;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fg: #ecebe8;
+    --muted: #a19e98;
+    --bg: #161514;
+    --card: #201f1d;
+    --line: #34322f;
+    --accent: #91a7ff;
+  }
+}
+body {
+  margin: 0 auto;
+  max-width: 46rem;
+  padding: 1.5rem 1rem 4rem;
+  color: var(--fg);
+  background: var(--bg);
+}
+a {
+  color: var(--accent);
+}
+h1 {
+  line-height: 1.2;
+}
+.lede,
+.kicker,
+.meta,
+time {
+  color: var(--muted);
+}
+.cards {
+  padding-left: 1.2rem;
+}
+.cards li {
+  margin: 0.3rem 0;
+}
+.cards time {
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+/*
+ * The related list is rewritten in place. Every slot has a fixed height and titles are clamped
+ * to two lines, so swapping one item for another cannot shift the layout (CLS 0).
+ */
+.related {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.related li {
+  box-sizing: border-box;
+  height: 5rem;
+  padding: 0.5rem 0.75rem;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+.related .title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-weight: 600;
+  line-height: 1.35;
+  height: 2.7em;
+}
+.related .meta {
+  display: block;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A brief fade when the ranked items arrive, unless the visitor prefers reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  inkling-related[data-inkling-state='ready'] li {
+    animation: inkling-in 200ms ease-out;
+  }
+  @keyframes inkling-in {
+    from {
+      opacity: 0.4;
+    }
+  }
+}
+.why {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}

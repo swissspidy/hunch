@@ -1,0 +1,36 @@
+# Dependency updates, weekly, grouped, after a week's cooldown: npm for the package and the
+# GitHub Actions the workflows and the local action use.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5
+    groups:
+      # oxlint's type-aware rules come from oxlint-tsgolint: update them together.
+      oxc:
+        patterns: ['oxlint', 'oxlint-tsgolint', 'oxfmt']
+      dependencies:
+        dependency-type: production
+        update-types: [minor, patch]
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # Pinned to the version whose Chromium build the CI cache and the dev container hold;
+      # update it deliberately, with the browser.
+      - dependency-name: playwright-core
+        update-types: [version-update:semver-minor]
+
+  - package-ecosystem: github-actions
+    directories: ['/', '/.github/actions/*']
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ['*']

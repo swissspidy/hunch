@@ -1,0 +1,30 @@
+[
+  {
+    "id": "banana-bread",
+    "url": "/banana-bread",
+    "title": "Banana bread",
+    "text": "Baking a moist banana bread loaf with ripe bananas",
+    "section": "Food"
+  },
+  {
+    "id": "banana-muffins",
+    "url": "/banana-muffins",
+    "title": "Banana muffins",
+    "text": "Baking banana muffins with ripe bananas and walnuts",
+    "section": "Food"
+  },
+  {
+    "id": "trains",
+    "url": "/trains",
+    "title": "Night trains",
+    "text": "Sleeper trains across Europe",
+    "section": "Travel"
+  },
+  {
+    "id": "stars",
+    "url": "/stars",
+    "title": "Stargazing",
+    "text": "Telescopes and dark skies",
+    "section": "Science"
+  }
+]

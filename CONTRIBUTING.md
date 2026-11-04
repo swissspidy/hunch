@@ -1,0 +1,61 @@
+# Contributing to Inkling
+
+Thanks for helping. This page covers setting up a checkout, the checks, and what a pull request
+needs. The reasons behind the design are the [ADRs](docs/adr/README.md). Security reports don't
+go here; see [SECURITY.md](SECURITY.md).
+
+## Setup
+
+Inkling needs Node.js 24 or later. Node runs the TypeScript sources directly, so a checkout needs
+no build:
+
+```sh
+npm ci
+npm test                        # unit tests (no network, no model)
+npm run demo -- --serve         # the demo at http://127.0.0.1:4173/
+node bin/inkling.js --help      # the CLI, from the sources
+```
+
+## Checks
+
+| Command                | What it checks                                                     |
+| ---------------------- | ------------------------------------------------------------------ |
+| `npm run typecheck`    | TypeScript 7 over `src`, `test` and `scripts`                      |
+| `npm run lint`         | oxlint (type-aware) and knip (unused files, exports, dependencies) |
+| `npm run format:check` | oxfmt (`npm run format` fixes it)                                  |
+| `npm test`             | Unit tests in `test/unit`                                          |
+| `npm run size`         | The client's gzipped size against its budget                       |
+| `npm run test:e2e`     | The demo in Chromium: related items, layout shift, requests        |
+| `npm run test:pack`    | The packed package, installed into an empty project                |
+| `npm run bench`        | Shard sizes and ranking time for 10,000 items                      |
+
+The browser tests need Chromium for the installed `playwright-core`:
+`npx playwright-core install chromium` (on Linux, add `install-deps` if it doesn't start).
+
+**The client stays dependency-free and Node-free.** oxlint rejects `node:*` and build-step
+imports under `src/format`, `src/rank`, `src/client` and `src/elements`.
+
+## The demo's embeddings
+
+`demo/inkling-cache/` holds the demo's EmbeddingGemma vectors, so CI builds the demo without the
+model. If you change `demo/feed.xml`, rebuild the cache with the model and commit it:
+
+```sh
+npm install --no-save @huggingface/transformers
+npm run demo
+```
+
+## Pull requests
+
+- **Add a changeset** (`npm run changeset`) when the package's behaviour changes. While the
+  version is 0.x, a breaking change is a minor bump.
+- **Record decisions.** A change to the manifest or shard format, the signal schema or the
+  ranking function amends [ADR 0001](docs/adr/0001-format-signals-ranking.md) or adds an ADR,
+  with its row in [`docs/adr/README.md`](docs/adr/README.md).
+
+## Releases
+
+Merging the "Version packages" pull request that Changesets keeps open releases a version. CI
+stages it on npm with trusted publishing, a maintainer approves the staged version with 2FA, and
+the workflow tags it and creates its GitHub release
+([ADR 0002](docs/adr/0002-tooling-and-releases.md)).

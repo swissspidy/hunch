@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Field Notes</title>
+    <link>https://example.com/</link>
+    <description>A demo publication for Inkling. Every article here is fictional.</description>
+    <item>
+      <title>Keeping a sourdough starter alive through the summer</title>
+      <link>https://example.com/food/sourdough-starter/</link>
+      <guid isPermaLink="false">sourdough-starter</guid>
+      <category>Food</category>
+      <pubDate>Fri, 30 Oct 2026 08:00:00 +0000</pubDate>
+      <description>Warm kitchens make wild yeast and lactic acid bacteria run fast. Feed your starter more often, use cooler water, and keep a dried backup in the cupboard so a hot week never ends your bread baking.</description>
+    </item>
+    <item>
+      <title>Reading the air of planets around other stars</title>
+      <link>https://example.com/science/exoplanet-atmospheres/</link>
+      <guid isPermaLink="false">exoplanet-atmospheres</guid>
+      <category>Science</category>
+      <pubDate>Tue, 27 Oct 2026 07:00:00 +0000</pubDate>
+      <description>When an exoplanet passes in front of its star, starlight filters through its atmosphere. Space telescopes split that light into spectra that reveal water vapour, carbon dioxide and methane.</description>
+    </item>
+    <item>
+      <title>Compiling Rust to WebAssembly for the browser</title>
+      <link>https://example.com/technology/rust-webassembly/</link>
+      <guid isPermaLink="false">rust-webassembly</guid>
+      <category>Technology</category>
+      <pubDate>Sat, 24 Oct 2026 06:00:00 +0000</pubDate>
+      <description>With wasm-bindgen and a small build step, Rust code runs in the browser at near-native speed. We port an image filter and compare it with plain JavaScript.</description>
+    </item>
+    <item>
+      <title>Crossing the Alps by night train</title>
+      <link>https://example.com/travel/night-train-alps/</link>
+      <guid isPermaLink="false">night-train-alps</guid>
+      <category>Travel</category>
+      <pubDate>Wed, 21 Oct 2026 05:00:00 +0000</pubDate>
+      <description>A sleeper train leaves Zurich after dinner and arrives in Vienna for breakfast. We compare couchettes and private cabins and what to pack for a comfortable night on the rails.</description>
+    </item>
+    <item>
+      <title>Shaping baguettes without a couche</title>
+      <link>https://example.com/food/baguette-shaping/</link>
+      <guid isPermaLink="false">baguette-shaping</guid>
+      <category>Food</category>
+      <pubDate>Sun, 18 Oct 2026 04:00:00 +0000</pubDate>
+      <description>A rolled kitchen towel dusted with rice flour holds the dough's shape just as well as a linen couche. We walk through pre-shaping, the final roll and scoring the loaves before they go into a steamy oven.</description>
+    </item>
+    <item>
+      <title>Why dark sky reserves matter for astronomy</title>
+      <link>https://example.com/science/dark-sky-reserves/</link>
+      <guid isPermaLink="false">dark-sky-reserves</guid>
+      <category>Science</category>
+      <pubDate>Thu, 15 Oct 2026 03:00:00 +0000</pubDate>
+      <description>Light pollution hides the Milky Way from most people on Earth. Dark sky reserves limit outdoor lighting so astronomers and stargazers can still see faint galaxies and meteor showers.</description>
+    </item>
+    <item>
+      <title>Web components that render on the server first</title>
+      <link>https://example.com/technology/web-components/</link>
+      <guid isPermaLink="false">web-components</guid>
+      <category>Technology</category>
+      <pubDate>Mon, 12 Oct 2026 02:00:00 +0000</pubDate>
+      <description>Declarative shadow DOM lets a custom element arrive fully rendered in the HTML. The JavaScript only upgrades it, so the page shows content before any script runs.</description>
+    </item>
+    <item>
+      <title>Eating your way through Lisbon</title>
+      <link>https://example.com/travel/lisbon-food/</link>
+      <guid isPermaLink="false">lisbon-food</guid>
+      <category>Travel</category>
+      <pubDate>Fri, 09 Oct 2026 01:00:00 +0000</pubDate>
+      <description>Custard tarts warm from the oven, grilled sardines and tiny neighbourhood tascas. A walking route through Lisbon's old quarters, planned around the best food stops.</description>
+    </item>
+    <item>
+      <title>Fresh egg pasta with only a fork and a rolling pin</title>
+      <link>https://example.com/food/fresh-pasta/</link>
+      <guid isPermaLink="false">fresh-pasta</guid>
+      <category>Food</category>
+      <pubDate>Tue, 06 Oct 2026 00:00:00 +0000</pubDate>
+      <description>Semolina, eggs and a pinch of salt become silky tagliatelle. Knead until the dough is smooth, rest it under a bowl, then roll it thin enough to read a newspaper through.</description>
+    </item>
+    <item>
+      <title>What happens inside a coral during a marine heatwave</title>
+      <link>https://example.com/science/coral-bleaching/</link>
+      <guid isPermaLink="false">coral-bleaching</guid>
+      <category>Science</category>
+      <pubDate>Fri, 02 Oct 2026 23:00:00 +0000</pubDate>
+      <description>Corals expel the symbiotic algae that feed them when ocean water stays too warm. Reefs can recover if the heat passes quickly, but repeated bleaching events leave them starving.</description>
+    </item>
+    <item>
+      <title>Running machine learning models on the device</title>
+      <link>https://example.com/technology/on-device-ml/</link>
+      <guid isPermaLink="false">on-device-ml</guid>
+      <category>Technology</category>
+      <pubDate>Tue, 29 Sep 2026 22:00:00 +0000</pubDate>
+      <description>Small quantized models now run in the browser and on phones. On-device inference keeps personal data local, works offline and avoids server costs.</description>
+    </item>
+    <item>
+      <title>Driving Iceland's ring road in winter</title>
+      <link>https://example.com/travel/iceland-ring-road/</link>
+      <guid isPermaLink="false">iceland-ring-road</guid>
+      <category>Travel</category>
+      <pubDate>Sat, 26 Sep 2026 21:00:00 +0000</pubDate>
+      <description>Short days, icy roads and the chance of northern lights. How to plan a winter road trip around Iceland, from rental cars to weather apps and glacier hikes.</description>
+    </item>
+    <item>
+      <title>Cold brew coffee at home, and why grind size matters</title>
+      <link>https://example.com/food/cold-brew/</link>
+      <guid isPermaLink="false">cold-brew</guid>
+      <category>Food</category>
+      <pubDate>Wed, 23 Sep 2026 20:00:00 +0000</pubDate>
+      <description>Steeping coarse ground coffee in cold water for sixteen hours gives a sweet, low-acid concentrate. Grind too fine and the brew turns muddy and bitter; filter twice for a clean cup.</description>
+    </item>
+    <item>
+      <title>Life without sunlight at deep sea hydrothermal vents</title>
+      <link>https://example.com/science/deep-sea-vents/</link>
+      <guid isPermaLink="false">deep-sea-vents</guid>
+      <category>Science</category>
+      <pubDate>Sun, 20 Sep 2026 19:00:00 +0000</pubDate>
+      <description>Microbes at hot vents on the ocean floor turn hydrogen sulfide into energy. Tube worms, shrimp and crabs build whole ecosystems on that chemistry, far from any sunlight.</description>
+    </item>
+    <item>
+      <title>Stopping layout shift with modern CSS</title>
+      <link>https://example.com/technology/css-layout-shift/</link>
+      <guid isPermaLink="false">css-layout-shift</guid>
+      <category>Technology</category>
+      <pubDate>Thu, 17 Sep 2026 18:00:00 +0000</pubDate>
+      <description>Reserve space with aspect-ratio, size-adjusted fallback fonts and fixed slots for late content. Cumulative layout shift drops to zero and pages stop jumping under the reader's thumb.</description>
+    </item>
+    <item>
+      <title>Kyoto's quiet temples away from the crowds</title>
+      <link>https://example.com/travel/kyoto-temples/</link>
+      <guid isPermaLink="false">kyoto-temples</guid>
+      <category>Travel</category>
+      <pubDate>Mon, 14 Sep 2026 17:00:00 +0000</pubDate>
+      <description>Skip the busiest shrines at noon and visit moss gardens and mountain temples early in the morning, when the paths are empty and the light is soft.</description>
+    </item>
+    <item>
+      <title>A fermented chili hot sauce for beginners</title>
+      <link>https://example.com/food/fermented-hot-sauce/</link>
+      <guid isPermaLink="false">fermented-hot-sauce</guid>
+      <category>Food</category>
+      <pubDate>Fri, 11 Sep 2026 16:00:00 +0000</pubDate>
+      <description>Salt brine, garlic and fresh chilies sit in a jar for two weeks while lactic acid fermentation builds a deep, tangy heat. Blend, strain and bottle; it keeps for months in the fridge.</description>
+    </item>
+    <item>
+      <title>Gene editing crops to survive drought</title>
+      <link>https://example.com/science/crispr-crops/</link>
+      <guid isPermaLink="false">crispr-crops</guid>
+      <category>Science</category>
+      <pubDate>Tue, 08 Sep 2026 15:00:00 +0000</pubDate>
+      <description>CRISPR lets plant geneticists switch off single genes that make wheat and rice lose water. Field trials show edited crops holding their yield through dry seasons.</description>
+    </item>
+    <item>
+      <title>Website analytics without tracking visitors</title>
+      <link>https://example.com/technology/privacy-analytics/</link>
+      <guid isPermaLink="false">privacy-analytics</guid>
+      <category>Technology</category>
+      <pubDate>Sat, 05 Sep 2026 14:00:00 +0000</pubDate>
+      <description>Aggregate counts, no cookies and no cross-site identifiers can still tell you which pages people read. We compare privacy-preserving analytics tools and what they give up.</description>
+    </item>
+    <item>
+      <title>Seeing Europe by rail on a budget</title>
+      <link>https://example.com/travel/budget-rail-europe/</link>
+      <guid isPermaLink="false">budget-rail-europe</guid>
+      <category>Travel</category>
+      <pubDate>Wed, 02 Sep 2026 13:00:00 +0000</pubDate>
+      <description>Rail passes, regional trains and booking early keep costs down. A three-week route connects Amsterdam, Berlin, Prague, Vienna and Venice without a single flight.</description>
+    </item>
+    <item>
+      <title>Five winter soups built on one vegetable stock</title>
+      <link>https://example.com/food/winter-soups/</link>
+      <guid isPermaLink="false">winter-soups</guid>
+      <category>Food</category>
+      <pubDate>Sun, 30 Aug 2026 12:00:00 +0000</pubDate>
+      <description>Roast onions, carrots and celery, simmer them with herbs, and you have the base for lentil, barley, potato-leek, mushroom and white bean soups all season long.</description>
+    </item>
+    <item>
+      <title>The chemistry of roasting coffee beans</title>
+      <link>https://example.com/science/coffee-chemistry/</link>
+      <guid isPermaLink="false">coffee-chemistry</guid>
+      <category>Science</category>
+      <pubDate>Thu, 27 Aug 2026 11:00:00 +0000</pubDate>
+      <description>Inside a roaster, Maillard reactions and caramelization create hundreds of aroma compounds. Light roasts keep more acidity and fruit; dark roasts trade them for bitterness and body.</description>
+    </item>
+    <item>
+      <title>SQLite is everywhere, including your browser</title>
+      <link>https://example.com/technology/sqlite-everywhere/</link>
+      <guid isPermaLink="false">sqlite-everywhere</guid>
+      <category>Technology</category>
+      <pubDate>Mon, 24 Aug 2026 10:00:00 +0000</pubDate>
+      <description>SQLite compiled to WebAssembly with the origin private file system gives web apps a real relational database that persists locally and works offline.</description>
+    </item>
+    <item>
+      <title>Hut-to-hut hiking in the Dolomites</title>
+      <link>https://example.com/travel/hiking-dolomites/</link>
+      <guid isPermaLink="false">hiking-dolomites</guid>
+      <category>Travel</category>
+      <pubDate>Fri, 21 Aug 2026 09:00:00 +0000</pubDate>
+      <description>The Alta Via trails link mountain huts with hearty dinners and dormitory beds. Plan a week of hiking among limestone peaks, with tips on booking huts and packing light.</description>
+    </item>
+    <item>
+      <title>Knife skills that make weeknight cooking faster</title>
+      <link>https://example.com/food/knife-skills/</link>
+      <guid isPermaLink="false">knife-skills</guid>
+      <category>Food</category>
+      <pubDate>Tue, 18 Aug 2026 08:00:00 +0000</pubDate>
+      <description>Hold the blade with a pinch grip, curl your guiding fingers, and let the knife rock. Dicing onions, julienning carrots and mincing herbs become quick and safe.</description>
+    </item>
+    <item>
+      <title>Measuring glacier retreat with satellites and old photographs</title>
+      <link>https://example.com/science/glacier-retreat/</link>
+      <guid isPermaLink="false">glacier-retreat</guid>
+      <category>Science</category>
+      <pubDate>Sat, 15 Aug 2026 07:00:00 +0000</pubDate>
+      <description>Comparing satellite images with century-old expedition photographs shows how far alpine glaciers have retreated as the climate warms, and how fast meltwater is rising.</description>
+    </item>
+    <item>
+      <title>Vector search explained with embeddings</title>
+      <link>https://example.com/technology/vector-search/</link>
+      <guid isPermaLink="false">vector-search</guid>
+      <category>Technology</category>
+      <pubDate>Wed, 12 Aug 2026 06:00:00 +0000</pubDate>
+      <description>An embedding model turns text into vectors so that similar meanings sit close together. Cosine similarity and approximate nearest neighbour indexes find related documents fast.</description>
+    </item>
+    <item>
+      <title>A night of street food in Bangkok</title>
+      <link>https://example.com/travel/street-food-bangkok/</link>
+      <guid isPermaLink="false">street-food-bangkok</guid>
+      <category>Travel</category>
+      <pubDate>Sun, 09 Aug 2026 05:00:00 +0000</pubDate>
+      <description>Boat noodles, grilled pork skewers and mango sticky rice. Where to find Bangkok's best night markets and how to order when you do not speak Thai.</description>
+    </item>
+    <item>
+      <title>Dense, dark rye bread the Nordic way</title>
+      <link>https://example.com/food/rye-bread/</link>
+      <guid isPermaLink="false">rye-bread</guid>
+      <category>Food</category>
+      <pubDate>Thu, 06 Aug 2026 04:00:00 +0000</pubDate>
+      <description>Rye flour has little gluten, so the loaf relies on a sour starter, cracked grains and a long, slow bake in a tin. Wait a full day before slicing for the best crumb.</description>
+    </item>
+    <item>
+      <title>A field guide to this year's meteor showers</title>
+      <link>https://example.com/science/meteor-showers/</link>
+      <guid isPermaLink="false">meteor-showers</guid>
+      <category>Science</category>
+      <pubDate>Mon, 03 Aug 2026 03:00:00 +0000</pubDate>
+      <description>The Perseids, Geminids and Quadrantids peak on predictable nights. Find a dark site away from city lights, let your eyes adapt for twenty minutes and look up.</description>
+    </item>
+    <item>
+      <title>Building a quiet mechanical keyboard</title>
+      <link>https://example.com/technology/mechanical-keyboards/</link>
+      <guid isPermaLink="false">mechanical-keyboards</guid>
+      <category>Technology</category>
+      <pubDate>Fri, 31 Jul 2026 02:00:00 +0000</pubDate>
+      <description>Lubed linear switches, foam dampening and a gasket-mounted plate turn a clacky keyboard into a soft, quiet one that still feels great to type on.</description>
+    </item>
+    <item>
+      <title>Stargazing in the Atacama desert</title>
+      <link>https://example.com/travel/stargazing-atacama/</link>
+      <guid isPermaLink="false">stargazing-atacama</guid>
+      <category>Travel</category>
+      <pubDate>Tue, 28 Jul 2026 01:00:00 +0000</pubDate>
+      <description>The driest desert on Earth has some of the clearest skies anywhere. Observatories and dark sky tours let travellers see the Milky Way and distant galaxies with their own eyes.</description>
+    </item>
+  </channel>
+</rss>
