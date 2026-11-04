@@ -26,7 +26,8 @@ popularity's, or if any ranking differs after a model switch.
 
 **Model switch:** signals recorded on model A's catalog and then ranked on model B's gave the same
 ranking as a fresh profile on model B in **1,230 of 1,230** impressions. The device stores only
-item ids, so there is nothing to migrate. After a switch, quality is the new model's own (B is
+signals (item id, kind, weight and time), never vectors or a profile, so there is nothing to
+migrate. After a switch, quality is the new model's own (B is
 the noisier model here), not a degraded version of it.
 
 ## MIND small
@@ -36,7 +37,7 @@ average of 37 shown items each. The catalog is the 13,965 articles they show or 
 histories, embedded from title and abstract. Popularity counts the clicks of the days before
 (the training impressions). Most of the day's articles are new, so popularity knows little
 about them. Raw numbers:
-[`eval/results/mind-hash-embeddinggemma-300m-ONNX.json`](../eval/results/mind-hash-embeddinggemma-300m-ONNX.json).
+[`eval/results/mind-hash-256-embeddinggemma-300m-ONNX-256.json`](../eval/results/mind-hash-256-embeddinggemma-300m-ONNX-256.json).
 
 | Ranker                                           | AUC       | MRR       | nDCG@5    | nDCG@10   | Recall@10 |
 | ------------------------------------------------ | --------- | --------- | --------- | --------- | --------- |

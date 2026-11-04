@@ -5,7 +5,7 @@
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { CatalogItem } from '../types.ts';
 import { parseFeed } from './feed.ts';
 import { normalizeItem, parseJsonCatalog } from './json.ts';
@@ -44,7 +44,13 @@ export async function loadSource(
       const base = remote ? source : pathToFileURL(resolve(source)).href;
       return loadSitemap(base, {
         limit: options.limit,
-        fetchText: (url) => (url === base ? Promise.resolve(body) : fetchText(url)),
+        fetchText: (url) =>
+          url === base
+            ? Promise.resolve(body)
+            : // A local sitemap may name local files; fetch() cannot read file: URLs.
+              url.startsWith('file:')
+              ? readFile(fileURLToPath(url), 'utf8')
+              : fetchText(url),
       });
     }
     case 'module':

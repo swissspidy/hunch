@@ -61,8 +61,43 @@ test('bad input is rejected', () => {
     () => encodeShard({ space: 's', items }, [vectors[0]!], 5, 'int8'),
     /2 items but 1 vectors/,
   );
+  for (const header of ['null', '{}', '{"items":[]}', '{"space":"s"}']) {
+    assert.throws(
+      () => decodeShard(withHeader(header)),
+      /needs a string space and an items array/,
+      header,
+    );
+  }
 });
+
+/** A shard with no vectors and the given raw JSON header. */
+function withHeader(json: string): ArrayBuffer {
+  const text = new TextEncoder().encode(json);
+  const out = new Uint8Array(20 + text.length + 3);
+  const view = new DataView(out.buffer);
+  view.setUint32(0, 0x564b4e49, true);
+  view.setUint8(4, 1);
+  view.setUint8(5, 1);
+  view.setUint32(8, 4, true);
+  view.setUint32(12, 0, true);
+  view.setUint32(16, text.length, true);
+  out.set(text, 20);
+  return out.buffer;
+}
 
 function copy(bytes: Uint8Array): ArrayBuffer {
   return bytes.slice().buffer;
 }
+
+test('the JavaScript SHA-256 matches node:crypto', async () => {
+  const { createHash } = await import('node:crypto');
+  const { sha256Hex } = await import('../../src/format/sha256.ts');
+  for (const length of [0, 1, 55, 56, 63, 64, 65, 1000, 70_000]) {
+    const bytes = Uint8Array.from({ length }, (_, i) => (i * 31 + length) & 0xff);
+    assert.equal(
+      sha256Hex(bytes),
+      createHash('sha256').update(bytes).digest('hex'),
+      `length ${length}`,
+    );
+  }
+});

@@ -20,8 +20,13 @@ export interface SitemapOptions {
 }
 
 export async function loadSitemap(url: string, options: SitemapOptions): Promise<CatalogItem[]> {
-  const pages = await sitemapUrls(url, options.fetchText, new Set());
-  const selected = options.limit ? pages.slice(0, options.limit) : pages;
+  const concurrency = options.concurrency ?? 4;
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    throw new RangeError(`concurrency must be a positive integer, not ${concurrency}`);
+  }
+  const limit = options.limit ?? Infinity;
+  const pages = await sitemapUrls(url, options.fetchText, new Set(), limit);
+  const selected = pages.slice(0, limit);
   const items: CatalogItem[] = new Array(selected.length);
   let next = 0;
   const worker = async (): Promise<void> => {
@@ -31,7 +36,7 @@ export async function loadSitemap(url: string, options: SitemapOptions): Promise
       items[i] = parsePage(page.loc, await options.fetchText(page.loc), page.lastmod);
     }
   };
-  await Promise.all(Array.from({ length: options.concurrency ?? 4 }, worker));
+  await Promise.all(Array.from({ length: concurrency }, worker));
   return items;
 }
 
@@ -39,8 +44,9 @@ async function sitemapUrls(
   url: string,
   fetchText: (url: string) => Promise<string>,
   seen: Set<string>,
+  limit: number,
 ): Promise<{ loc: string; lastmod?: string }[]> {
-  if (seen.has(url)) return [];
+  if (seen.has(url) || limit <= 0) return [];
   seen.add(url);
   const doc = new XMLParser({ isArray: (name) => name === 'url' || name === 'sitemap' }).parse(
     await fetchText(url),
@@ -48,9 +54,13 @@ async function sitemapUrls(
   const index = doc.sitemapindex as Node | undefined;
   if (index) {
     const nested = ((index.sitemap as Node[] | undefined) ?? []).map((s) => String(s.loc));
-    const lists = [];
-    for (const loc of nested) lists.push(await sitemapUrls(loc, fetchText, seen));
-    return lists.flat();
+    const found: { loc: string; lastmod?: string }[] = [];
+    // Stop fetching child sitemaps once the limit is met.
+    for (const loc of nested) {
+      if (found.length >= limit) break;
+      found.push(...(await sitemapUrls(loc, fetchText, seen, limit - found.length)));
+    }
+    return found;
   }
   const set = doc.urlset as Node | undefined;
   if (!set) throw new Error(`${url} is not a sitemap`);
@@ -81,7 +91,8 @@ export function parsePage(url: string, html: string, lastmod?: string): CatalogI
     html;
   const date = meta('article:published_time') ?? lastmod;
   return compact({
-    id: new URL(url).pathname,
+    // The full URL, like feeds' links: pages that differ only in their query are different items.
+    id: url,
     url,
     title: title || url,
     text: htmlToText(body),

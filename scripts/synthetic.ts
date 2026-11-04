@@ -19,6 +19,11 @@ export async function syntheticCatalog(
   sections: number,
   quantization: Quantization,
 ): Promise<SyntheticCatalog> {
+  for (const [name, value] of Object.entries({ count, dims, sections })) {
+    if (!Number.isInteger(value) || value < 1) {
+      throw new RangeError(`${name} must be a positive integer, not ${value}`);
+    }
+  }
   let seed = 42;
   const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32) * 2 - 1;
   const files = new Map<string, Uint8Array<ArrayBuffer>>();

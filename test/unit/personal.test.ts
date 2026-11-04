@@ -135,6 +135,8 @@ test('pause, resume, forget and export', async () => {
   await ink.resume();
   assert.equal(await ink.record('dwell', 'bread-1', { seconds: 30 }), true);
   assert.equal(await ink.record('dwell', 'bread-2', { seconds: 5 }), false);
+  assert.equal(await ink.record('dwell', 'bread-2', { seconds: Number.NaN }), false);
+  assert.equal(await ink.record('nope' as 'view', 'bread-2'), false);
   const exported = await ink.export();
   assert.equal(exported.format, 'inkling/signals');
   assert.deepEqual(

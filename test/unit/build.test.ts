@@ -164,6 +164,10 @@ test('splits large sections and checks its input', async () => {
   );
   assert.match(result.manifest.shards[2]!.url, /^shards\/s-3\./);
   await assert.rejects(
+    build({ items, outDir: out, provider: countingProvider(), cacheDir: false, maxShardItems: 0 }),
+    /maxShardItems must be a positive integer/,
+  );
+  await assert.rejects(
     build({ items: [], outDir: out, provider: countingProvider(), cacheDir: false }),
     /empty/,
   );

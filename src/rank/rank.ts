@@ -136,6 +136,8 @@ export function recency(date: string | undefined, now: number, halfLifeDays: num
   const t = Date.parse(date);
   if (Number.isNaN(t)) return 0;
   const ageDays = Math.max(0, now - t) / 86_400_000;
+  // Before dividing: a half-life of 0 would make 0 / 0.
+  if (ageDays === 0) return 1;
   return Math.pow(0.5, ageDays / halfLifeDays);
 }
 

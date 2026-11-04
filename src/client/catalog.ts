@@ -11,6 +11,7 @@ import {
   type ShardItem,
   type ShardRef,
 } from '../format/manifest.ts';
+import { sha256Hex } from '../format/sha256.ts';
 import { decodeShard, type DecodedShard } from '../format/shard.ts';
 import { dotRow } from '../rank/vector.ts';
 
@@ -129,11 +130,16 @@ export class Catalog {
 
 async function verify(buffer: ArrayBuffer, ref: ShardRef, url: URL): Promise<void> {
   const subtle = globalThis.crypto?.subtle;
-  // Without SubtleCrypto (insecure contexts) the space check below still applies.
-  if (!subtle) return;
-  const digest = new Uint8Array(await subtle.digest('SHA-256', buffer));
-  let hex = '';
-  for (const byte of digest) hex += byte.toString(16).padStart(2, '0');
+  let hex: string;
+  if (subtle) {
+    hex = '';
+    for (const byte of new Uint8Array(await subtle.digest('SHA-256', buffer))) {
+      hex += byte.toString(16).padStart(2, '0');
+    }
+  } else {
+    // SubtleCrypto is only exposed in secure contexts: plain-HTTP sites get the JS fallback.
+    hex = sha256Hex(new Uint8Array(buffer));
+  }
   if (hex !== ref.sha256)
     throw new Error(`Inkling: shard ${url} does not match the manifest's hash`);
 }

@@ -99,6 +99,8 @@ test('recency halves every half-life', () => {
   assert.equal(recency(undefined, now, 30), 0);
   assert.equal(recency('not a date', now, 30), 0);
   assert.equal(recency('2027-01-01T00:00:00Z', now, 30), 1);
+  // A half-life of 0: no 0 / 0 for items dated now.
+  assert.equal(recency('2026-01-31T00:00:00Z', now, 0), 1);
 });
 
 test('n of 0 or no candidates give nothing', () => {
@@ -118,4 +120,19 @@ test('n of 0 or no candidates give nothing', () => {
     ),
     [],
   );
+});
+
+test('redundancy is rescaled linearly, not thresholded', () => {
+  // The query band is 0.5..0.9; candidate 2 has a cosine of 0.7 to the first pick.
+  const pair = (i: number, j: number) => (i + j === 2 && i !== j ? 0.7 : 0.5);
+  const ranked = rank([0, 1, 2], input([0.9, 0.5, 0.85], pair), {
+    ...options,
+    n: 2,
+    diversity: 0.3,
+  });
+  assert.deepEqual(
+    ranked.map((r) => r.index),
+    [0, 2],
+  );
+  assert.ok(Math.abs(ranked[1]!.redundancy - 0.5) < 1e-9, String(ranked[1]!.redundancy));
 });

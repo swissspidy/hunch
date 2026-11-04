@@ -262,7 +262,8 @@ export class Inkling {
     options: { seconds?: number } = {},
   ): Promise<boolean> {
     const weight = kind === 'dwell' ? dwellWeight(options.seconds ?? 0) : SIGNAL_WEIGHTS[kind];
-    if (weight === 0) return false;
+    // An unknown kind or a NaN duration would poison the profile's sums.
+    if (!Number.isFinite(weight) || weight === 0) return false;
     return this.write({ itemId, kind, weight, at: this.now() });
   }
 

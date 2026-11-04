@@ -88,7 +88,7 @@ const popularity = new Map(dataset.items.map((item) => [item.id, item.popularity
 rows.push({
   ranker: 'popularity',
   metrics: evaluate(dataset.impressions, (imp) =>
-    [...imp.candidates].sort((a, b) => popularity.get(b)! - popularity.get(a)!),
+    [...imp.candidates].sort((a, b) => (popularity.get(b) ?? 0) - (popularity.get(a) ?? 0)),
   ),
 });
 
@@ -100,6 +100,10 @@ for (const model of models) {
     model.provider.model.id.replace(/[^\w.-]+/g, '_'),
     String(model.dims),
   );
+  // Two selections of one space would make the model-switch check compare a catalog with itself.
+  if (catalogs.some((c) => c.dir === dir)) {
+    throw new Error(`${model.name} is the same embedding space as another of --models`);
+  }
   const started = performance.now();
   const result = await build({
     items: dataset.items,
@@ -147,7 +151,7 @@ console.log(`\n${dataset.name}, ${dataset.impressions.length} impressions\n\n${t
 await mkdir(values.out, { recursive: true });
 const name =
   values.dataset === 'mind'
-    ? `mind-${models.map((m) => m.provider.model.id.split('/').pop()).join('-')}`
+    ? `mind-${models.map((m) => `${m.provider.model.id.split('/').pop()}-${m.dims}`).join('-')}`
     : slug;
 await writeFile(
   join(values.out, `${name}.json`),

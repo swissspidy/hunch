@@ -71,6 +71,10 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       `warning: ${model.id} was trained for ${provider.matryoshkaDims.join('/')} dims, not ${dims}`,
     );
   }
+  const maxItems = options.maxShardItems ?? 2000;
+  if (!Number.isInteger(maxItems) || maxItems < 1) {
+    throw new RangeError(`maxShardItems must be a positive integer, not ${maxItems}`);
+  }
   const items = checkItems(options.items);
   const space = spaceKey(model, dims);
 
@@ -111,7 +115,6 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
     if (!group) groups.set(section, (group = []));
     group.push(i);
   });
-  const maxItems = options.maxShardItems ?? 2000;
   const shardDir = join(outDir, 'shards');
   await mkdir(shardDir, { recursive: true });
   const shards: ShardRef[] = [];
@@ -218,7 +221,7 @@ export function computePriors(items: readonly CatalogItem[]): number[] {
     return a - b;
   });
   const priors = new Array<number>(items.length);
-  order.forEach((index, rank) => (priors[index] = round((items.length - rank) / items.length)));
+  order.forEach((index, rank) => (priors[index] = (items.length - rank) / items.length));
   return priors;
 }
 
@@ -251,8 +254,4 @@ function slug(text: string): string {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '') || 'section'
   );
-}
-
-function round(n: number): number {
-  return Math.round(n * 1e4) / 1e4;
 }

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
 import type { BrowserContext, Page } from 'playwright-core';
+import { loadSource } from '../../src/node/sources/index.ts';
 import {
   DESKTOP,
   layoutShift,
@@ -61,13 +62,12 @@ test('without consent nothing is stored and "for you" is the editors’ order', 
   await page.click('[data-signal="follow"]');
   assert.match((await page.locator('#feedback').textContent()) ?? '', /Turn on personalization/);
   await home(page);
-  const fallback = await page.$$eval('inkling-for-you [data-inkling-slot]', (els) =>
-    els.map((el) => (el as HTMLElement).dataset.inklingId),
-  );
   assert.equal(await page.getAttribute('inkling-for-you', 'data-inkling-personalized'), 'false');
+  // The editors' order: the feed's first items, as the demo renders them (scripts/demo.ts).
+  const editorial = (await loadSource('demo/feed.xml')).slice(0, 4).map((item) => item.id);
   assert.deepEqual(
     (await slots(page, 'inkling-for-you')).map((s) => s.id),
-    fallback,
+    editorial,
   );
   // Not even an empty database was created.
   assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);
@@ -120,6 +120,20 @@ test('"Not interested" hides an item for good; "Forget everything" starts over',
   await home(page);
   // The hidden item is gone, and so is the visit to it (seen items are not recommended).
   assert.ok(!(await slots(page, 'inkling-for-you')).some((r) => r.id === first));
+  // Hidden even where seen items are allowed: the hide signal, not the view, keeps it out.
+  const withSeen = await page.evaluate(async () => {
+    const shared = (
+      window as unknown as {
+        Inkling: {
+          shared(m: string): Promise<{ recommend(o: object): Promise<{ id: string }[]> }>;
+        };
+      }
+    ).Inkling.shared;
+    const inkling = await shared(document.body.dataset.manifest!);
+    return (await inkling.recommend({ n: 40, includeSeen: true })).map((r) => r.id);
+  });
+  assert.ok(withSeen.length > 20);
+  assert.ok(!withSeen.includes(first), `${first} came back with includeSeen`);
 
   await page.click('#forget');
   await page.waitForFunction(() =>

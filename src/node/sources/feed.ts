@@ -1,4 +1,4 @@
-/** RSS 2.0 and Atom 1.0 feeds. */
+/** RSS 2.0, RSS 1.0 (RDF) and Atom 1.0 feeds. */
 
 import { XMLParser } from 'fast-xml-parser';
 import { htmlToText, decodeEntities } from '../text.ts';
@@ -23,6 +23,9 @@ export function parseFeed(xml: string): CatalogItem[] {
     const channel = rss.channel as Node | undefined;
     return ((channel?.item as Node[] | undefined) ?? []).map(rssItem);
   }
+  // RSS 1.0: the items are siblings of the channel, under rdf:RDF.
+  const rdf = doc['rdf:RDF'] as Node | undefined;
+  if (rdf) return ((rdf.item as Node[] | undefined) ?? []).map(rssItem);
   const feed = doc.feed as Node | undefined;
   if (feed) return ((feed.entry as Node[] | undefined) ?? []).map(atomEntry);
   throw new Error('Not an RSS or Atom feed');
@@ -31,13 +34,18 @@ export function parseFeed(xml: string): CatalogItem[] {
 function rssItem(item: Node, index: number): CatalogItem {
   const link = text(first(item.link));
   const guid = text(item.guid);
-  const id = guid || link;
+  const id = guid || link || attr(item, 'rdf:about');
   if (!id) throw new Error(`Feed item ${index + 1} has neither guid nor link`);
+  // A guid is a link only when it says so (isPermaLink defaults to true) and looks like one.
+  const permalink =
+    attr(item.guid, 'isPermaLink') !== 'false' && /^https?:\/\//i.test(guid) ? guid : '';
+  const url = link || permalink || attr(item, 'rdf:about');
+  if (!url) throw new Error(`Feed item ${index + 1} (${id}) has no link`);
   const categories = ((item.category as unknown[] | undefined) ?? []).map(text).filter(Boolean);
   const body = text(item['content:encoded']) || text(item.description);
   return compact({
     id,
-    url: link || guid,
+    url,
     title: decodeEntities(htmlToText(text(item.title))),
     text: htmlToText(decodeEntities(body)),
     section: categories[0],

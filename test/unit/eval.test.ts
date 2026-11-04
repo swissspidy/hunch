@@ -23,6 +23,7 @@ test('synthetic evaluation: beats popularity, and a model switch loses nothing',
   const result = JSON.parse(await readFile(join(out, 'synthetic.json'), 'utf8')) as {
     rows: { ranker: string; metrics: { ndcg10: number; auc: number } }[];
     modelSwitch: { identical: number; total: number };
+    impressions: number;
   };
   const row = (prefix: string) => result.rows.find((r) => r.ranker.startsWith(prefix))!.metrics;
   const popularity = row('popularity');
@@ -31,5 +32,7 @@ test('synthetic evaluation: beats popularity, and a model switch loses nothing',
   assert.ok(inkling.ndcg10 > popularity.ndcg10 + 0.2, `${inkling.ndcg10} vs ${popularity.ndcg10}`);
   assert.ok(afterSwitch.ndcg10 > popularity.ndcg10 + 0.2);
   assert.ok(row('random').auc > 0.45 && row('random').auc < 0.55);
+  assert.ok(result.impressions > 1000);
+  assert.equal(result.modelSwitch.total, result.impressions);
   assert.equal(result.modelSwitch.identical, result.modelSwitch.total);
 });

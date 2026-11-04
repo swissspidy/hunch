@@ -111,3 +111,39 @@ void InklingRelatedElement;
     { cwd: project },
   );
 });
+
+test('the browser entry points typecheck without Node.js types', async () => {
+  await writeFile(
+    join(project, 'check-browser.ts'),
+    `import { Inkling } from '@swissspidy/inkling';
+import { InklingRelatedElement } from '@swissspidy/inkling/elements';
+import { decodeShard, encodeShard } from '@swissspidy/inkling/format';
+void Inkling;
+void InklingRelatedElement;
+void decodeShard;
+void encodeShard;
+`,
+  );
+  await writeFile(
+    join(project, 'tsconfig.browser.json'),
+    JSON.stringify({
+      compilerOptions: {
+        noEmit: true,
+        strict: true,
+        module: 'nodenext',
+        target: 'es2022',
+        lib: ['es2024', 'dom'],
+        // No ambient types at all: a Node.js type in the browser declarations would fail here.
+        types: [],
+      },
+      files: ['check-browser.ts'],
+    }),
+  );
+  await run(
+    process.execPath,
+    [resolve('node_modules/typescript/bin/tsc'), '-p', 'tsconfig.browser.json'],
+    {
+      cwd: project,
+    },
+  );
+});

@@ -239,8 +239,8 @@ pick    = argmax_c  (1 − λ) · base(c) − λ · red(c)       (MMR, λ = 0.2)
 
 ## Consequences
 
-- The client was 2.5 KB gzipped with `related()` alone, and is 5.3 KB with personalization
-  (6.5 KB with the web components), under the 10 KB budget. `npm run size` checks this in CI.
+- The client was 2.5 KB gzipped with `related()` alone, and is 6.4 KB with personalization
+  and the hash check's fallback (7.6 KB with the web components), under the 10 KB budget. `npm run size` checks this in CI.
 - Related items need no consent and no storage. They are the safe first integration.
 - A site can switch models by rebuilding, with no migration on any device. The price is that
   the first page after a switch fetches new shards, and that items removed from the catalog

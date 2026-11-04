@@ -20,7 +20,7 @@ the signals and the ranking function are specified in
    [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) through Transformers.js. It
    writes `manifest.json` and one small binary shard per section: 256-dimensional int8 vectors,
    about 260 KB gzipped per 1,000 items.
-2. **In the browser**, the client (5.3 KB gzipped, no dependencies) fetches the manifest and
+2. **In the browser**, the client (6.4 KB gzipped, no dependencies) fetches the manifest and
    the shards it needs. It ranks by cosine similarity, a small recency boost and diversity (MMR).
    For "for you", similarity is to a profile derived from the visitor's signals (what they read,
    followed or hid), which stay in the site's own IndexedDB.

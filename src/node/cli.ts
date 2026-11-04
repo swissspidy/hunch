@@ -169,9 +169,14 @@ async function resolveProvider(
 async function inspectCommand(argv: string[]): Promise<void> {
   const { positionals } = parseArgs({ args: argv, allowPositionals: true, strict: true });
   const target = positionals[0] ?? 'inkling/manifest.json';
-  const text = /^https?:\/\//.test(target)
-    ? await (await fetch(target)).text()
-    : await readFile(target, 'utf8');
+  let text: string;
+  if (/^https?:\/\//.test(target)) {
+    const response = await fetch(target);
+    if (!response.ok) throw new Error(`${target} returned ${response.status}`);
+    text = await response.text();
+  } else {
+    text = await readFile(target, 'utf8');
+  }
   const manifest: unknown = JSON.parse(text);
   assertManifest(manifest);
   console.log(`version     ${manifest.version} (${manifest.generatedAt})`);

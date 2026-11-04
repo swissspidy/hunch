@@ -71,6 +71,7 @@ export function synthetic(options: SyntheticOptions = {}): Synthetic {
     );
     const affinity = (id: string) => Math.max(...likes.map((t) => dot(t, latent.get(id)!)));
     const pick = (weight: (id: string) => number, n: number, exclude: Set<string>) => {
+      if (n > itemCount - exclude.size) throw new Error(`Cannot pick ${n} distinct items`);
       const out: string[] = [];
       while (out.length < n) {
         const item = items[Math.floor(rand() * itemCount)]!;

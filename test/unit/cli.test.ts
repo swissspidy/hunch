@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
+import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -55,4 +56,21 @@ test('errors are one line and exit 1', async () => {
 test('inkling --version prints the package version', async () => {
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
   assert.equal((await inkling('--version')).stdout.trim(), pkg.version);
+});
+
+test('inkling inspect fails on an HTTP error, whatever the body', async () => {
+  // A body that looks like a manifest: only the status says it isn't one.
+  const body = JSON.stringify({ format: 'inkling/manifest' });
+  const server = createServer((_req, res) => res.writeHead(404).end(body));
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+  try {
+    await assert.rejects(
+      inkling('inspect', `http://127.0.0.1:${port}/manifest.json`),
+      /returned 404/,
+    );
+  } finally {
+    server.close();
+  }
 });

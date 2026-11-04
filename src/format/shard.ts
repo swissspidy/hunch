@@ -102,7 +102,15 @@ export function decodeShard(buffer: ArrayBuffer): DecodedShard {
   }
   const header = JSON.parse(
     new TextDecoder().decode(new Uint8Array(buffer, FIXED_HEADER, headerLength)),
-  ) as ShardHeader;
+  ) as ShardHeader | null;
+  if (
+    typeof header !== 'object' ||
+    header === null ||
+    typeof header.space !== 'string' ||
+    !Array.isArray(header.items)
+  ) {
+    throw new TypeError('Inkling shard: the header needs a string space and an items array');
+  }
   if (header.items.length !== count) {
     throw new TypeError(`Inkling shard: header lists ${header.items.length} items, not ${count}`);
   }
