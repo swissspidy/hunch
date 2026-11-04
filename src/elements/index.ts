@@ -8,6 +8,7 @@ import { defineElements } from './define.ts';
 defineElements();
 
 export { defineElements } from './define.ts';
+export { InklingDigestElement } from './digest.ts';
 export { InklingForYouElement } from './for-you.ts';
 export { InklingPageElement } from './page.ts';
 export { InklingRelatedElement } from './related.ts';

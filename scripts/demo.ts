@@ -94,12 +94,27 @@ ${list.map((item) => `    <li><a href="${esc(item.url)}">${esc(item.title)}</a> 
     )
     .join('\n');
   // The cold start is the site's own order: the feed's first items.
+  // The digest's fallback: the newest articles.
+  const latest = [...items]
+    .sort((a, b) => Date.parse(b.date ?? '') - Date.parse(a.date ?? ''))
+    .slice(0, 3)
+    .map((item) => slot(item, '      '))
+    .join('\n');
   const editorial = items
     .slice(0, SLOTS)
     .map((item) => slot(item, '      '))
     .join('\n');
   return `<header><h1>Field Notes</h1><p class="lede">A demo publication for <a href="https://github.com/swissspidy/inkling">Inkling</a>. Everything below is ranked in your browser from precomputed vectors, with no model, no server-side profile and no tracking.</p></header>
 <main>
+  <section aria-labelledby="digest-heading">
+    <h2 id="digest-heading">Since your last visit</h2>
+    <inkling-digest manifest="${base}inkling/manifest.json" context="Headlines of a publication about food, science, technology and travel, published since the reader's last visit.">
+      <p class="summary" data-inkling-summary>The latest articles. Come back later, with personalization on, for what is new since this visit.</p>
+      <ol class="related">
+${latest}
+      </ol>
+    </inkling-digest>
+  </section>
   <section aria-labelledby="for-you-heading">
     <h2 id="for-you-heading">For you</h2>
     <inkling-for-you manifest="${base}inkling/manifest.json">
@@ -122,6 +137,7 @@ ${editorial}
       <button type="button" id="forget">Forget everything</button>
     </p>
     <p class="status"><output id="status">Personalization is off.</output></p>
+    <p class="time-travel">Try "since your last visit" (with personalization on): <a id="travel" href="?as-of=2026-09-15">visit as if it were 15 September 2026</a>, then <a href="./">come back today</a>. The first link forgets this browser's visits, so September is the last visit.</p>
   </section>
 ${sections}
 </main>`;
@@ -173,8 +189,11 @@ function page(title: string, body: string): string {
 <script>
   // Inkling's consent hook, set before the components start. The demo asks with a checkbox;
   // a real site asks its consent manager.
+  // ?as-of=2026-09-15 visits the demo as if it were that day, to try "since your last visit".
+  const asOf = Date.parse(new URLSearchParams(location.search).get('as-of') ?? '');
   window.InklingConfig = {
     consent: () => { try { return localStorage.getItem('inkling-demo-consent') === 'yes'; } catch { return false; } },
+    now: Number.isNaN(asOf) ? undefined : () => asOf,
   };
 </script>
 <script src="${base}inkling.js" defer></script>

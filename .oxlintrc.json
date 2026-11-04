@@ -50,7 +50,13 @@
   },
   "overrides": [
     {
-      "files": ["src/format/**", "src/rank/**", "src/client/**", "src/elements/**"],
+      "files": [
+        "src/format/**",
+        "src/rank/**",
+        "src/client/**",
+        "src/elements/**",
+        "src/digest/**"
+      ],
       "rules": {
         "eslint/no-restricted-imports": [
           "error",

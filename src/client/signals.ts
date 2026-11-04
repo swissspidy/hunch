@@ -19,6 +19,21 @@ export interface Signal {
 
 export interface SignalState {
   paused: boolean;
+  /** The visitor's last activity on the site, epoch milliseconds. */
+  lastSeen?: number;
+  /** The last activity of the visit before the current one: "since your last visit". */
+  previousVisit?: number;
+}
+
+/**
+ * The state after activity at `now`: a gap of more than `gapMs` since the last activity starts
+ * a new visit, and the old visit's last activity becomes the previous visit.
+ */
+export function nextVisit(state: SignalState, now: number, gapMs: number): SignalState {
+  if (state.lastSeen !== undefined && now - state.lastSeen > gapMs) {
+    return { ...state, previousVisit: state.lastSeen, lastSeen: now };
+  }
+  return { ...state, lastSeen: Math.max(now, state.lastSeen ?? now) };
 }
 
 /** Where signals live. `IndexedDbStore` in browsers, `MemoryStore` elsewhere and in tests. */
@@ -30,8 +45,15 @@ export interface SignalStore {
   destroy(): Promise<void>;
   /** Whether the store holds anything (without creating it if not). */
   exists(): Promise<boolean>;
+  /** Returns what `setState()` stored: `paused`, and the visit fields `lastSeen` and `previousVisit`. */
   getState(): Promise<SignalState>;
+  /** Stores all of `state`, the visit fields included. */
   setState(state: SignalState): Promise<void>;
+  /**
+   * Reads the state, applies `update` and stores the result in one step, so concurrent
+   * updates (a pause and a visit) cannot overwrite each other. Returns the stored state.
+   */
+  updateState(update: (state: SignalState) => SignalState): Promise<SignalState>;
 }
 
 export const SIGNAL_WEIGHTS: Readonly<Record<Exclude<SignalKind, 'dwell'>, number>> = {
@@ -137,6 +159,10 @@ export class MemoryStore implements SignalStore {
     this.state = { ...state };
     return Promise.resolve();
   }
+  updateState(update: (state: SignalState) => SignalState): Promise<SignalState> {
+    this.state = { ...update({ ...this.state }) };
+    return Promise.resolve({ ...this.state });
+  }
 }
 
 /** Signals in IndexedDB: database `name` (default `inkling`), version 1. Opened on first use. */
@@ -186,11 +212,40 @@ export class IndexedDbStore implements SignalStore {
       'readonly',
       (store) => store.get('state') as IDBRequest<(SignalState & { key: string }) | undefined>,
     );
-    return { paused: row?.paused ?? false };
+    return compactState({
+      paused: row?.paused ?? false,
+      lastSeen: row?.lastSeen,
+      previousVisit: row?.previousVisit,
+    });
   }
 
   async setState(state: SignalState): Promise<void> {
     await this.tx('meta', 'readwrite', (store) => store.put({ key: 'state', ...state }));
+  }
+
+  async updateState(update: (state: SignalState) => SignalState): Promise<SignalState> {
+    const db = await this.db();
+    const tx = db.transaction('meta', 'readwrite');
+    const store = tx.objectStore('meta');
+    let next: SignalState | undefined;
+    // The read and the write share one readwrite transaction: IndexedDB runs it alone.
+    const read = store.get('state') as IDBRequest<(SignalState & { key: string }) | undefined>;
+    read.onsuccess = () => {
+      const row = read.result;
+      next = update(
+        compactState({
+          paused: row?.paused ?? false,
+          lastSeen: row?.lastSeen,
+          previousVisit: row?.previousVisit,
+        }),
+      );
+      store.put({ key: 'state', ...next });
+    };
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction failed'));
+    });
+    return next!;
   }
 
   private db(): Promise<IDBDatabase> {
@@ -234,6 +289,12 @@ export class IndexedDbStore implements SignalStore {
     });
     return result;
   }
+}
+
+function compactState(state: SignalState): SignalState {
+  if (state.lastSeen === undefined) delete state.lastSeen;
+  if (state.previousVisit === undefined) delete state.previousVisit;
+  return state;
 }
 
 function request<T>(req: IDBRequest<T>): Promise<T> {

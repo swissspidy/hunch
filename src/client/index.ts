@@ -16,6 +16,7 @@ import {
   IndexedDbStore,
   MemoryStore,
   SIGNAL_WEIGHTS,
+  nextVisit,
   toPrune,
   type Aggregate,
   type Signal,
@@ -44,6 +45,8 @@ export interface InklingOptions {
   maxSignals?: number;
   /** Implicit signals kept at most this many days (default 180). */
   maxSignalAgeDays?: number;
+  /** Minutes without activity that end a visit (default 30), for "since your last visit". */
+  visitGapMinutes?: number;
   /** Replaces `fetch` (tests, service workers, custom caching). */
   fetch?: Fetch;
   /** Clock, in epoch milliseconds (tests). */
@@ -78,6 +81,8 @@ export interface RecommendOptions extends RankingOptions {
   sections?: readonly string[];
   /** Include items the visitor has already viewed (default false). */
   includeSeen?: boolean;
+  /** Only items dated after this time (epoch milliseconds); undated items are left out. */
+  after?: number;
 }
 
 /** An item the profile leans on: "because you read …". */
@@ -165,6 +170,8 @@ export class Inkling {
   private readonly options: InklingOptions;
   private readonly store: SignalStore;
   private readonly now: () => number;
+  /** Counts forget() calls, so a visit that started before one does not write after it. */
+  private forgotten = 0;
   private constructor(catalog: Catalog, options: InklingOptions) {
     this.catalog = catalog;
     this.options = options;
@@ -178,7 +185,12 @@ export class Inkling {
 
   /** Fetches the manifest. Shards are fetched on first use. */
   static async load(options: InklingOptions): Promise<Inkling> {
-    for (const name of ['signalHalfLifeDays', 'maxSignals', 'maxSignalAgeDays'] as const) {
+    for (const name of [
+      'signalHalfLifeDays',
+      'maxSignals',
+      'maxSignalAgeDays',
+      'visitGapMinutes',
+    ] as const) {
       const value = options[name];
       if (value !== undefined && !(Number.isFinite(value) && value > 0)) {
         throw new RangeError(`Inkling: ${name} must be a positive number, not ${value}`);
@@ -277,6 +289,7 @@ export class Inkling {
    */
   observe(itemId: string): () => void {
     if (typeof document === 'undefined') return () => {};
+    void this.visit();
     void this.record('view', itemId);
     let visibleSince: number | null = document.visibilityState === 'visible' ? this.now() : null;
     let seconds = 0;
@@ -314,11 +327,48 @@ export class Inkling {
     const personal = await this.personal();
     await this.catalog.loadSections(options.sections);
     const exclude = new Set(options.exclude);
+    const after = options.after;
     const pool = this.candidates(options.sections, (e) => {
       const agg = personal.aggregates.get(e.item.id);
+      if (after !== undefined && !(Date.parse(e.item.date ?? '') > after)) return false;
       return !exclude.has(e.item.id) && !agg?.hidden && (options.includeSeen || !agg?.seen);
     });
     return this.rankPersonal(pool, personal, options);
+  }
+
+  /**
+   * Records activity now (with consent, unless paused) and returns when the visitor's previous
+   * visit ended, or `undefined` on a first visit. A visit ends after `visitGapMinutes` without
+   * activity; calling this again in the same visit changes nothing.
+   */
+  async visit(): Promise<number | undefined> {
+    if (!(await this.consented())) return undefined;
+    const generation = this.forgotten;
+    try {
+      const gap = (this.options.visitGapMinutes ?? 30) * 60_000;
+      const now = this.now();
+      // One read-modify-write: a concurrent pause() is never overwritten, and the state read
+      // is the current one, so a forget() before it cannot be undone. A forget() that started
+      // after this call began leaves the state as it finds it.
+      const next = await this.store.updateState((state) =>
+        state.paused || generation !== this.forgotten ? state : nextVisit(state, now, gap),
+      );
+      return generation === this.forgotten ? next.previousVisit : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * "Since your last visit": items published after the visitor's previous visit, ranked like
+   * `recommend()`. Records this visit first. Empty on a first visit or without consent.
+   */
+  async sinceLastVisit(options: Omit<RecommendOptions, 'after'> = {}): Promise<Recommendation[]> {
+    const previous = await this.visit();
+    if (previous === undefined) return [];
+    const recommendations = await this.recommend({ ...options, after: previous });
+    // Consent may have been withdrawn meanwhile: then there is no "last visit" to speak of.
+    return (await this.consented()) ? recommendations : [];
   }
 
   /**
@@ -405,6 +455,7 @@ export class Inkling {
    */
   async forget(itemId?: string): Promise<void> {
     if (itemId === undefined) {
+      this.forgotten++;
       await this.store.destroy();
       return;
     }
@@ -451,7 +502,7 @@ export class Inkling {
 
   private async setPaused(paused: boolean): Promise<void> {
     if (!(await this.consented())) return;
-    await this.store.setState({ ...(await this.store.getState()), paused });
+    await this.store.updateState((state) => ({ ...state, paused }));
   }
 
   /** Signals, aggregated, and the profile they make with the current catalog's vectors. */

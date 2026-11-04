@@ -3,6 +3,7 @@
   "entry": [
     "src/client/index.ts",
     "src/elements/index.ts",
+    "src/digest/index.ts",
     "src/elements/global.ts",
     "src/format/index.ts",
     "src/node/index.ts",
