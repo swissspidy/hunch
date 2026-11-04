@@ -67,7 +67,8 @@
     "demo": "node scripts/demo.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",
-    "bench": "node scripts/bench.ts"
+    "bench": "node scripts/bench.ts",
+    "eval": "node eval/run.ts"
   },
   "dependencies": {
     "fast-xml-parser": "^5.12.0"

@@ -1,0 +1,91 @@
+{
+  "dataset": "synthetic (3000 items, 16 topics, 1230 impressions)",
+  "impressions": 1230,
+  "items": 3000,
+  "rows": [
+    {
+      "ranker": "random",
+      "metrics": {
+        "auc": 0.4978553203371049,
+        "mrr": 0.17808361017445917,
+        "ndcg5": 0.18552671834781367,
+        "ndcg10": 0.28348631526064594,
+        "recall10": 0.4992808749516082
+      }
+    },
+    {
+      "ranker": "popularity",
+      "metrics": {
+        "auc": 0.5527835077537391,
+        "mrr": 0.21856452928858675,
+        "ndcg5": 0.24596818209254223,
+        "ndcg10": 0.3396299287350191,
+        "recall10": 0.5594066976384066
+      }
+    },
+    {
+      "ranker": "Inkling, model A (128 dims): profile only",
+      "metrics": {
+        "auc": 0.8435507736388438,
+        "mrr": 0.499073480584124,
+        "ndcg5": 0.6553639426944359,
+        "ndcg10": 0.716748417794368,
+        "recall10": 0.8773790166473201
+      }
+    },
+    {
+      "ranker": "Inkling, model A (128 dims): profile + popularity (default weights)",
+      "metrics": {
+        "auc": 0.8473883002184922,
+        "mrr": 0.5004496246423471,
+        "ndcg5": 0.6583186704878653,
+        "ndcg10": 0.7209520954717696,
+        "recall10": 0.8871273712737244
+      }
+    },
+    {
+      "ranker": "Inkling, model A (128 dims): profile + popularity + diversity 0.2",
+      "metrics": {
+        "auc": 0.8454656301575236,
+        "mrr": 0.49769678262951234,
+        "ndcg5": 0.6546267201113529,
+        "ndcg10": 0.7186049117365176,
+        "recall10": 0.8903310104529731
+      }
+    },
+    {
+      "ranker": "Inkling, model B (96 dims): profile only",
+      "metrics": {
+        "auc": 0.8248301624477327,
+        "mrr": 0.4705640503063468,
+        "ndcg5": 0.6207072354231851,
+        "ndcg10": 0.6840245219056539,
+        "recall10": 0.8633691444057395
+      }
+    },
+    {
+      "ranker": "Inkling, model B (96 dims): profile + popularity (default weights)",
+      "metrics": {
+        "auc": 0.8286693613886131,
+        "mrr": 0.47885553383170776,
+        "ndcg5": 0.6297229771535554,
+        "ndcg10": 0.692823390484112,
+        "recall10": 0.8676916376306723
+      }
+    },
+    {
+      "ranker": "Inkling, model B (96 dims): profile + popularity + diversity 0.2",
+      "metrics": {
+        "auc": 0.8217944614157318,
+        "mrr": 0.47279351901368144,
+        "ndcg5": 0.6169517288740726,
+        "ndcg10": 0.6843408362077623,
+        "recall10": 0.8613308168796073
+      }
+    }
+  ],
+  "modelSwitch": {
+    "identical": 1230,
+    "total": 1230
+  }
+}

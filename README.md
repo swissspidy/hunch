@@ -126,6 +126,9 @@ editors' pick) and `because` (the visitor's items it leans on).
 
 ## The demo
 
+**Live:** [swissspidy.github.io/inkling](https://swissspidy.github.io/inkling/), deployed from
+`main` by [`pages.yml`](.github/workflows/pages.yml). To run it locally:
+
 ```sh
 npm ci
 npm run demo -- --serve     # http://127.0.0.1:4173/
@@ -186,6 +189,13 @@ and baselines, not for production.
 4. Offline evaluation (nDCG@10, recall@10) against popularity and recency baselines.
 5. Optional: query embedding in the browser, and a "since your last visit" digest with the
    built-in Summarizer.
+
+## Evaluation
+
+[`eval/`](eval/README.md) replays click logs through the real client and compares Inkling with
+random and popularity rankings: a synthetic dataset in CI, and
+[MIND](https://msnews.github.io/) (Microsoft News) on demand. The results are in
+[docs/evaluation.md](docs/evaluation.md).
 
 ## Development
 

@@ -3,3 +3,6 @@ dist/
 demo/dist/
 .inkling-cache/
 *.tgz
+eval/.work/
+eval/.cache/
+eval/.data/

@@ -1,0 +1,57 @@
+{
+  "dataset": "MIND small (dev, 2000 impressions)",
+  "impressions": 2000,
+  "items": 13965,
+  "rows": [
+    {
+      "ranker": "random",
+      "metrics": {
+        "auc": 0.5040850166960764,
+        "mrr": 0.21710804214079524,
+        "ndcg5": 0.2186592162255956,
+        "ndcg10": 0.2852227611334765,
+        "recall10": 0.5227484126984088
+      }
+    },
+    {
+      "ranker": "popularity",
+      "metrics": {
+        "auc": 0.5344048276296759,
+        "mrr": 0.23635174389790412,
+        "ndcg5": 0.24380856264053474,
+        "ndcg10": 0.3075329641914667,
+        "recall10": 0.5469345238095172
+      }
+    },
+    {
+      "ranker": "Inkling, hash (lexical, 512 → 256 dims): profile only",
+      "metrics": {
+        "auc": 0.5439146094083903,
+        "mrr": 0.25050531076418503,
+        "ndcg5": 0.25693773990857377,
+        "ndcg10": 0.3210496601109113,
+        "recall10": 0.547961904761898
+      }
+    },
+    {
+      "ranker": "Inkling, hash (lexical, 512 → 256 dims): profile + popularity (default weights)",
+      "metrics": {
+        "auc": 0.553388346780587,
+        "mrr": 0.2505145090836818,
+        "ndcg5": 0.25898518145737165,
+        "ndcg10": 0.3239473862192934,
+        "recall10": 0.5591027777777701
+      }
+    },
+    {
+      "ranker": "Inkling, hash (lexical, 512 → 256 dims): profile + popularity + diversity 0.2",
+      "metrics": {
+        "auc": 0.551762817401115,
+        "mrr": 0.25171920639124706,
+        "ndcg5": 0.260598532761179,
+        "ndcg10": 0.3245798906571442,
+        "recall10": 0.5568827380952305
+      }
+    }
+  ]
+}

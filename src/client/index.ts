@@ -320,7 +320,16 @@ export class Inkling {
    * Orders a list the server rendered (item ids) by the visitor's profile. Unknown ids keep
    * their order after the known ones, hidden items go last, and nothing is dropped.
    */
-  async rank(ids: readonly string[], options: RankingOptions = {}): Promise<string[]> {
+  async rank(
+    ids: readonly string[],
+    options: RankingOptions & {
+      /**
+       * The cold-start order: the list's own (default), or the catalog's published prior
+       * (popularity or editorial order), for lists in no particular order.
+       */
+      prior?: 'list' | 'catalog';
+    } = {},
+  ): Promise<string[]> {
     const personal = await this.personal();
     const entries = await Promise.all(ids.map((id) => this.catalog.find(id)));
     const known: Entry[] = [];
@@ -331,10 +340,13 @@ export class Inkling {
       else if (entries[i]) known.push(entries[i]);
       else unknown.push(id);
     });
-    // The site's list is the cold-start order here: its positions are the prior.
+    // By default the site's list is the cold-start order: its positions are the prior.
     const position = new Map(known.map((e, i) => [e.item.id, 1 - i / known.length]));
-    const ranked = this.rankPersonal(known, personal, { ...options, n: known.length }, (e) =>
-      position.get(e.item.id)!,
+    const ranked = this.rankPersonal(
+      known,
+      personal,
+      { ...options, n: known.length },
+      options.prior === 'catalog' ? undefined : (e) => position.get(e.item.id)!,
     );
     return [...ranked.map((r) => r.id), ...unknown, ...hidden];
   }

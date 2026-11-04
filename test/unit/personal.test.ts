@@ -170,6 +170,14 @@ test('rank() reorders a server list, keeping unknown ids and moving hidden ones 
   const ink = await load();
   const list = ['bread-0', 'space-0', 'nope', 'rail-0', 'space-1'];
   assert.deepEqual(await ink.rank(list), ['bread-0', 'space-0', 'rail-0', 'space-1', 'nope']);
+  // With the catalog's prior, the editorial order (bread-0, space-0, rail-0, …, space-1) decides.
+  assert.deepEqual(await ink.rank([...list].reverse(), { prior: 'catalog' }), [
+    'bread-0',
+    'space-0',
+    'rail-0',
+    'space-1',
+    'nope',
+  ]);
   await ink.record('follow', 'space-2');
   await ink.record('follow', 'space-3');
   await ink.record('hide', 'bread-0');

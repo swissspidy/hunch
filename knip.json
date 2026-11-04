@@ -8,7 +8,8 @@
     "src/node/index.ts",
     "src/node/cli.ts",
     "scripts/*.ts",
-    "test/**/*.test.ts"
+    "test/**/*.test.ts",
+    "eval/download-mind.ts"
   ],
-  "project": ["src/**/*.ts", "scripts/**/*.ts", "test/**/*.ts", "bin/*.js"]
+  "project": ["src/**/*.ts", "scripts/**/*.ts", "test/**/*.ts", "bin/*.js", "eval/**/*.ts"]
 }
