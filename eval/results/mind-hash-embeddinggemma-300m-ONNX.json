@@ -52,6 +52,40 @@
         "ndcg10": 0.3245798906571442,
         "recall10": 0.5568827380952305
       }
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (256 dims): profile only",
+      "metrics": {
+        "auc": 0.6298099965038743,
+        "mrr": 0.3037533976651923,
+        "ndcg5": 0.3311379218774202,
+        "ndcg10": 0.38696711613150303,
+        "recall10": 0.6174904761904628
+      }
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (256 dims): profile + popularity (default weights)",
+      "metrics": {
+        "auc": 0.6337969623665473,
+        "mrr": 0.3065925588958638,
+        "ndcg5": 0.3352675032070904,
+        "ndcg10": 0.3900285689852702,
+        "recall10": 0.620103571428558
+      }
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (256 dims): profile + popularity + diversity 0.2",
+      "metrics": {
+        "auc": 0.6336689030785302,
+        "mrr": 0.30504602842637724,
+        "ndcg5": 0.33299582154395013,
+        "ndcg10": 0.38836985426865994,
+        "recall10": 0.6179563492063356
+      }
     }
-  ]
+  ],
+  "modelSwitch": {
+    "identical": 2000,
+    "total": 2000
+  }
 }

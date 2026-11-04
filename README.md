@@ -6,7 +6,7 @@ summaries next. Your build step publishes a vector for each item, and the browse
 with plain arithmetic. No model runs in the browser, there is no server-side profile, and nothing
 about the visitor leaves the device.
 
-**Status: milestone 2 of 5.** The CLI builds a manifest and vector shards from a feed. The
+**Status: milestones 1–4 of 5.** The CLI builds a manifest and vector shards from a feed. The
 client ranks related items, and, with the site's consent, "for you" from signals kept on the
 device, with `explain()` and the visitor's controls. See the [roadmap](#roadmap). The format,
 the signals and the ranking function are specified in
@@ -184,9 +184,9 @@ and baselines, not for production.
    related items on a demo site with no model in the browser.
 2. ✅ Signals, decay, profile derivation, "for you" ranking, `explain()`, user controls. CLS 0
    on the demo.
-3. Model switch: profiles recompute from signals with no migration, and the evaluation shows
-   no quality loss.
-4. Offline evaluation (nDCG@10, recall@10) against popularity and recency baselines.
+3. ✅ Model switch: profiles recompute from signals with no migration, and the evaluation shows
+   no quality loss ([docs/evaluation.md](docs/evaluation.md)).
+4. ✅ Offline evaluation: on MIND, nDCG@10 0.390 vs 0.308 for popularity.
 5. Optional: query embedding in the browser, and a "since your last visit" digest with the
    built-in Summarizer.
 
