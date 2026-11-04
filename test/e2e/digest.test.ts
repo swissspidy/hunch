@@ -55,6 +55,8 @@ test('a returning visitor sees what was published since the last visit, summariz
   await page.goto(`${site.origin}/`);
   const back = await digest(page);
   assert.equal(back.new, '3');
+  // Every filled slot shows its date, and all of them are after the first visit.
+  assert.equal(back.dates.length, Number(back.new));
   assert.ok(
     back.dates.every((d) => Date.parse(d!) > SEPT_15),
     back.dates.join(),

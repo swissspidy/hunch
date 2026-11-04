@@ -119,3 +119,32 @@ test('the Summarizer is used only where an on-device model is available', async 
     delete g.Summarizer;
   }
 });
+
+test('since your last visit leaves out seen and hidden items, like recommend()', async () => {
+  let now = t0;
+  const store = new MemoryStore();
+  const ink = await load(() => now, store);
+  await ink.visit();
+  now = t0 + 3 * DAY;
+  // Both dated after the first visit.
+  await ink.record('view', 'item-2');
+  await ink.record('hide', 'item-3');
+  const ids = (await ink.sinceLastVisit({ n: 10 })).map((r) => r.id);
+  assert.ok(ids.length > 0);
+  assert.ok(!ids.includes('item-2') && !ids.includes('item-3'), ids.join());
+  const withSeen = (await ink.sinceLastVisit({ n: 10, includeSeen: true })).map((r) => r.id);
+  assert.ok(withSeen.includes('item-2'));
+  assert.ok(!withSeen.includes('item-3'));
+});
+
+test('a visit never overwrites a pause, and does not undo a forget', async () => {
+  const store = new MemoryStore();
+  const ink = await load(() => t0, store);
+  await ink.visit();
+  await Promise.all([ink.pause(), ink.visit()]);
+  assert.equal((await store.getState()).paused, true);
+  await ink.resume();
+  await ink.forget();
+  assert.deepEqual(await store.getState(), { paused: false });
+  assert.equal(await ink.visit(), undefined, 'a first visit again');
+});

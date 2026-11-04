@@ -137,7 +137,7 @@ ${editorial}
       <button type="button" id="forget">Forget everything</button>
     </p>
     <p class="status"><output id="status">Personalization is off.</output></p>
-    <p class="time-travel">Try "since your last visit": <a href="?as-of=2026-09-15">visit as if it were 15 September 2026</a>, then <a href="./">come back today</a>.</p>
+    <p class="time-travel">Try "since your last visit" (with personalization on): <a id="travel" href="?as-of=2026-09-15">visit as if it were 15 September 2026</a>, then <a href="./">come back today</a>. The first link forgets this browser's visits, so September is the last visit.</p>
   </section>
 ${sections}
 </main>`;

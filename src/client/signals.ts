@@ -45,8 +45,15 @@ export interface SignalStore {
   destroy(): Promise<void>;
   /** Whether the store holds anything (without creating it if not). */
   exists(): Promise<boolean>;
+  /** Returns what `setState()` stored: `paused`, and the visit fields `lastSeen` and `previousVisit`. */
   getState(): Promise<SignalState>;
+  /** Stores all of `state`, the visit fields included. */
   setState(state: SignalState): Promise<void>;
+  /**
+   * Reads the state, applies `update` and stores the result in one step, so concurrent
+   * updates (a pause and a visit) cannot overwrite each other. Returns the stored state.
+   */
+  updateState(update: (state: SignalState) => SignalState): Promise<SignalState>;
 }
 
 export const SIGNAL_WEIGHTS: Readonly<Record<Exclude<SignalKind, 'dwell'>, number>> = {
@@ -152,6 +159,10 @@ export class MemoryStore implements SignalStore {
     this.state = { ...state };
     return Promise.resolve();
   }
+  updateState(update: (state: SignalState) => SignalState): Promise<SignalState> {
+    this.state = { ...update({ ...this.state }) };
+    return Promise.resolve({ ...this.state });
+  }
 }
 
 /** Signals in IndexedDB: database `name` (default `inkling`), version 1. Opened on first use. */
@@ -210,6 +221,31 @@ export class IndexedDbStore implements SignalStore {
 
   async setState(state: SignalState): Promise<void> {
     await this.tx('meta', 'readwrite', (store) => store.put({ key: 'state', ...state }));
+  }
+
+  async updateState(update: (state: SignalState) => SignalState): Promise<SignalState> {
+    const db = await this.db();
+    const tx = db.transaction('meta', 'readwrite');
+    const store = tx.objectStore('meta');
+    let next: SignalState | undefined;
+    // The read and the write share one readwrite transaction: IndexedDB runs it alone.
+    const read = store.get('state') as IDBRequest<(SignalState & { key: string }) | undefined>;
+    read.onsuccess = () => {
+      const row = read.result;
+      next = update(
+        compactState({
+          paused: row?.paused ?? false,
+          lastSeen: row?.lastSeen,
+          previousVisit: row?.previousVisit,
+        }),
+      );
+      store.put({ key: 'state', ...next });
+    };
+    await new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction failed'));
+    });
+    return next!;
   }
 
   private db(): Promise<IDBDatabase> {

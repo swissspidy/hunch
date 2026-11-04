@@ -14,7 +14,7 @@ device without making the core larger or calling any service.
 
 - **Visits live in the state the client already keeps.** The `meta` store's `state` record
   (ADR 0001) gains `lastSeen` (the last activity) and `previousVisit` (the last activity of the
-  visit before this one). `visit()` updates them. More than `visitGapMinutes` (default 30)
+  visit before this one). `visit()` updates them in one read-modify-write (`SignalStore.updateState()`, a single IndexedDB transaction), so a concurrent `pause()` is never overwritten, and a `forget()` is never undone. More than `visitGapMinutes` (default 30)
   without activity starts a new visit, and the old visit's last activity becomes
   `previousVisit`. Within a visit nothing changes, so every component on every page may call
   it. `observe()`, `<inkling-page>` and `sinceLastVisit()` do. Like signals, visits are recorded
@@ -43,7 +43,7 @@ device without making the core larger or calling any service.
 
 ## Consequences
 
-- The core grows by `visit()`, `sinceLastVisit()` and the `after` filter, to 6.8 KB gzipped. The
+- The core grows by `visit()`, `sinceLastVisit()` and the `after` filter, to 7.0 KB gzipped. The
   Summarizer wrapper adds about 0.4 KB, to the components' bundle only.
 - The summary needs a browser with the built-in Summarizer (Chrome's, with Gemini Nano), and only
   appears once its model is on the device. The browser tests fake the API, because headless

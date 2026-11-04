@@ -74,6 +74,16 @@ if (consent) {
   void updateStatus();
 }
 
+// Time travel: start over, so the visit as of September is the last one, whatever was recorded today.
+const travel = $('travel');
+if (travel) {
+  on(travel, 'click', async (event) => {
+    event.preventDefault();
+    await (await Inkling.shared(manifest)).forget();
+    location.href = travel.href;
+  });
+}
+
 // Explicit signals on article pages.
 for (const button of document.querySelectorAll('[data-signal]')) {
   on(button, 'click', async () => {

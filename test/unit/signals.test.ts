@@ -137,6 +137,19 @@ test('IndexedDbStore stores, deletes, keeps state and destroys its database', as
     assert.deepEqual(await store.getState(), { paused: false });
     await store.setState({ paused: true });
     assert.deepEqual(await store.getState(), { paused: true });
+    // updateState: one transaction; visit fields round-trip.
+    const updated = await store.updateState((state) => ({
+      ...state,
+      lastSeen: 5,
+      previousVisit: 3,
+    }));
+    assert.deepEqual(updated, { paused: true, lastSeen: 5, previousVisit: 3 });
+    assert.deepEqual(await store.getState(), { paused: true, lastSeen: 5, previousVisit: 3 });
+    await Promise.all([
+      store.updateState((state) => ({ ...state, paused: false })),
+      store.updateState((state) => ({ ...state, lastSeen: 9 })),
+    ]);
+    assert.deepEqual(await store.getState(), { paused: false, lastSeen: 9, previousVisit: 3 });
     assert.deepEqual(
       (await indexedDB.databases()).map((d) => d.name),
       ['inkling-test'],

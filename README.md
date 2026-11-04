@@ -1,9 +1,11 @@
 # Inkling
 
 First-party, on-device personalization for websites. Inkling ranks your catalog in the
-visitor's browser: related items, "for you" modules and "since your last visit" digests. Your build step publishes a vector for each item, and the browser ranks them
-with plain arithmetic. No model runs in the browser, there is no server-side profile, and nothing
-about the visitor leaves the device.
+visitor's browser: related items, "for you" modules and "since your last visit" digests. Your
+build step publishes a vector for each item, and the browser ranks them with plain arithmetic:
+the ranking runs no model. The optional digest summary uses the browser's built-in Summarizer,
+whose model runs on the device. There is no server-side profile, and nothing about the visitor
+leaves the device.
 
 **Status: milestones 1–4 of 5, and the first half of 5.** The CLI builds a manifest and vector
 shards from a feed. The client ranks related items, and, with the site's consent, "for you"
@@ -20,7 +22,7 @@ the signals and the ranking function are specified in
    [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) through Transformers.js. It
    writes `manifest.json` and one small binary shard per section: 256-dimensional int8 vectors,
    about 260 KB gzipped per 1,000 items.
-2. **In the browser**, the client (6.8 KB gzipped, no dependencies) fetches the manifest and
+2. **In the browser**, the client (7.0 KB gzipped, no dependencies) fetches the manifest and
    the shards it needs. It ranks by cosine similarity, a small recency boost and diversity (MMR).
    For "for you", similarity is to a profile derived from the visitor's signals (what they read,
    followed or hid), which stay in the site's own IndexedDB.

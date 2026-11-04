@@ -23,7 +23,8 @@ export const Base: typeof HTMLElement =
   typeof HTMLElement === 'undefined' ? (class {} as typeof HTMLElement) : HTMLElement;
 
 export abstract class SlotsElement extends Base {
-  private run = 0;
+  /** The render generation: each refresh increments it, and stale work checks it. */
+  protected run = 0;
   private listening = false;
   /** Copies of the server-rendered slots, taken before the first replacement. */
   private original: HTMLElement[] | undefined;
@@ -36,6 +37,7 @@ export abstract class SlotsElement extends Base {
     inkling: Inkling,
     n: number,
     fallback: readonly string[],
+    run: number,
   ): Promise<Recommendation[] | null>;
 
   connectedCallback(): void {
@@ -92,7 +94,12 @@ export abstract class SlotsElement extends Base {
     try {
       if (slots.length === 0) throw new Error(`<${this.localName}> has no [data-inkling-slot]`);
       const fallback = original.map((slot) => slot.dataset.inklingId ?? '').filter(Boolean);
-      const recommendations = await this.recommend(await this.inkling(), slots.length, fallback);
+      const recommendations = await this.recommend(
+        await this.inkling(),
+        slots.length,
+        fallback,
+        run,
+      );
       if (run !== this.run) return;
       slots.forEach((slot, i) => {
         const copy = original[i]!.cloneNode(true) as HTMLElement;

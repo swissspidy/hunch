@@ -170,6 +170,8 @@ export class Inkling {
   private readonly options: InklingOptions;
   private readonly store: SignalStore;
   private readonly now: () => number;
+  /** Counts forget() calls, so a visit that started before one does not write after it. */
+  private forgotten = 0;
   private constructor(catalog: Catalog, options: InklingOptions) {
     this.catalog = catalog;
     this.options = options;
@@ -341,13 +343,17 @@ export class Inkling {
    */
   async visit(): Promise<number | undefined> {
     if (!(await this.consented())) return undefined;
+    const generation = this.forgotten;
     try {
-      const state = await this.store.getState();
-      if (state.paused) return state.previousVisit;
-      const next = nextVisit(state, this.now(), (this.options.visitGapMinutes ?? 30) * 60_000);
-      if (!(await this.consented())) return undefined;
-      await this.store.setState(next);
-      return next.previousVisit;
+      const gap = (this.options.visitGapMinutes ?? 30) * 60_000;
+      const now = this.now();
+      // One read-modify-write: a concurrent pause() is never overwritten, and the state read
+      // is the current one, so a forget() before it cannot be undone. A forget() that started
+      // after this call began leaves the state as it finds it.
+      const next = await this.store.updateState((state) =>
+        state.paused || generation !== this.forgotten ? state : nextVisit(state, now, gap),
+      );
+      return generation === this.forgotten ? next.previousVisit : undefined;
     } catch {
       return undefined;
     }
@@ -360,7 +366,9 @@ export class Inkling {
   async sinceLastVisit(options: Omit<RecommendOptions, 'after'> = {}): Promise<Recommendation[]> {
     const previous = await this.visit();
     if (previous === undefined) return [];
-    return this.recommend({ ...options, after: previous });
+    const recommendations = await this.recommend({ ...options, after: previous });
+    // Consent may have been withdrawn meanwhile: then there is no "last visit" to speak of.
+    return (await this.consented()) ? recommendations : [];
   }
 
   /**
@@ -447,6 +455,7 @@ export class Inkling {
    */
   async forget(itemId?: string): Promise<void> {
     if (itemId === undefined) {
+      this.forgotten++;
       await this.store.destroy();
       return;
     }
@@ -493,7 +502,7 @@ export class Inkling {
 
   private async setPaused(paused: boolean): Promise<void> {
     if (!(await this.consented())) return;
-    await this.store.setState({ ...(await this.store.getState()), paused });
+    await this.store.updateState((state) => ({ ...state, paused }));
   }
 
   /** Signals, aggregated, and the profile they make with the current catalog's vectors. */
