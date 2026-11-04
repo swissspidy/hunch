@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example</title>
+  <id>urn:example</id>
+  <updated>2026-10-02T10:00:00Z</updated>
+  <entry>
+    <title type="html">Tom &amp;amp; Jerry&#8217;s guide</title>
+    <id>urn:example:1</id>
+    <link rel="alternate" href="https://example.com/1"/>
+    <link rel="enclosure" href="https://example.com/1.mp3"/>
+    <category term="cartoons" label="Cartoons"/>
+    <category term="history"/>
+    <published>2026-10-01T10:00:00Z</published>
+    <content type="html">&lt;p&gt;A &lt;b&gt;long&lt;/b&gt; story.&lt;/p&gt;&lt;script&gt;x()&lt;/script&gt;</content>
+  </entry>
+  <entry>
+    <title>No id</title>
+    <link href="https://example.com/2"/>
+    <updated>2026-10-02T10:00:00Z</updated>
+    <summary>Short.</summary>
+  </entry>
+</feed>

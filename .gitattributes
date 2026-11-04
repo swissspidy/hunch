@@ -1,0 +1,5 @@
+# LF on every OS: fixtures and generated files are compared byte for byte.
+* text=auto eol=lf
+# Embedding caches and vector shards are binary.
+*.vec binary
+*.ink binary

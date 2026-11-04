@@ -1,0 +1,103 @@
+{
+  "name": "@swissspidy/inkling",
+  "version": "0.0.0",
+  "description": "First-party, on-device personalization for websites: the visitor's interests stay in their browser.",
+  "keywords": [
+    "embeddings",
+    "on-device",
+    "personalization",
+    "privacy",
+    "recommendations"
+  ],
+  "homepage": "https://github.com/swissspidy/inkling#readme",
+  "bugs": {
+    "url": "https://github.com/swissspidy/inkling/issues"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swissspidy/inkling.git"
+  },
+  "bin": {
+    "inkling": "./bin/inkling.js"
+  },
+  "files": [
+    "bin",
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "./dist/elements/index.js",
+    "./dist/elements/global.js",
+    "./dist/inkling.global.js",
+    "./src/elements/index.ts",
+    "./src/elements/global.ts"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./elements": {
+      "types": "./dist/elements/index.d.ts",
+      "default": "./dist/elements/index.js"
+    },
+    "./format": {
+      "types": "./dist/format/index.d.ts",
+      "default": "./dist/format/index.js"
+    },
+    "./build": {
+      "types": "./dist/node/index.d.ts",
+      "default": "./dist/node/index.js"
+    },
+    "./inkling.global.js": "./dist/inkling.global.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && tsc -p tsconfig.build.json && node scripts/build.ts",
+    "prepack": "npm run build",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "oxlint --type-aware && knip --no-progress",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "test": "node --test --test-reporter=spec \"test/unit/*.test.ts\"",
+    "test:e2e": "node --test --test-reporter=spec --test-concurrency=1 \"test/e2e/*.test.ts\"",
+    "test:pack": "node --test --test-reporter=spec \"test/pack/*.test.ts\"",
+    "size": "node scripts/size.ts",
+    "demo": "node scripts/demo.ts",
+    "changeset": "changeset",
+    "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",
+    "bench": "node scripts/bench.ts",
+    "eval": "node eval/run.ts"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.12.0"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^1.0.1",
+    "@changesets/cli": "^3.0.3",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "fake-indexeddb": "^6.2.7",
+    "knip": "^6.44.1",
+    "oxfmt": "^0.76.0",
+    "oxlint": "^1.91.0",
+    "oxlint-tsgolint": "^7.0.2005",
+    "playwright-core": "1.63.0",
+    "typescript": "^7.0.2"
+  },
+  "peerDependencies": {
+    "@huggingface/transformers": "^4.3.2"
+  },
+  "peerDependenciesMeta": {
+    "@huggingface/transformers": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "allowScripts": {
+    "esbuild": false
+  }
+}

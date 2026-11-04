@@ -1,0 +1,73 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "import", "node", "promise"],
+  "categories": {
+    "correctness": "error"
+  },
+  "ignorePatterns": ["dist/**", "demo/dist/**"],
+  "rules": {
+    "typescript/no-floating-promises": [
+      "error",
+      {
+        "allowForKnownSafeCalls": [
+          {
+            "from": "package",
+            "package": "node:test",
+            "name": [
+              "test",
+              "it",
+              "describe",
+              "suite",
+              "before",
+              "after",
+              "beforeEach",
+              "afterEach"
+            ]
+          }
+        ]
+      }
+    ],
+    "typescript/no-misused-promises": "error",
+    "typescript/await-thenable": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/switch-exhaustiveness-check": [
+      "error",
+      { "considerDefaultExhaustiveForUnions": true }
+    ],
+    "typescript/require-array-sort-compare": "error",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/consistent-type-imports": "error",
+    "eslint/no-fallthrough": "error",
+    "eslint/eqeqeq": ["error", "smart"],
+    "eslint/no-self-compare": "error",
+    "eslint/no-new-func": "error",
+    "eslint/no-eval": "error",
+    "typescript/no-implied-eval": "error",
+    "typescript/unbound-method": "off",
+    "typescript/restrict-template-expressions": "off",
+    "typescript/no-base-to-string": "off",
+    "unicorn/no-new-array": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/format/**", "src/rank/**", "src/client/**", "src/elements/**"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["node:*"],
+                "message": "This file runs in the browser: no Node.js modules (ADR 0001)."
+              },
+              {
+                "group": ["fast-xml-parser", "@huggingface/*", "../node/*", "../../node/*"],
+                "message": "The client has no dependencies and loads no model (ADR 0001)."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
