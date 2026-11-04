@@ -18,16 +18,16 @@ node bin/inkling.js --help      # the CLI, from the sources
 
 ## Checks
 
-| Command                | What it checks                                                     |
-| ---------------------- | ------------------------------------------------------------------ |
-| `npm run typecheck`    | TypeScript 7 over `src`, `test` and `scripts`                      |
-| `npm run lint`         | oxlint (type-aware) and knip (unused files, exports, dependencies) |
-| `npm run format:check` | oxfmt (`npm run format` fixes it)                                  |
-| `npm test`             | Unit tests in `test/unit`                                          |
-| `npm run size`         | The client's gzipped size against its budget                       |
-| `npm run test:e2e`     | The demo in Chromium: related items, layout shift, requests        |
-| `npm run test:pack`    | The packed package, installed into an empty project                |
-| `npm run bench`        | Shard sizes and ranking time for 10,000 items                      |
+| Command                | What it checks                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `npm run typecheck`    | TypeScript 7 over `src`, `test` and `scripts`                                              |
+| `npm run lint`         | oxlint (type-aware) and knip (unused files, exports, dependencies)                         |
+| `npm run format:check` | oxfmt (`npm run format` fixes it)                                                          |
+| `npm test`             | Unit tests in `test/unit`                                                                  |
+| `npm run size`         | The client's gzipped size against its budget                                               |
+| `npm run test:e2e`     | The demo in Chromium: related items, layout shift, requests                                |
+| `npm run test:pack`    | The packed package, installed into an empty project                                        |
+| `npm run bench`        | Shard sizes and ranking time for 10,000 items (`-- --browser`: in Chromium, CPU 4× slower) |
 
 The browser tests need Chromium for the installed `playwright-core`:
 `npx playwright-core install chromium` (on Linux, add `install-deps` if it doesn't start).

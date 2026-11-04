@@ -1,9 +1,13 @@
-/** Registers Inkling's example web components (a no-op during server rendering). */
+/**
+ * Inkling's example web components, registered on import. Call `Inkling.configure({ consent })`
+ * before importing this module if the components should personalize.
+ */
 
-import { InklingRelatedElement } from './related.ts';
+import { defineElements } from './define.ts';
 
-if (globalThis.customElements && !customElements.get('inkling-related')) {
-  customElements.define('inkling-related', InklingRelatedElement);
-}
+defineElements();
 
-export { InklingRelatedElement, inklingFor } from './related.ts';
+export { defineElements } from './define.ts';
+export { InklingForYouElement } from './for-you.ts';
+export { InklingPageElement } from './page.ts';
+export { InklingRelatedElement } from './related.ts';

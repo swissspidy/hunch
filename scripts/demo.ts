@@ -55,6 +55,7 @@ const result = await build({
 await provider.dispose?.();
 await bundleGlobal(join(OUT, 'inkling.js'));
 await cp('demo/style.css', join(OUT, 'style.css'));
+await cp('demo/demo.js', join(OUT, 'demo.js'));
 
 const bySection = new Map<string, CatalogItem[]>();
 for (const item of items) {
@@ -74,6 +75,13 @@ console.error(
 
 if (values.serve) await serve(Number(values.port));
 
+function slot(item: CatalogItem, indent: string): string {
+  return `${indent}<li data-inkling-slot data-inkling-id="${esc(item.id)}">
+${indent}  <a href="${esc(item.url)}"><span class="title" data-inkling-title>${esc(item.title)}</span></a>
+${indent}  <span class="meta"><span data-inkling-section>${esc(item.section ?? '')}</span> · <time data-inkling-date datetime="${esc(item.date ?? '')}">${fmt(item.date)}</time></span>
+${indent}</li>`;
+}
+
 function indexBody(): string {
   const sections = [...bySection]
     .map(
@@ -85,8 +93,38 @@ ${list.map((item) => `    <li><a href="${esc(item.url)}">${esc(item.title)}</a> 
 </section>`,
     )
     .join('\n');
-  return `<header><h1>Field Notes</h1><p class="lede">A demo publication for <a href="https://github.com/swissspidy/inkling">Inkling</a>. Open any article: its "Related" list is ranked in your browser from precomputed vectors, with no model and no tracking.</p></header>
-<main>${sections}</main>`;
+  // The cold start is the site's own order: the feed's first items.
+  const editorial = items
+    .slice(0, SLOTS)
+    .map((item) => slot(item, '      '))
+    .join('\n');
+  return `<header><h1>Field Notes</h1><p class="lede">A demo publication for <a href="https://github.com/swissspidy/inkling">Inkling</a>. Everything below is ranked in your browser from precomputed vectors, with no model, no server-side profile and no tracking.</p></header>
+<main>
+  <section aria-labelledby="for-you-heading">
+    <h2 id="for-you-heading">For you</h2>
+    <inkling-for-you manifest="${base}inkling/manifest.json">
+      <ol class="related">
+${editorial}
+      </ol>
+    </inkling-for-you>
+    <details class="why">
+      <summary>Why these?</summary>
+      <ol id="why-list"><li>The editors' picks: turn on personalization below and read a few articles.</li></ol>
+    </details>
+  </section>
+  <section class="privacy" aria-labelledby="privacy-heading">
+    <h2 id="privacy-heading">Your data</h2>
+    <p>Personalization keeps a list of the articles you read in this browser's storage. It never leaves your device.</p>
+    <p><label><input type="checkbox" id="consent"> Personalize this site on my device</label></p>
+    <p class="controls">
+      <button type="button" id="pause">Pause</button>
+      <button type="button" id="export">Export</button>
+      <button type="button" id="forget">Forget everything</button>
+    </p>
+    <p class="status"><output id="status">Personalization is off.</output></p>
+  </section>
+${sections}
+</main>`;
 }
 
 function articleBody(item: CatalogItem): string {
@@ -94,26 +132,24 @@ function articleBody(item: CatalogItem): string {
   const fallback = (bySection.get(item.section ?? 'Other') ?? [])
     .filter((other) => other.id !== item.id)
     .slice(0, SLOTS);
-  const slots = fallback
-    .map(
-      (other) => `      <li data-inkling-slot data-inkling-id="${esc(other.id)}">
-        <a href="${esc(other.url)}"><span class="title" data-inkling-title>${esc(other.title)}</span></a>
-        <span class="meta"><span data-inkling-section>${esc(other.section ?? '')}</span> · <time data-inkling-date datetime="${esc(other.date ?? '')}">${fmt(other.date)}</time></span>
-      </li>`,
-    )
-    .join('\n');
   return `<header><p><a href="${base}">← Field Notes</a></p></header>
 <main>
+  <inkling-page manifest="${base}inkling/manifest.json" item="${esc(item.id)}"></inkling-page>
   <article>
     <p class="kicker">${esc(item.section ?? '')} · <time datetime="${esc(item.date ?? '')}">${fmt(item.date)}</time></p>
     <h1>${esc(item.title)}</h1>
     <p>${esc(item.text)}</p>
+    <p class="controls" data-item="${esc(item.id)}">
+      <button type="button" data-signal="follow">More like this</button>
+      <button type="button" data-signal="hide">Not interested</button>
+      <output id="feedback"></output>
+    </p>
   </article>
   <aside aria-labelledby="related-heading">
     <h2 id="related-heading">Related</h2>
     <inkling-related manifest="${base}inkling/manifest.json" item="${esc(item.id)}" section="${esc(item.section ?? '')}">
       <ol class="related">
-${slots}
+${fallback.map((other) => slot(other, '        ')).join('\n')}
       </ol>
     </inkling-related>
     <details class="why">
@@ -122,17 +158,7 @@ ${slots}
       <ol id="why-list"><li>Waiting for the ranking…</li></ol>
     </details>
   </aside>
-</main>
-<script>
-  document.querySelector('inkling-related').addEventListener('inkling:ready', (event) => {
-    const list = document.getElementById('why-list');
-    list.replaceChildren(...event.detail.recommendations.map((r) => {
-      const li = document.createElement('li');
-      li.textContent = r.title + ': similarity ' + r.why.similarity.toFixed(2) + ', recency ' + r.why.recency.toFixed(2);
-      return li;
-    }));
-  });
-</script>`;
+</main>`;
 }
 
 function page(title: string, body: string): string {
@@ -144,9 +170,17 @@ function page(title: string, body: string): string {
 <title>${esc(title)}</title>
 <link rel="stylesheet" href="${base}style.css">
 <link rel="preload" href="${base}inkling/manifest.json" as="fetch" crossorigin="anonymous">
+<script>
+  // Inkling's consent hook, set before the components start. The demo asks with a checkbox;
+  // a real site asks its consent manager.
+  window.InklingConfig = {
+    consent: () => { try { return localStorage.getItem('inkling-demo-consent') === 'yes'; } catch { return false; } },
+  };
+</script>
 <script src="${base}inkling.js" defer></script>
+<script src="${base}demo.js" defer></script>
 </head>
-<body>
+<body data-manifest="${base}inkling/manifest.json">
 ${body}
 </body>
 </html>

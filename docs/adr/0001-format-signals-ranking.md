@@ -1,7 +1,8 @@
 # ADR 0001: The manifest and vector format, the signal schema, and the ranking function
 
-- Status: Accepted (milestone 1 builds the format and `related()`. The signal schema and the
-  profile are what milestone 2 builds.)
+- Status: Accepted (milestone 1 built the format and `related()`, milestone 2 the signals and
+  the profile). Amended by [ADR 0003](0003-personalization-client.md): followed items count as
+  seen, and the cold start keeps the site's order exactly.
 - Date: 2026-11-04
 
 ## Context
@@ -137,7 +138,8 @@ characters), and writes the manifest and shards ([`build.ts`](../../src/node/bui
 
 `npm run bench` ([`scripts/bench.ts`](../../scripts/bench.ts)) measures a synthetic catalog of
 10,000 news-like items in 10 sections. The numbers below are from Node 24 on the development
-machine. Measurements on a mid-range phone are part of the performance work in milestone 2.
+machine. [ADR 0003](0003-personalization-client.md) adds the same catalog in Chromium with a
+CPU slowed to a mid-range phone's.
 
 | Encoding                 | Shards  | Of which vectors | Gzipped | `related()`, all items |
 | ------------------------ | ------- | ---------------- | ------- | ---------------------- |
@@ -150,7 +152,7 @@ per 1,000-item section**. Vectors barely compress, but the metadata compresses a
 Sites with more items, or whose pages need every section, use 128 dimensions. Loading and
 scoring happen in idle time, after the page has rendered.
 
-### 5. The signal schema (milestone 2)
+### 5. The signal schema
 
 Signals are the only thing stored about the visitor. They live in IndexedDB, in the site's own
 origin:
@@ -169,7 +171,7 @@ origin:
   }
   ```
 
-- Object store `meta`, `keyPath: "key"`: `{ key: "state", paused: boolean, lastVisit: number }`.
+- Object store `meta`, `keyPath: "key"`: `{ key: "state", paused: boolean }`.
 
 | Kind                                    | Default weight             | Decays                            |
 | --------------------------------------- | -------------------------- | --------------------------------- |
@@ -217,7 +219,7 @@ pick    = argmax_c  (1 − λ) · base(c) − λ · red(c)       (MMR, λ = 0.2)
 
 - **`related(itemId)`** takes `sim` as the cosine to the item's vector and `conf = 1`. It uses
   no visitor data.
-- **"For you"** (milestone 2) takes `sim` from the profile above and `conf` from its mass. With
+- **"For you"** takes `sim` from the profile above and `conf` from its mass. With
   no signals, `conf = 0` and the site's own order (`prior`) decides. That is the cold start. As
   signals accumulate, the profile takes over gradually.
 - **Similarity is rescaled over the candidate set.** Each model uses its own band of cosines
@@ -231,13 +233,14 @@ pick    = argmax_c  (1 − λ) · base(c) − λ · red(c)       (MMR, λ = 0.2)
   hidden items and, by default, items already seen.
 - **Deterministic.** Ties go to the higher prior, then catalog order.
 - **Explainable.** Every result carries its terms (`similarity`, `relevance`, `recency`, `prior`,
-  `redundancy`). `explain()` (milestone 2) adds the signal items that contributed most:
-  `s_i · cos(c, v_i)`.
+  `redundancy`, `confidence`, and `similarityShare`, the part of the score similarity accounts
+  for). For "for you", `because` lists the signal items that contributed most, by
+  `s_i · cos(c, v_i)`, and `explain(itemId)` gives the same for any item.
 
 ## Consequences
 
-- The client is about 2.5 KB gzipped (6.0 KB minified), and 3.4 KB with `<inkling-related>`,
-  well under the 10 KB budget. `npm run size` checks this in CI.
+- The client was 2.5 KB gzipped with `related()` alone, and is 5.3 KB with personalization
+  (6.5 KB with the web components), under the 10 KB budget. `npm run size` checks this in CI.
 - Related items need no consent and no storage. They are the safe first integration.
 - A site can switch models by rebuilding, with no migration on any device. The price is that
   the first page after a switch fetches new shards, and that items removed from the catalog

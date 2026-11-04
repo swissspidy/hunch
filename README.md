@@ -1,15 +1,17 @@
 # Inkling
 
 First-party, on-device personalization for websites. Inkling ranks your catalog in the
-visitor's browser: related items now, and "for you" modules and "since your last visit"
+visitor's browser: related items and "for you" modules now, and "since your last visit"
 summaries next. Your build step publishes a vector for each item, and the browser ranks them
 with plain arithmetic. No model runs in the browser, there is no server-side profile, and nothing
 about the visitor leaves the device.
 
-**Status: milestone 1 of 5.** The CLI builds a manifest and vector shards from a feed, and the
-client ranks related items. Signals, the "for you" profile and the privacy controls are next
-(see the [roadmap](#roadmap)). The format and the ranking function are specified in
-[ADR 0001](docs/adr/0001-format-signals-ranking.md).
+**Status: milestone 2 of 5.** The CLI builds a manifest and vector shards from a feed. The
+client ranks related items, and, with the site's consent, "for you" from signals kept on the
+device, with `explain()` and the visitor's controls. See the [roadmap](#roadmap). The format,
+the signals and the ranking function are specified in
+[ADR 0001](docs/adr/0001-format-signals-ranking.md), and personalization in the client in
+[ADR 0003](docs/adr/0003-personalization-client.md).
 
 ## How it works
 
@@ -18,10 +20,12 @@ client ranks related items. Signals, the "for you" profile and the privacy contr
    [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) through Transformers.js. It
    writes `manifest.json` and one small binary shard per section: 256-dimensional int8 vectors,
    about 260 KB gzipped per 1,000 items.
-2. **In the browser**, the client (2.5 KB gzipped, no dependencies) fetches the manifest and
+2. **In the browser**, the client (5.3 KB gzipped, no dependencies) fetches the manifest and
    the shards it needs. It ranks by cosine similarity, a small recency boost and diversity (MMR).
-3. **On the page**, the server renders a normal, non-personalized list. `<inkling-related>`
-   swaps its entries for related items in idle time, slot for slot, with no layout shift.
+   For "for you", similarity is to a profile derived from the visitor's signals (what they read,
+   followed or hid), which stay in the site's own IndexedDB.
+3. **On the page**, the server renders a normal, non-personalized list. `<inkling-related>` and
+   `<inkling-for-you>` swap its entries in idle time, slot for slot, with no layout shift.
 
 ## Quick start
 
@@ -65,15 +69,60 @@ item's link, title, section, date and image, so nothing moves. If the manifest c
 loaded, the fallback stays. The element sets `data-inkling-state` to `loading`, `ready` or
 `error`, and fires `inkling:ready` with the recommendations.
 
-Or use the client directly:
+### "For you"
+
+Personalization stays off until the site says the visitor agreed. Set the consent hook before
+the script, record views on article pages, and wrap a list in the site's own order (the cold
+start) on the home page:
+
+```html
+<script>
+  window.InklingConfig = { consent: () => myConsentManager.allows('personalization') };
+</script>
+<script src="/inkling.global.js" defer></script>
+
+<!-- On an article page: records the view, and dwell time from 10 seconds on. -->
+<inkling-page manifest="/inkling/manifest.json" item="sourdough-starter"></inkling-page>
+
+<!-- On the home page: the editors' picks, replaced once the visitor has a profile. -->
+<inkling-for-you manifest="/inkling/manifest.json">
+  <ol>
+    <li data-inkling-slot data-inkling-id="night-train-alps">…</li>
+    <!-- … -->
+  </ol>
+</inkling-for-you>
+```
+
+Without consent nothing is stored (not even an empty database) and the list never changes.
+With consent, items the visitor has read are left out, hidden items never come back, and the
+profile takes over gradually as signals accumulate.
+
+### The client
 
 ```js
 import { Inkling } from '@swissspidy/inkling';
 
-const inkling = await Inkling.load({ manifest: '/inkling/manifest.json' });
-const related = await inkling.related('sourdough-starter', { n: 4, sections: 'same' });
-// [{ id, url, title, section, date, score, why: { similarity, relevance, recency, prior, redundancy } }, …]
+const inkling = await Inkling.load({
+  manifest: '/inkling/manifest.json',
+  consent: () => myConsentManager.allows('personalization'), // asked before every read or write
+});
+
+await inkling.related('sourdough-starter', { n: 4, sections: 'same' }); // no visitor data
+inkling.observe('sourdough-starter'); // a view now, dwell time as the page is left
+await inkling.record('follow', 'rye-bread'); // or 'hide', 'click', 'view', 'dwell'
+await inkling.recommend({ n: 4 }); // "for you"
+await inkling.rank(['a', 'b', 'c']); // reorder a server-rendered list
+await inkling.explain('cold-brew'); // { similarity, confidence, because: [{ id, title, share }], … }
+
+// The visitor's controls
+await inkling.pause(); // and resume(), paused()
+await inkling.export(); // { format: 'inkling/signals', signals: [{ itemId, kind, weight, at }] }
+await inkling.forget(); // deletes everything; forget(itemId) one item's signals
 ```
+
+Every result has `why`: `similarity`, `relevance`, `recency`, `prior`, `redundancy`,
+`confidence`, `similarityShare` (how much of the score the profile accounts for: low means an
+editors' pick) and `because` (the visitor's items it leans on).
 
 ## The demo
 
@@ -85,8 +134,11 @@ npm run demo -- --serve     # http://127.0.0.1:4173/
 [`demo/feed.xml`](demo/feed.xml) is a fictional publication with 32 articles in four sections.
 Its EmbeddingGemma vectors come from the committed embedding cache, so the demo builds without
 the model. Open an article: the "Related" list is ranked in your browser, and "Why these?" shows
-each item's similarity. The browser test checks that the page fetches only `manifest.json` and
-the shards, and that the layout shift is 0 on desktop and phone viewports.
+each item's similarity. On the home page, turn on personalization under "Your data", read a few
+articles, and "For you" follows. "More like this" and "Not interested" on an article are
+explicit signals, and pause, export and forget are on the home page. The browser tests check
+that the pages fetch only `manifest.json` and the shards, that nothing is stored without
+consent, and that the layout shift is 0 on desktop and phone viewports.
 
 ## The CLI
 
@@ -113,19 +165,22 @@ and baselines, not for production.
 ## Privacy
 
 - Related items use no visitor data and store nothing on the device.
-- The "for you" profile (milestone 2) will be derived from a list of signals (item id, kind,
-  weight, time) in the site's own IndexedDB. It will never be sent anywhere, and recording is off
-  until the site enables it. `pause()`, `forget()` and `export()` give the visitor control.
+- The "for you" profile is derived on every page from a list of signals (item id, kind, weight,
+  time) in the site's own IndexedDB, and never stored itself. Nothing is sent anywhere: the
+  only requests are for the manifest and the shards, which are the same for every visitor.
+- Recording is off until the site's consent hook says yes, and the hook is asked before every
+  read or write. `pause()`, `export()` and `forget()` give the visitor control. `forget()`
+  deletes the database and works even without consent, so call it when consent is withdrawn.
 - **Consent is the site's call.** Storing personalization signals on the visitor's device may
-  need consent under the EU ePrivacy Directive (Art. 5(3)), even though nothing leaves the device.
-  Inkling will call a consent hook before it reads or writes any signal.
+  need consent under the EU ePrivacy Directive (Art. 5(3)), even though nothing leaves the
+  device.
 
 ## Roadmap
 
 1. ✅ The CLI builds a manifest and vector shards from an RSS feed. The client recommends
    related items on a demo site with no model in the browser.
-2. Signals, decay, profile derivation, "for you" ranking, `explain()`, user controls. CLS 0 on
-   the demo.
+2. ✅ Signals, decay, profile derivation, "for you" ranking, `explain()`, user controls. CLS 0
+   on the demo.
 3. Model switch: profiles recompute from signals with no migration, and the evaluation shows
    no quality loss.
 4. Offline evaluation (nDCG@10, recall@10) against popularity and recency baselines.

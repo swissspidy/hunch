@@ -9,7 +9,7 @@ import { bundleEsm } from './bundle.ts';
 
 const BUDGETS: [label: string, entry: string, gzipBudget: number][] = [
   ['core (Inkling client)', 'src/client/index.ts', 10 * 1024],
-  ['core + <inkling-related>', 'src/elements/global.ts', 12 * 1024],
+  ['core + web components', 'src/elements/global.ts', 12 * 1024],
 ];
 
 let failed = false;
