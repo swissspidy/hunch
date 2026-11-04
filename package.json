@@ -42,6 +42,10 @@
       "types": "./dist/elements/index.d.ts",
       "default": "./dist/elements/index.js"
     },
+    "./digest": {
+      "types": "./dist/digest/index.d.ts",
+      "default": "./dist/digest/index.js"
+    },
     "./format": {
       "types": "./dist/format/index.d.ts",
       "default": "./dist/format/index.js"

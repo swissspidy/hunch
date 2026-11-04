@@ -33,7 +33,7 @@ The browser tests need Chromium for the installed `playwright-core`:
 `npx playwright-core install chromium` (on Linux, add `install-deps` if it doesn't start).
 
 **The client stays dependency-free and Node-free.** oxlint rejects `node:*` and build-step
-imports under `src/format`, `src/rank`, `src/client` and `src/elements`.
+imports under `src/format`, `src/rank`, `src/client`, `src/elements` and `src/digest`.
 
 ## The demo's embeddings
 

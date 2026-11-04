@@ -16,6 +16,7 @@ import {
   IndexedDbStore,
   MemoryStore,
   SIGNAL_WEIGHTS,
+  nextVisit,
   toPrune,
   type Aggregate,
   type Signal,
@@ -44,6 +45,8 @@ export interface InklingOptions {
   maxSignals?: number;
   /** Implicit signals kept at most this many days (default 180). */
   maxSignalAgeDays?: number;
+  /** Minutes without activity that end a visit (default 30), for "since your last visit". */
+  visitGapMinutes?: number;
   /** Replaces `fetch` (tests, service workers, custom caching). */
   fetch?: Fetch;
   /** Clock, in epoch milliseconds (tests). */
@@ -78,6 +81,8 @@ export interface RecommendOptions extends RankingOptions {
   sections?: readonly string[];
   /** Include items the visitor has already viewed (default false). */
   includeSeen?: boolean;
+  /** Only items dated after this time (epoch milliseconds); undated items are left out. */
+  after?: number;
 }
 
 /** An item the profile leans on: "because you read …". */
@@ -178,7 +183,12 @@ export class Inkling {
 
   /** Fetches the manifest. Shards are fetched on first use. */
   static async load(options: InklingOptions): Promise<Inkling> {
-    for (const name of ['signalHalfLifeDays', 'maxSignals', 'maxSignalAgeDays'] as const) {
+    for (const name of [
+      'signalHalfLifeDays',
+      'maxSignals',
+      'maxSignalAgeDays',
+      'visitGapMinutes',
+    ] as const) {
       const value = options[name];
       if (value !== undefined && !(Number.isFinite(value) && value > 0)) {
         throw new RangeError(`Inkling: ${name} must be a positive number, not ${value}`);
@@ -277,6 +287,7 @@ export class Inkling {
    */
   observe(itemId: string): () => void {
     if (typeof document === 'undefined') return () => {};
+    void this.visit();
     void this.record('view', itemId);
     let visibleSince: number | null = document.visibilityState === 'visible' ? this.now() : null;
     let seconds = 0;
@@ -314,11 +325,42 @@ export class Inkling {
     const personal = await this.personal();
     await this.catalog.loadSections(options.sections);
     const exclude = new Set(options.exclude);
+    const after = options.after;
     const pool = this.candidates(options.sections, (e) => {
       const agg = personal.aggregates.get(e.item.id);
+      if (after !== undefined && !(Date.parse(e.item.date ?? '') > after)) return false;
       return !exclude.has(e.item.id) && !agg?.hidden && (options.includeSeen || !agg?.seen);
     });
     return this.rankPersonal(pool, personal, options);
+  }
+
+  /**
+   * Records activity now (with consent, unless paused) and returns when the visitor's previous
+   * visit ended, or `undefined` on a first visit. A visit ends after `visitGapMinutes` without
+   * activity; calling this again in the same visit changes nothing.
+   */
+  async visit(): Promise<number | undefined> {
+    if (!(await this.consented())) return undefined;
+    try {
+      const state = await this.store.getState();
+      if (state.paused) return state.previousVisit;
+      const next = nextVisit(state, this.now(), (this.options.visitGapMinutes ?? 30) * 60_000);
+      if (!(await this.consented())) return undefined;
+      await this.store.setState(next);
+      return next.previousVisit;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * "Since your last visit": items published after the visitor's previous visit, ranked like
+   * `recommend()`. Records this visit first. Empty on a first visit or without consent.
+   */
+  async sinceLastVisit(options: Omit<RecommendOptions, 'after'> = {}): Promise<Recommendation[]> {
+    const previous = await this.visit();
+    if (previous === undefined) return [];
+    return this.recommend({ ...options, after: previous });
   }
 
   /**

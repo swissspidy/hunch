@@ -1,14 +1,14 @@
 # Inkling
 
 First-party, on-device personalization for websites. Inkling ranks your catalog in the
-visitor's browser: related items and "for you" modules now, and "since your last visit"
-summaries next. Your build step publishes a vector for each item, and the browser ranks them
+visitor's browser: related items, "for you" modules and "since your last visit" digests. Your build step publishes a vector for each item, and the browser ranks them
 with plain arithmetic. No model runs in the browser, there is no server-side profile, and nothing
 about the visitor leaves the device.
 
-**Status: milestones 1–4 of 5.** The CLI builds a manifest and vector shards from a feed. The
-client ranks related items, and, with the site's consent, "for you" from signals kept on the
-device, with `explain()` and the visitor's controls. See the [roadmap](#roadmap). The format,
+**Status: milestones 1–4 of 5, and the first half of 5.** The CLI builds a manifest and vector
+shards from a feed. The client ranks related items, and, with the site's consent, "for you"
+and "since your last visit" from signals kept on the device, with `explain()` and the
+visitor's controls. See the [roadmap](#roadmap). The format,
 the signals and the ranking function are specified in
 [ADR 0001](docs/adr/0001-format-signals-ranking.md), and personalization in the client in
 [ADR 0003](docs/adr/0003-personalization-client.md).
@@ -20,7 +20,7 @@ the signals and the ranking function are specified in
    [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) through Transformers.js. It
    writes `manifest.json` and one small binary shard per section: 256-dimensional int8 vectors,
    about 260 KB gzipped per 1,000 items.
-2. **In the browser**, the client (6.6 KB gzipped, no dependencies) fetches the manifest and
+2. **In the browser**, the client (6.8 KB gzipped, no dependencies) fetches the manifest and
    the shards it needs. It ranks by cosine similarity, a small recency boost and diversity (MMR).
    For "for you", similarity is to a profile derived from the visitor's signals (what they read,
    followed or hid), which stay in the site's own IndexedDB.
@@ -120,6 +120,25 @@ await inkling.export(); // { format: 'inkling/signals', signals: [{ itemId, kind
 await inkling.forget(); // deletes everything; forget(itemId) one item's signals
 ```
 
+### "Since your last visit"
+
+`<inkling-digest>` shows what was published since the visitor's previous visit (with consent),
+ranked by their interests. Where the browser has a built-in Summarizer with its on-device model,
+it also writes a one-line summary. Elsewhere the placeholder stays:
+
+```html
+<inkling-digest manifest="/inkling/manifest.json">
+  <p data-inkling-summary>The latest articles.</p>
+  <ol>
+    <li data-inkling-slot data-inkling-id="newest-post">…</li>
+  </ol>
+</inkling-digest>
+```
+
+In code: `await inkling.sinceLastVisit({ n: 5 })`, and `summarize(items)` from
+`@swissspidy/inkling/digest`. A visit ends after 30 minutes without activity
+([ADR 0004](docs/adr/0004-since-your-last-visit.md)).
+
 Every result has `why`: `similarity`, `relevance`, `recency`, `prior`, `redundancy`,
 `confidence`, `similarityShare` (how much of the score the profile accounts for: low means an
 editors' pick) and `because` (the visitor's items it leans on).
@@ -139,7 +158,9 @@ Its EmbeddingGemma vectors come from the committed embedding cache, so the demo 
 the model. Open an article: the "Related" list is ranked in your browser, and "Why these?" shows
 each item's similarity. On the home page, turn on personalization under "Your data", read a few
 articles, and "For you" follows. "More like this" and "Not interested" on an article are
-explicit signals, and pause, export and forget are on the home page. The browser tests check
+explicit signals, and pause, export and forget are on the home page. To try "since your last
+visit", follow the home page's link to visit as if it were 15 September 2026, then come back
+today. The browser tests check
 that the pages fetch only `manifest.json` and the shards, that nothing is stored without
 consent, and that the layout shift is 0 on desktop and phone viewports.
 
@@ -187,8 +208,8 @@ and baselines, not for production.
 3. ✅ Model switch: profiles recompute from signals with no migration, and the evaluation shows
    no quality loss ([docs/evaluation.md](docs/evaluation.md)).
 4. ✅ Offline evaluation: on MIND, nDCG@10 0.390 vs 0.308 for popularity.
-5. Optional: query embedding in the browser, and a "since your last visit" digest with the
-   built-in Summarizer.
+5. Optional: a "since your last visit" digest with the built-in Summarizer (done), and query
+   embedding in the browser (next).
 
 ## Evaluation
 

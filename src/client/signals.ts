@@ -19,6 +19,21 @@ export interface Signal {
 
 export interface SignalState {
   paused: boolean;
+  /** The visitor's last activity on the site, epoch milliseconds. */
+  lastSeen?: number;
+  /** The last activity of the visit before the current one: "since your last visit". */
+  previousVisit?: number;
+}
+
+/**
+ * The state after activity at `now`: a gap of more than `gapMs` since the last activity starts
+ * a new visit, and the old visit's last activity becomes the previous visit.
+ */
+export function nextVisit(state: SignalState, now: number, gapMs: number): SignalState {
+  if (state.lastSeen !== undefined && now - state.lastSeen > gapMs) {
+    return { ...state, previousVisit: state.lastSeen, lastSeen: now };
+  }
+  return { ...state, lastSeen: Math.max(now, state.lastSeen ?? now) };
 }
 
 /** Where signals live. `IndexedDbStore` in browsers, `MemoryStore` elsewhere and in tests. */
@@ -186,7 +201,11 @@ export class IndexedDbStore implements SignalStore {
       'readonly',
       (store) => store.get('state') as IDBRequest<(SignalState & { key: string }) | undefined>,
     );
-    return { paused: row?.paused ?? false };
+    return compactState({
+      paused: row?.paused ?? false,
+      lastSeen: row?.lastSeen,
+      previousVisit: row?.previousVisit,
+    });
   }
 
   async setState(state: SignalState): Promise<void> {
@@ -234,6 +253,12 @@ export class IndexedDbStore implements SignalStore {
     });
     return result;
   }
+}
+
+function compactState(state: SignalState): SignalState {
+  if (state.lastSeen === undefined) delete state.lastSeen;
+  if (state.previousVisit === undefined) delete state.previousVisit;
+  return state;
 }
 
 function request<T>(req: IDBRequest<T>): Promise<T> {

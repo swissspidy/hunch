@@ -1,3 +1,4 @@
+import { InklingDigestElement } from './digest.ts';
 import { InklingForYouElement } from './for-you.ts';
 import { InklingPageElement } from './page.ts';
 import { InklingRelatedElement } from './related.ts';
@@ -9,6 +10,7 @@ export function defineElements(): void {
     ['inkling-related', InklingRelatedElement],
     ['inkling-for-you', InklingForYouElement],
     ['inkling-page', InklingPageElement],
+    ['inkling-digest', InklingDigestElement],
   ] as const) {
     if (!customElements.get(name)) customElements.define(name, element);
   }
