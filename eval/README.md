@@ -13,8 +13,31 @@ npm install --no-save @huggingface/transformers
 node eval/run.ts --dataset mind --mind-dir eval/.data/mind --models hash,gemma --impressions 2000
 ```
 
-Results go to `eval/results/<name>.json`. Builds go to `eval/.work/`, and embeddings are cached
-in `eval/.cache/`, so a second run doesn't embed again.
+Results go to `eval/results/<name>.json` (`--name` overrides the name). Builds go to
+`eval/.work/`, and embeddings are cached in `eval/.cache/` (one directory per weights variant,
+such as `q8`; `--cache` sets another root), so a second run doesn't embed again. The default
+name includes the weights variant and any float32 quantization, so runs that differ only in those
+don't overwrite each other.
+
+### Ablation: dimensions, quantization, weights
+
+```sh
+node eval/run.ts --dataset mind --mind-dir eval/.data/mind --impressions 10000 \
+  --models hash@256,gemma,gemma-q4@256/int8 --dims 128,256,512,768 \
+  --quantization int8,float32 --variants profile,default --name mind-ablation-10k
+```
+
+- `--dims` and `--quantization` take comma-separated lists. Each model gets one catalog per
+  combination. The embedding cache keeps full-size vectors, and truncation and quantization
+  happen at build, so a model is embedded once however many catalogs it gets.
+- `name@dims` or `name@dims/quantization` in `--models` gives that model one catalog only.
+  Models: `hash`, `gemma` (q8 weights, the CLI's default), `gemma-q4`, `gemma-fp32`.
+- `--variants` picks the rankings run per catalog: `profile`, `default`, `diversity`.
+- The results file then also lists each catalog's size (shard bytes per item, manifest bytes),
+  the mean `rank()` time per impression, and paired comparisons of neighbouring catalogs of a
+  model (adjacent sizes, int8 vs float32, weights variants): the mean nDCG@10 difference over
+  the same impressions, its standard error, and a bootstrap 95% interval (2,000 resamples of
+  impressions). They use the default weights when those are run.
 
 ## Protocol
 

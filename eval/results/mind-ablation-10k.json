@@ -1,0 +1,559 @@
+{
+  "dataset": "MIND small (dev, 10000 impressions)",
+  "impressions": 10000,
+  "items": 24784,
+  "rows": [
+    {
+      "ranker": "random",
+      "metrics": {
+        "auc": 0.5016238529300224,
+        "mrr": 0.2219476089428148,
+        "ndcg5": 0.2265205918685054,
+        "ndcg10": 0.2883836060888026,
+        "recall10": 0.5205786566211161
+      }
+    },
+    {
+      "ranker": "popularity",
+      "metrics": {
+        "auc": 0.5368006646222039,
+        "mrr": 0.2384943965457898,
+        "ndcg5": 0.24582037560926404,
+        "ndcg10": 0.309969260167377,
+        "recall10": 0.548849042623999
+      }
+    },
+    {
+      "ranker": "Inkling, hash (lexical) (256 dims): profile only",
+      "catalog": "hash (lexical) (256 dims)",
+      "metrics": {
+        "auc": 0.5352611752149693,
+        "mrr": 0.24316843244101596,
+        "ndcg5": 0.25223707611895213,
+        "ndcg10": 0.31528287360199014,
+        "recall10": 0.5505195325507388
+      },
+      "rankMs": 1.2434574402000025
+    },
+    {
+      "ranker": "Inkling, hash (lexical) (256 dims): profile + popularity (default weights)",
+      "catalog": "hash (lexical) (256 dims)",
+      "metrics": {
+        "auc": 0.5450929136275056,
+        "mrr": 0.2462323340162264,
+        "ndcg5": 0.25767082550168524,
+        "ndcg10": 0.3205709710348169,
+        "recall10": 0.5609991519591074
+      },
+      "rankMs": 1.3000257806999973
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (128 dims): profile only",
+      "catalog": "EmbeddingGemma q8 (128 dims)",
+      "metrics": {
+        "auc": 0.6217964863895535,
+        "mrr": 0.2946620953381056,
+        "ndcg5": 0.32239782711511944,
+        "ndcg10": 0.3810136808241114,
+        "recall10": 0.6279335934897925
+      },
+      "rankMs": 0.9241347606999567
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (128 dims): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q8 (128 dims)",
+      "metrics": {
+        "auc": 0.6263803537815262,
+        "mrr": 0.2977286441397953,
+        "ndcg5": 0.32627031164412024,
+        "ndcg10": 0.3841179970316742,
+        "recall10": 0.630135379204078
+      },
+      "rankMs": 0.903053107499962
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (128 dims, float32): profile only",
+      "catalog": "EmbeddingGemma q8 (128 dims, float32)",
+      "metrics": {
+        "auc": 0.6219817211884684,
+        "mrr": 0.2948885012436214,
+        "ndcg5": 0.3225283651430849,
+        "ndcg10": 0.38110128192266024,
+        "recall10": 0.6275615101564591
+      },
+      "rankMs": 0.8851105662999434
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (128 dims, float32): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q8 (128 dims, float32)",
+      "metrics": {
+        "auc": 0.6266432713154717,
+        "mrr": 0.29794247396767815,
+        "ndcg5": 0.3263036469124333,
+        "ndcg10": 0.3844678055181514,
+        "recall10": 0.6308299625374112
+      },
+      "rankMs": 0.9408901422000352
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (256 dims): profile only",
+      "catalog": "EmbeddingGemma q8 (256 dims)",
+      "metrics": {
+        "auc": 0.6219921890281838,
+        "mrr": 0.29637860715999087,
+        "ndcg5": 0.3256193577149821,
+        "ndcg10": 0.38243551996475394,
+        "recall10": 0.6271328442390435
+      },
+      "rankMs": 1.6638229017000732
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (256 dims): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q8 (256 dims)",
+      "metrics": {
+        "auc": 0.6267821370281915,
+        "mrr": 0.29890070518160716,
+        "ndcg5": 0.3289339477620782,
+        "ndcg10": 0.38563820923745806,
+        "recall10": 0.631134233127932
+      },
+      "rankMs": 1.6128494264001463
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (256 dims, float32): profile only",
+      "catalog": "EmbeddingGemma q8 (256 dims, float32)",
+      "metrics": {
+        "auc": 0.6219724367564456,
+        "mrr": 0.29656676762284984,
+        "ndcg5": 0.3256781816419624,
+        "ndcg10": 0.38267935580022483,
+        "recall10": 0.6274418521755515
+      },
+      "rankMs": 1.5073650017999622
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (256 dims, float32): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q8 (256 dims, float32)",
+      "metrics": {
+        "auc": 0.6267068580226721,
+        "mrr": 0.29917126419179985,
+        "ndcg5": 0.3291643630821297,
+        "ndcg10": 0.385805031341273,
+        "recall10": 0.6310850664612654
+      },
+      "rankMs": 1.6119861859998972
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (512 dims): profile only",
+      "catalog": "EmbeddingGemma q8 (512 dims)",
+      "metrics": {
+        "auc": 0.6192737082767754,
+        "mrr": 0.2891790618983983,
+        "ndcg5": 0.31785628115628767,
+        "ndcg10": 0.3736767054001762,
+        "recall10": 0.6196430552780046
+      },
+      "rankMs": 2.7911368479999568
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (512 dims): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q8 (512 dims)",
+      "metrics": {
+        "auc": 0.624320359699574,
+        "mrr": 0.2935835303536233,
+        "ndcg5": 0.322045388884381,
+        "ndcg10": 0.37764820202444194,
+        "recall10": 0.621189007658957
+      },
+      "rankMs": 3.015069631000052
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (512 dims, float32): profile only",
+      "catalog": "EmbeddingGemma q8 (512 dims, float32)",
+      "metrics": {
+        "auc": 0.6192832632257943,
+        "mrr": 0.2891201133384124,
+        "ndcg5": 0.31761772719376247,
+        "ndcg10": 0.3736523828620086,
+        "recall10": 0.6197704362303855
+      },
+      "rankMs": 2.458872284500103
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (512 dims, float32): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q8 (512 dims, float32)",
+      "metrics": {
+        "auc": 0.624344379112294,
+        "mrr": 0.2935201769463891,
+        "ndcg5": 0.32196259354346457,
+        "ndcg10": 0.3775161088127633,
+        "recall10": 0.621111388611338
+      },
+      "rankMs": 2.5049496023000537
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (768 dims): profile only",
+      "catalog": "EmbeddingGemma q8 (768 dims)",
+      "metrics": {
+        "auc": 0.6296460465650295,
+        "mrr": 0.2985806288214136,
+        "ndcg5": 0.3268105392132257,
+        "ndcg10": 0.3846384113239982,
+        "recall10": 0.6311322446996931
+      },
+      "rankMs": 3.8698507172999848
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (768 dims): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q8 (768 dims)",
+      "metrics": {
+        "auc": 0.6341159349551252,
+        "mrr": 0.301344473412936,
+        "ndcg5": 0.33010569129588585,
+        "ndcg10": 0.3871607462173118,
+        "recall10": 0.6318894579031561
+      },
+      "rankMs": 3.8151101732998565
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (768 dims, float32): profile only",
+      "catalog": "EmbeddingGemma q8 (768 dims, float32)",
+      "metrics": {
+        "auc": 0.6295305040130642,
+        "mrr": 0.29827736735264443,
+        "ndcg5": 0.32645966158359496,
+        "ndcg10": 0.38449250428377746,
+        "recall10": 0.6313639113663596
+      },
+      "rankMs": 3.9398185557002026
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (768 dims, float32): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q8 (768 dims, float32)",
+      "metrics": {
+        "auc": 0.6340164580441221,
+        "mrr": 0.3012661504476271,
+        "ndcg5": 0.33017878938828554,
+        "ndcg10": 0.38717074512297717,
+        "recall10": 0.6321411245698227
+      },
+      "rankMs": 3.6252976051998385
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q4 (256 dims): profile only",
+      "catalog": "EmbeddingGemma q4 (256 dims)",
+      "metrics": {
+        "auc": 0.624580359592416,
+        "mrr": 0.3015352782998073,
+        "ndcg5": 0.33235660390994026,
+        "ndcg10": 0.38900654309238747,
+        "recall10": 0.6337503182927667
+      },
+      "rankMs": 1.5149009735004568
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q4 (256 dims): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q4 (256 dims)",
+      "metrics": {
+        "auc": 0.6293444344771045,
+        "mrr": 0.3040081909072282,
+        "ndcg5": 0.33458220961342466,
+        "ndcg10": 0.39101428014686906,
+        "recall10": 0.6340266278165766
+      },
+      "rankMs": 1.6438445738994691
+    }
+  ],
+  "modelSwitch": {
+    "identical": 10000,
+    "total": 10000
+  },
+  "catalogs": [
+    {
+      "label": "hash (lexical) (256 dims)",
+      "model": "inkling/hash",
+      "dims": 256,
+      "quantization": "int8",
+      "default": true,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 11688812,
+      "manifestBytes": 5199,
+      "bytesPerItem": 471.62734021949643,
+      "buildSeconds": 1.1530945330000004
+    },
+    {
+      "label": "EmbeddingGemma q8 (128 dims)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q8",
+      "dims": 128,
+      "quantization": "int8",
+      "default": false,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 8518040,
+      "manifestBytes": 5393,
+      "bytesPerItem": 343.6910910264687,
+      "buildSeconds": 1.0049630749999996
+    },
+    {
+      "label": "EmbeddingGemma q8 (128 dims, float32)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q8",
+      "dims": 128,
+      "quantization": "float32",
+      "default": false,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 18035096,
+      "manifestBytes": 5406,
+      "bytesPerItem": 727.6910910264687,
+      "buildSeconds": 1.0312589769999976
+    },
+    {
+      "label": "EmbeddingGemma q8 (256 dims)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q8",
+      "dims": 256,
+      "quantization": "int8",
+      "default": true,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 11690392,
+      "manifestBytes": 5393,
+      "bytesPerItem": 471.6910910264687,
+      "buildSeconds": 1.158044556000008
+    },
+    {
+      "label": "EmbeddingGemma q8 (256 dims, float32)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q8",
+      "dims": 256,
+      "quantization": "float32",
+      "default": false,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 30724504,
+      "manifestBytes": 5410,
+      "bytesPerItem": 1239.6910910264687,
+      "buildSeconds": 1.196132310000001
+    },
+    {
+      "label": "EmbeddingGemma q8 (512 dims)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q8",
+      "dims": 512,
+      "quantization": "int8",
+      "default": false,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 18035096,
+      "manifestBytes": 5403,
+      "bytesPerItem": 727.6910910264687,
+      "buildSeconds": 1.8119728069999836
+    },
+    {
+      "label": "EmbeddingGemma q8 (512 dims, float32)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q8",
+      "dims": 512,
+      "quantization": "float32",
+      "default": false,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 56103320,
+      "manifestBytes": 5413,
+      "bytesPerItem": 2263.6910910264687,
+      "buildSeconds": 1.9053551220000082
+    },
+    {
+      "label": "EmbeddingGemma q8 (768 dims)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q8",
+      "dims": 768,
+      "quantization": "int8",
+      "default": false,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 24379800,
+      "manifestBytes": 5406,
+      "bytesPerItem": 983.6910910264687,
+      "buildSeconds": 2.3473156820000147
+    },
+    {
+      "label": "EmbeddingGemma q8 (768 dims, float32)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q8",
+      "dims": 768,
+      "quantization": "float32",
+      "default": false,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 81482136,
+      "manifestBytes": 5416,
+      "bytesPerItem": 3287.6910910264687,
+      "buildSeconds": 2.1306479640000036
+    },
+    {
+      "label": "EmbeddingGemma q4 (256 dims)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q4",
+      "dims": 256,
+      "quantization": "int8",
+      "default": true,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 11690392,
+      "manifestBytes": 5393,
+      "bytesPerItem": 471.6910910264687,
+      "buildSeconds": 1.2644162899999647
+    }
+  ],
+  "comparisons": [
+    {
+      "a": "EmbeddingGemma q8 (128 dims)",
+      "b": "EmbeddingGemma q8 (128 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.00034980848647708253,
+      "stderr": 0.00021380043449064268,
+      "ci95": [-0.00005649227214159639, 0.0007656292056407065]
+    },
+    {
+      "a": "EmbeddingGemma q8 (128 dims)",
+      "b": "EmbeddingGemma q8 (256 dims)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.0015202122057855945,
+      "stderr": 0.001376898685279974,
+      "ci95": [-0.0010581744041756385, 0.004245305661248244]
+    },
+    {
+      "a": "EmbeddingGemma q8 (128 dims, float32)",
+      "b": "EmbeddingGemma q8 (256 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.0013372258231235453,
+      "stderr": 0.0013807251419883865,
+      "ci95": [-0.0013021429675290554, 0.004100776280792076]
+    },
+    {
+      "a": "EmbeddingGemma q8 (256 dims)",
+      "b": "EmbeddingGemma q8 (256 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.00016682210381503587,
+      "stderr": 0.00019553824795335144,
+      "ci95": [-0.0002112282694319833, 0.000550888633640802]
+    },
+    {
+      "a": "EmbeddingGemma q8 (256 dims)",
+      "b": "EmbeddingGemma q8 (512 dims)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": -0.007990007213017033,
+      "stderr": 0.0015571606881799958,
+      "ci95": [-0.011164665592797305, -0.004825027247127492]
+    },
+    {
+      "a": "EmbeddingGemma q8 (256 dims)",
+      "b": "EmbeddingGemma q4 (256 dims)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.005376070909409976,
+      "stderr": 0.0009748549449934413,
+      "ci95": [0.0034326314322411285, 0.007367086390729851]
+    },
+    {
+      "a": "EmbeddingGemma q8 (256 dims, float32)",
+      "b": "EmbeddingGemma q8 (512 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": -0.008288922528510507,
+      "stderr": 0.0015622980219057035,
+      "ci95": [-0.01145399309051645, -0.005135752902938554]
+    },
+    {
+      "a": "EmbeddingGemma q8 (512 dims)",
+      "b": "EmbeddingGemma q8 (512 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": -0.00013209321167844038,
+      "stderr": 0.00017782600740879324,
+      "ci95": [-0.0004747463993338467, 0.0002074996972738457]
+    },
+    {
+      "a": "EmbeddingGemma q8 (512 dims)",
+      "b": "EmbeddingGemma q8 (768 dims)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.009512544192869512,
+      "stderr": 0.001092119913154525,
+      "ci95": [0.007440794843357971, 0.011622594298063949]
+    },
+    {
+      "a": "EmbeddingGemma q8 (512 dims, float32)",
+      "b": "EmbeddingGemma q8 (768 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.00965463631021295,
+      "stderr": 0.0010907829216184367,
+      "ci95": [0.007570471801050688, 0.011814789999440021]
+    },
+    {
+      "a": "EmbeddingGemma q8 (768 dims)",
+      "b": "EmbeddingGemma q8 (768 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.000009998905665015662,
+      "stderr": 0.0001710302163130511,
+      "ci95": [-0.00031719844845035675, 0.00033704899864422575]
+    },
+    {
+      "a": "EmbeddingGemma q8 (256 dims)",
+      "b": "EmbeddingGemma q8 (128 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": -0.0011704037193085075,
+      "stderr": 0.0013782684084549125,
+      "ci95": [-0.003866425171687237, 0.0014945556686690815]
+    },
+    {
+      "a": "EmbeddingGemma q8 (256 dims)",
+      "b": "EmbeddingGemma q8 (512 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": -0.008122100424695477,
+      "stderr": 0.0015594025807962552,
+      "ci95": [-0.011266290279333005, -0.004977783865770607]
+    },
+    {
+      "a": "EmbeddingGemma q8 (256 dims)",
+      "b": "EmbeddingGemma q8 (768 dims)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.001522536979852497,
+      "stderr": 0.0015606619236916844,
+      "ci95": [-0.0015019525661880073, 0.00454311705754925]
+    },
+    {
+      "a": "EmbeddingGemma q8 (256 dims)",
+      "b": "EmbeddingGemma q8 (768 dims, float32)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.0015325358855175122,
+      "stderr": 0.0015646115405367554,
+      "ci95": [-0.0014949707444928725, 0.004598793773663095]
+    }
+  ]
+}
