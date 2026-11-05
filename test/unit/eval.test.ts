@@ -80,9 +80,11 @@ test('synthetic evaluation: beats popularity, a model switch loses nothing, one 
   const perItem = (label: string) => result.catalogs.find((c) => c.label === label)!.bytesPerItem;
   assert.ok(perItem('model A (64 dims, float32)') > perItem('model A (64 dims)'));
   assert.ok(perItem('model A (128 dims)') > perItem('model A (64 dims)'));
-  // Neighbours of one model: 64 → 128 at each quantization, and int8 → float32 at each size.
+  // Neighbours of one model (64 → 128 at each quantization, int8 → float32 at each size), then
+  // the rest against the model's default catalog (128 dims, int8).
   assert.deepEqual(result.comparisons.map((c) => `${c.a} → ${c.b}`).sort(), [
     'model A (128 dims) → model A (128 dims, float32)',
+    'model A (128 dims) → model A (64 dims, float32)',
     'model A (64 dims) → model A (128 dims)',
     'model A (64 dims) → model A (64 dims, float32)',
     'model A (64 dims, float32) → model A (128 dims, float32)',

@@ -62,6 +62,8 @@ interface Catalog {
   dtype?: string;
   dims: number;
   quantization: Quantization;
+  /** The model's default catalog: its default dimensions, int8. */
+  default: boolean;
   dir: string;
   items: number;
   embedded: number;
@@ -200,6 +202,7 @@ for (const { model, dims: dimsForModel, quantizations: quantsForModel } of plan)
         dtype,
         dims,
         quantization,
+        default: dims === model.defaultDims && quantization === 'int8',
         dir,
         items: dataset.items.length,
         embedded: result.embedded,
@@ -237,7 +240,7 @@ if (from && to) {
   );
 }
 
-const comparisons = neighbours(catalogs).map(([a, b]) => ({
+const comparisons = pairs(catalogs).map(([a, b]) => ({
   a: a.label,
   b: b.label,
   metric: 'ndcg10',
@@ -356,10 +359,22 @@ async function switchCheck(
 
 /**
  * Pairs of catalogs of one model that differ in one setting: adjacent dimensions (same
- * quantization and weights), int8 and float32 (same dimensions), or weights variants.
+ * quantization and weights), int8 and float32 (same dimensions), or weights variants. Then
+ * every other catalog of a model against its default catalog, as `[default, other]`.
  */
+function pairs(all: readonly Catalog[]): [Catalog, Catalog][] {
+  const out = neighbours(all);
+  for (const d of all.filter((c) => c.default)) {
+    for (const c of all) {
+      if (c === d || c.model !== d.model || c.dtype !== d.dtype) continue;
+      if (!out.some(([a, b]) => (a === c && b === d) || (a === d && b === c))) out.push([d, c]);
+    }
+  }
+  return out;
+}
+
 function neighbours(all: readonly Catalog[]): [Catalog, Catalog][] {
-  const pairs: [Catalog, Catalog][] = [];
+  const found: [Catalog, Catalog][] = [];
   for (const [i, a] of all.entries()) {
     for (const b of all.slice(i + 1)) {
       if (a.model !== b.model) continue;
@@ -374,13 +389,13 @@ function neighbours(all: readonly Catalog[]): [Catalog, Catalog][] {
             c.dims > Math.min(a.dims, b.dims) &&
             c.dims < Math.max(a.dims, b.dims),
         );
-        if (!between) pairs.push(a.dims < b.dims ? [a, b] : [b, a]);
+        if (!between) found.push(a.dims < b.dims ? [a, b] : [b, a]);
       } else if (a.dims === b.dims && (sameDtype || sameQuant)) {
-        pairs.push([a, b]);
+        found.push([a, b]);
       }
     }
   }
-  return pairs;
+  return found;
 }
 
 function shuffle(ids: readonly string[], seed: string): string[] {
