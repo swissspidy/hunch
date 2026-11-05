@@ -85,3 +85,37 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:pack
+
+  wordpress:
+    name: WordPress plugin (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest PHP the plugin supports, and a current one.
+        php: ['7.4', '8.4']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: composer install --no-interaction --no-progress
+        working-directory: wordpress/inkling
+      - run: vendor/bin/phpunit
+        working-directory: wordpress/inkling
+      # WordPress coding standards and PHP 7.4 compatibility.
+      - run: vendor/bin/phpcs
+        working-directory: wordpress/inkling
+      # The PHP encoder against the Node build, byte for byte (ADR 0007).
+      - run: node --test --test-reporter=spec test/unit/wordpress.test.ts
+      - run: npm run wordpress:build

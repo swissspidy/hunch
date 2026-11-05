@@ -165,6 +165,16 @@ Every result has `why`: `similarity`, `relevance`, `recency`, `prior`, `redundan
 `confidence`, `similarityShare` (how much of the score the profile accounts for: low means an
 editors' pick) and `because` (the visitor's items it leans on).
 
+## WordPress
+
+The [WordPress plugin](wordpress/inkling/readme.txt) needs no Node on the server and no CI.
+Posts are embedded with the same pinned EmbeddingGemma in the editor's browser, in wp-admin, on
+publish and with a "Build index" button. PHP writes the same manifest and shards as the CLI, in
+`wp-content/uploads/inkling/`. It adds related posts after each post, a "For you" block and a
+block with the visitor's controls, with the consent setting of your choice
+([ADR 0007](docs/adr/0007-wordpress-plugin.md)). `npm run wordpress:build` bundles the client
+into the plugin and writes `wordpress/inkling.zip`.
+
 ## The demo
 
 **Live:** [swissspidy.github.io/inkling](https://swissspidy.github.io/inkling/), deployed from

@@ -15,6 +15,7 @@
     "eval/download-mind.ts",
     "test/fixtures/astro/src/**/*.astro"
   ],
+  "ignoreBinaries": ["php"],
   "project": [
     "src/**/*.ts",
     "scripts/**/*.ts",

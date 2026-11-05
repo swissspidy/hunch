@@ -80,7 +80,8 @@
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",
     "bench": "node scripts/bench.ts",
-    "eval": "node eval/run.ts"
+    "eval": "node eval/run.ts",
+    "wordpress:build": "node scripts/wordpress.ts"
   },
   "dependencies": {
     "fast-xml-parser": "^5.12.0"

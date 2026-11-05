@@ -6,4 +6,8 @@ demo/dist/
 eval/.work/
 eval/.cache/
 eval/.data/
+wordpress/inkling/vendor/
+wordpress/inkling/assets/inkling.global.js
+wordpress/inkling.zip
+wordpress/inkling/.phpunit.result.cache
 test/fixtures/astro/.astro/
