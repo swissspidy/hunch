@@ -1,13 +1,13 @@
 /**
  * "Since your last visit" in the demo: a first visit as of 15 September 2026, then a visit
  * today. The digest shows what was published in between, and the built-in Summarizer (faked
- * here: headless Chromium has none) writes its summary.
+ * here: the test browsers have none) writes its summary.
  */
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { BrowserContext, Page } from 'playwright-core';
-import { DESKTOP, layoutShift, observeLayoutShifts, ready, serveDemo } from './site.ts';
+import { DESKTOP, assertNoLayoutShift, observeLayoutShifts, ready, serveDemo } from './site.ts';
 
 const site = serveDemo();
 const SEPT_15 = Date.parse('2026-09-15');
@@ -43,7 +43,7 @@ async function digest(page: Page) {
   }));
 }
 
-test('a returning visitor sees what was published since the last visit, summarized', async () => {
+test('a returning visitor sees what was published since the last visit, summarized', async (t) => {
   const ctx = await context(true);
   const page = await ctx.newPage();
   await page.goto(`${site.origin}/?as-of=2026-09-15`);
@@ -69,8 +69,7 @@ test('a returning visitor sees what was published since the last visit, summariz
     await page.locator('[data-inkling-summary]').textContent(),
     '3 new articles while you were away.',
   );
-  await page.waitForTimeout(300);
-  assert.equal(await layoutShift(page), 0);
+  await assertNoLayoutShift(t, page);
   await ctx.close();
 });
 

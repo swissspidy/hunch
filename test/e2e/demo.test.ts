@@ -1,5 +1,5 @@
 /**
- * Milestone 1's acceptance test: the demo site, in Chromium. Related items are ranked in the
+ * Milestone 1's acceptance test: the demo site, in a browser. Related items are ranked in the
  * browser from the published vectors, no model is fetched, and the layout does not shift.
  */
 
@@ -11,7 +11,8 @@ import { decodeShard, encodeShard } from '../../src/format/shard.ts';
 import type { BrowserContextOptions, Page } from 'playwright-core';
 import {
   DESKTOP,
-  layoutShift,
+  assertNoLayoutShift,
+  BROWSER,
   observeLayoutShifts,
   PHONE,
   ready as readyFor,
@@ -41,7 +42,7 @@ for (const [name, options] of [
   ['desktop', DESKTOP],
   ['phone', PHONE],
 ] as const) {
-  test(`related items replace the fallback in place, with no layout shift (${name})`, async () => {
+  test(`related items replace the fallback in place, with no layout shift (${name})`, async (t) => {
     let release = () => {};
     const gate = new Promise<void>((resolve) => (release = resolve));
     const { page, requests, close } = await open('/items/stargazing-atacama.html', options, gate);
@@ -58,8 +59,7 @@ for (const [name, options] of [
     assert.ok(related.every((r) => r.href === `/items/${r.id}.html`));
     assert.ok(!related.some((r) => r.id === 'stargazing-atacama'));
     assert.deepEqual(await page.locator('inkling-related').boundingBox(), box);
-    await page.waitForTimeout(300);
-    assert.equal(await layoutShift(page), 0);
+    await assertNoLayoutShift(t, page);
 
     // No model: the page fetched the manifest and the vector shards, nothing else of Inkling's.
     const paths = requests.map((url) => new URL(url).pathname);
@@ -68,9 +68,12 @@ for (const [name, options] of [
       requests.join('\n'),
     );
     assert.ok(!paths.some((p) => /\.onnx|tokenizer|transformers/i.test(p)), paths.join('\n'));
-    const inkling = paths
+    let inkling = paths
       .filter((p) => p.startsWith('/inkling/'))
       .map((p) => p.replace(/\.[0-9a-f]{12}\.ink$/, '.ink'));
+    // WebKit doesn't hand the `<link rel="preload" as="fetch">` response to the client's
+    // fetch(), so it requests the manifest a second time.
+    if (BROWSER === 'webkit') inkling = inkling.filter((p, i) => i === 0 || p !== inkling[0]);
     // The manifest, then the item's own section (the element's section hint), then the rest.
     assert.deepEqual(inkling.slice(0, 2), ['/inkling/manifest.json', '/inkling/shards/travel.ink']);
     assert.deepEqual(inkling.slice(2).sort(), [

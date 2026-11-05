@@ -25,12 +25,15 @@ node bin/inkling.js --help      # the CLI, from the sources
 | `npm run format:check` | oxfmt (`npm run format` fixes it)                                                          |
 | `npm test`             | Unit tests in `test/unit`                                                                  |
 | `npm run size`         | The client's gzipped size against its budget                                               |
-| `npm run test:e2e`     | The demo in Chromium: related items, layout shift, requests                                |
+| `npm run test:e2e`     | The demo in a browser: related items, layout shift, requests                               |
 | `npm run test:pack`    | The packed package, installed into an empty project                                        |
 | `npm run bench`        | Shard sizes and ranking time for 10,000 items (`-- --browser`: in Chromium, CPU 4× slower) |
 
-The browser tests need Chromium for the installed `playwright-core`:
-`npx playwright-core install chromium` (on Linux, add `install-deps` if it doesn't start).
+The browser tests run in Chromium, or in the browser `INKLING_BROWSER` names (`chromium`,
+`firefox` or `webkit`; CI runs all three). They need that browser for the installed
+`playwright-core`: `npx playwright-core install chromium` (on Linux, add `install-deps` if it
+doesn't start). Firefox and WebKit have no Layout Instability API, so there the layout-shift
+checks are skipped, with that reason.
 
 **The client stays dependency-free and Node-free.** oxlint rejects `node:*` and build-step
 imports under `src/format`, `src/rank`, `src/client`, `src/elements`, `src/digest` and `src/query`.
