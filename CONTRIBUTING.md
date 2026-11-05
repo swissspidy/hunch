@@ -25,7 +25,7 @@ node bin/inkling.js --help      # the CLI, from the sources
 | `npm run format:check` | oxfmt (`npm run format` fixes it)                                                          |
 | `npm test`             | Unit tests in `test/unit`                                                                  |
 | `npm run size`         | The client's gzipped size against its budget                                               |
-| `npm run test:e2e`     | The demo in Chromium: related items, layout shift, requests                                |
+| `npm run test:e2e`     | The demo and the Astro fixture in Chromium: related items, layout shift, requests          |
 | `npm run test:pack`    | The packed package, installed into an empty project                                        |
 | `npm run bench`        | Shard sizes and ranking time for 10,000 items (`-- --browser`: in Chromium, CPU 4× slower) |
 
@@ -34,6 +34,22 @@ The browser tests need Chromium for the installed `playwright-core`:
 
 **The client stays dependency-free and Node-free.** oxlint rejects `node:*` and build-step
 imports under `src/format`, `src/rank`, `src/client`, `src/elements`, `src/digest` and `src/query`.
+
+## The WordPress plugin
+
+[`wordpress/inkling/`](wordpress/inkling/readme.txt) is plain PHP with its own dev tools
+([ADR 0007](docs/adr/0007-wordpress-plugin.md)). With PHP 7.4 or later and Composer:
+
+```sh
+cd wordpress/inkling
+composer install
+vendor/bin/phpunit              # the encoder, without WordPress
+vendor/bin/phpcs                # WordPress coding standards
+```
+
+`npm test` also runs the PHP encoder against the Node build, byte for byte, when `php` is
+installed. `npm run wordpress:build` bundles the client into the plugin and writes
+`wordpress/inkling.zip`.
 
 ## The demo's embeddings
 
