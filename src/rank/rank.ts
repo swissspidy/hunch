@@ -74,9 +74,38 @@ export function rank(
   input: RankInput,
   options: RankOptions,
 ): Ranked[] {
+  const steps = ranking(candidates, input, options);
+  let step = steps.next();
+  while (!step.done) step = steps.next();
+  return step.value;
+}
+
+/** Candidates per step of `ranking()`. */
+const STEP = 512;
+
+/**
+ * `rank()` in steps: it pauses after every `STEP` candidates, so a caller can yield to the page
+ * in between (ADR 0008). Where it pauses does not change the result.
+ */
+export function* ranking(
+  candidates: readonly number[],
+  input: RankInput,
+  options: RankOptions,
+): Generator<void, Ranked[], void> {
   const { n, confidence, weights, diversity } = options;
-  if (n <= 0 || candidates.length === 0) return [];
-  const sims = candidates.map((index) => input.similarity(index));
+  const count = candidates.length;
+  if (n <= 0 || count === 0) return [];
+  // The terms of every candidate: the expensive part (one or two dot products each).
+  const sims = new Float64Array(count);
+  const priors = new Float64Array(count);
+  const recencies = new Float64Array(count);
+  for (let k = 0; k < count; k++) {
+    if (k % STEP === 0) yield;
+    const index = candidates[k]!;
+    sims[k] = input.similarity(index);
+    priors[k] = input.prior(index);
+    recencies[k] = input.recency(index);
+  }
   let min = Infinity;
   let max = -Infinity;
   for (const sim of sims) {
@@ -87,19 +116,33 @@ export function rank(
   // One candidate, or all equally similar: similarity says nothing.
   const rescale = (sim: number): number =>
     spread > 1e-9 ? Math.min(1, Math.max(0, (sim - min) / spread)) : 0;
-  const scored = candidates.map((index, k) => {
+  const wSim = weights.similarity * confidence;
+  const wPrior = weights.prior * (1 - confidence);
+  // The best `size` by base, best first, without sorting every candidate: kept sorted as
+  // candidates come in, so the pool is what a full sort would put first.
+  const size = Math.max(n, options.poolSize);
+  const pool: Ranked[] = [];
+  for (let k = 0; k < count; k++) {
+    if (k % STEP === 0) yield;
     const similarity = sims[k]!;
     const relevance = rescale(similarity);
-    const prior = input.prior(index);
-    const recency = input.recency(index);
-    const base =
-      weights.similarity * confidence * relevance +
-      weights.prior * (1 - confidence) * prior +
-      weights.recency * recency;
-    return { index, base, similarity, relevance, prior, recency, score: base, redundancy: 0 };
-  });
-  scored.sort(byBase);
-  const pool = scored.slice(0, Math.max(n, options.poolSize));
+    const prior = priors[k]!;
+    const recency = recencies[k]!;
+    const base = wSim * relevance + wPrior * prior + weights.recency * recency;
+    const index = candidates[k]!;
+    const worst = pool[size - 1];
+    if (worst && (worst.base - base || worst.prior - prior || index - worst.index) >= 0) continue;
+    const c = { index, base, similarity, relevance, prior, recency, score: base, redundancy: 0 };
+    let lo = 0;
+    let hi = pool.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (byBase(c, pool[mid]!) < 0) hi = mid;
+      else lo = mid + 1;
+    }
+    pool.splice(lo, 0, c);
+    if (pool.length > size) pool.pop();
+  }
   if (diversity <= 0) return pool.slice(0, n);
 
   const picked: Ranked[] = [];

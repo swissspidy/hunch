@@ -92,8 +92,8 @@ slowed 4× (DevTools' mid-range mobile preset) and 50 signals in IndexedDB:
 | 1,000 items               | 112 / 130 ms             | 13 ms       | 15 ms         | 3.2 MB  |
 
 Both run in idle time after the page has rendered. A catalog of 10,000 items is about at the
-edge of a single 50 ms task on a slow phone. Larger catalogs should rank by section, or wait for
-an ADR on chunked scoring.
+edge of a single 50 ms task on a slow phone. [ADR 0008](0008-sliced-ranking.md) splits loading
+and ranking into short tasks, so larger catalogs do not block input.
 
 ### Shards are checked everywhere
 
