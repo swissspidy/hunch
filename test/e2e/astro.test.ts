@@ -22,9 +22,18 @@ test('the related list fills in place from the integration’s manifest', async 
   const requests: string[] = [];
   page.on('request', (request) => requests.push(new URL(request.url()).pathname));
   await observeLayoutShifts(page);
+  // Hold the manifest until the server-rendered fallback has been read, so a fast fill can't
+  // race the snapshot.
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/inkling/manifest.json', async (route) => {
+    await gate;
+    await route.continue();
+  });
   await page.goto(`${site.origin}/blog/rye-bread/`);
   const fallback = await slots(page, 'inkling-related');
   const box = await page.locator('inkling-related').boundingBox();
+  release();
 
   await ready(page, 'inkling-related');
   const related = await slots(page, 'inkling-related');
