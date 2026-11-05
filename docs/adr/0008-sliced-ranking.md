@@ -64,7 +64,9 @@ The brief prefers the simpler option if it removes the long tasks at 100,000 ite
 ## Decision
 
 - **Ranking runs in slices.** `ranking()` in `src/rank/rank.ts` is the ranking function as a
-  generator that pauses after every 512 candidates, while scoring and while picking the pool.
+  generator that pauses after every 512 candidates, while scoring and while picking the pool,
+  and after every MMR pick (each compares the rest of the pool, which matters for long
+  `rank(ids)` lists).
   `rank()` runs it to the end in one go (the build, the eval, the tests). The client drives it
   and, at each pause, yields to the page once the current slice has run 10 ms
   (`src/client/slices.ts`). Filtering the candidates is sliced the same way.
@@ -80,9 +82,13 @@ The brief prefers the simpler option if it removes the long tasks at 100,000 ite
   its hash is checked and after it is decoded, so shards that arrive together are verified,
   decoded and indexed one task at a time.
 - **The pool is selected, not sorted.** MMR only looks at the best `max(4n, 50)` candidates
-  by `base`. They are now kept in a sorted array of that size as candidates come in, instead of
-  sorting all of them. The comparison is the same (base, then prior, then candidate index), and
-  it is a strict order, so the pool is exactly what the full sort put first.
+  by `base`. Candidates that can still make it are now collected and, whenever there are twice
+  that many, sorted and cut back, instead of sorting all of them; anything that ranks after the
+  last cut's worst is skipped. The comparison is the same (base, then prior, then candidate
+  index), and it is a strict order, so the pool is exactly what the full sort put first. This
+  is O(count log pool). `rank(ids)` keeps every candidate (`n` is the list's length), so it
+  sorts once, as before. (A first version kept the pool sorted by insertion, which made a
+  100,000-id `rank()` with ascending priors take 8.6 s instead of 41 ms.)
 - **Entries come in manifest order.** `loaded()` used to list entries in the order their shards
   arrived, so two items with exactly the same score could swap places depending on the
   network. It now lists them in manifest order, as its comment always said.
@@ -110,10 +116,13 @@ None of the nine runs had a long task. `recommend()` is faster than before becau
 no longer a full sort. Loading everything took about as long as before (3.0 s instead of 3.3 s
 at 100,000 items, from a local server).
 
-The browser test (`test/e2e/large.test.ts`) loads 50,000 items, slows the CPU 4× and checks
-that no task during `recommend()` is longer than 100 ms (twice the long-task line, for slow CI
-machines) or than half the call. It runs once with `scheduler.yield()` and once without. With
-the previous client, the same check fails: `recommend()` was one task of about 600 ms.
+The browser test (`test/e2e/large.test.ts`) slows the CPU 4×, loads 50,000 items, records 50
+signals and ranks once, and checks that no task in all of that reaches 100 ms (twice the
+long-task line, for slow CI machines). Then it checks that no task during one more
+`recommend()` reaches 100 ms or half the call. It runs once with `scheduler.yield()` and once
+without. With the previous client, the check fails: `recommend()` was one task of about
+600 ms. A unit test answers the shards in reverse manifest order and checks that ties still
+come in manifest order.
 
 ## Consequences
 

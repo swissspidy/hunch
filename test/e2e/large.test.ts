@@ -1,7 +1,7 @@
 /**
  * A large catalog in Chromium (ADR 0008): 50,000 items, the CPU slowed 4× like the browser
- * benchmark, and no long task while recommend() ranks them, with `scheduler.yield()` and
- * without it.
+ * benchmark, and no task of 100 ms or more while the shards load or while recommend() ranks
+ * them, with `scheduler.yield()` and without it.
  */
 
 import assert from 'node:assert/strict';
@@ -54,6 +54,10 @@ before(async () => {
   const address = server.address();
   origin = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
   browser = await chromium.launch();
+  // A first page, so the browser's own start-up work is not timed with the first test.
+  const warmUp = await browser.newPage();
+  await warmUp.goto(origin);
+  await warmUp.close();
 });
 
 after(async () => {
@@ -66,10 +70,16 @@ interface Run {
   ids: string[];
   duration: number;
   longTasks: number[];
+  /** Load, 50 signals and a first recommend(): every shard verified, decoded and indexed. */
+  loadDuration: number;
+  loadLongTasks: number[];
   yields: boolean;
 }
 
-/** Loads the catalog with 50 signals, then times one recommend() with the CPU slowed 4×. */
+/**
+ * With the CPU slowed 4× throughout: loads the catalog, records 50 signals and ranks once
+ * (timed as the load), then times one more recommend() on its own.
+ */
 async function recommendOnce(page: Page): Promise<Run> {
   await page.addInitScript(() => {
     const w = window as unknown as { __longTasks: { start: number; duration: number }[] };
@@ -81,16 +91,29 @@ async function recommendOnce(page: Page): Promise<Run> {
     }).observe({ type: 'longtask', buffered: true });
   });
   await page.goto(origin);
-  await page.evaluate(async (sections) => {
-    const w = window as unknown as { Inkling: typeof Inkling; ink: Inkling };
-    w.ink = await w.Inkling.load({ manifest: '/manifest.json', consent: true });
-    for (let i = 0; i < 50; i++) await w.ink.record('view', `s${i % sections}-item-${i * 7}`);
-    // Every shard and the profile, so what follows is ranking alone.
-    await w.ink.recommend({ n: 10 });
-  }, SECTIONS);
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   try {
+    const load = await page.evaluate(async (sections) => {
+      const w = window as unknown as {
+        Inkling: typeof Inkling;
+        ink: Inkling;
+        __longTasks: { start: number; duration: number }[];
+      };
+      const t0 = performance.now();
+      w.ink = await w.Inkling.load({ manifest: '/manifest.json', consent: true });
+      for (let i = 0; i < 50; i++) await w.ink.record('view', `s${i % sections}-item-${i * 7}`);
+      // Every shard and the profile, so what follows is ranking alone.
+      await w.ink.recommend({ n: 10 });
+      const t1 = performance.now();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      return {
+        loadDuration: t1 - t0,
+        loadLongTasks: w.__longTasks
+          .filter((t) => t.start + t.duration > t0 && t.start < t1)
+          .map((t) => t.duration),
+      };
+    }, SECTIONS);
     return await page
       .evaluate(async () => {
         const w = window as unknown as {
@@ -112,16 +135,21 @@ async function recommendOnce(page: Page): Promise<Run> {
           yields: typeof (window as { scheduler?: { yield?: unknown } }).scheduler?.yield,
         };
       })
-      .then((r) => ({ ...r, yields: r.yields === 'function' }));
+      .then((r) => ({ ...r, ...load, yields: r.yields === 'function' }));
   } finally {
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   }
 }
 
+/** Asserts that neither the load nor recommend() had a task of `LONGEST_MS` or more. */
 function check(t: TestContext, run: Run): void {
-  const longest = Math.max(0, ...run.longTasks);
-  const detail = `recommend() took ${run.duration.toFixed(0)} ms, long tasks: ${run.longTasks.map((d) => d.toFixed(0)).join(', ') || 'none'}`;
+  const list = (tasks: number[]) => tasks.map((d) => d.toFixed(0)).join(', ') || 'none';
+  const loadDetail = `load took ${run.loadDuration.toFixed(0)} ms, long tasks: ${list(run.loadLongTasks)}`;
+  const detail = `recommend() took ${run.duration.toFixed(0)} ms, long tasks: ${list(run.longTasks)}`;
+  t.diagnostic(loadDetail);
   t.diagnostic(detail);
+  assert.ok(Math.max(0, ...run.loadLongTasks) < LONGEST_MS, loadDetail);
+  const longest = Math.max(0, ...run.longTasks);
   assert.equal(run.ids.length, 10);
   assert.ok(longest < LONGEST_MS, detail);
   // Relative to the work: a ranking that ran as one task would be one task as long as itself.

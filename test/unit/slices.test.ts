@@ -10,7 +10,14 @@ import { syntheticCatalog, type SyntheticCatalog } from '../../scripts/synthetic
 import { Inkling, MemoryStore } from '../../src/client/index.ts';
 import { slicer } from '../../src/client/slices.ts';
 import { DEFAULT_WEIGHTS, rank, ranking, type RankInput } from '../../src/rank/rank.ts';
-import { DIMS, ITEMS, SECTIONS, rankingCalls, type Result } from '../fixtures/large-catalog.ts';
+import {
+  DIMS,
+  ITEMS,
+  NOW,
+  SECTIONS,
+  rankingCalls,
+  type Result,
+} from '../fixtures/large-catalog.ts';
 import { referenceRank } from '../reference-rank.ts';
 
 /** A seeded generator in [0, 1). */
@@ -63,7 +70,7 @@ test('rank() picks exactly what a full sort of every candidate picked', () => {
   assert.equal(cases, 60);
 });
 
-test('ranking() pauses every 512 candidates, and its result does not depend on the pauses', () => {
+test('ranking() pauses every 512 candidates and after every MMR pick, whatever the result', () => {
   const candidates = Array.from({ length: 2000 }, (_, i) => i);
   const options = {
     n: 10,
@@ -79,11 +86,35 @@ test('ranking() pauses every 512 candidates, and its result does not depend on t
     pauses++;
     step = steps.next();
   }
-  // Four slices to score, four to pick the pool.
-  assert.equal(pauses, 8);
+  // Four slices to score, four to pick the pool, one after each of the 10 MMR picks.
+  assert.equal(pauses, 18);
   assert.deepEqual(step.value, rank(candidates, input(2000, 3, 1000), options));
   // Nothing to rank: no pause at all.
   assert.equal(ranking([], input(0, 1, 10), options).next().done, true);
+});
+
+test('a whole list (n = every candidate, as rank(ids) asks) ranks as a full sort did', () => {
+  const count = 3000;
+  // Ascending priors: with no confidence, every candidate is better than the ones before.
+  const candidates = Array.from({ length: count }, (_, i) => i);
+  for (const [confidence, diversity] of [
+    [0, 0],
+    [0.7, 0],
+    [0.7, 0.2],
+  ] as const) {
+    const options = {
+      n: count,
+      confidence,
+      weights: DEFAULT_WEIGHTS,
+      diversity,
+      poolSize: 4 * count,
+    };
+    const ascending: RankInput = { ...input(count, 11, 50), prior: (i) => i / count };
+    assert.deepEqual(
+      rank(candidates, ascending, options),
+      referenceRank(candidates, ascending, options),
+    );
+  }
 });
 
 test('a slicer yields only once a slice has run its time', async () => {
@@ -137,11 +168,50 @@ test('20,000 items: same ids and scores as before slicing, with scheduler.yield(
     delete g.scheduler;
   }
   // Candidates (40 slices) and ranking (80 slices) for each of the full-catalog calls, and
-  // one yield before and after verifying each of the 10 shards.
+  // three yields for each of the 10 shards.
   assert.ok(yields > 500, `${yields} yields`);
 });
 
 test('20,000 items: same ids and scores without scheduler.yield() (new tasks instead)', async () => {
   assert.equal(g.scheduler, undefined);
   assert.deepEqual(await rankingCalls(Inkling, new MemoryStore(), catalog), expected);
+});
+
+test('ties come in manifest order, whatever order the shards arrive in', async () => {
+  const cold = expected.find((r) => r.call === 'cold recommend')!;
+  // Holds every shard until all of them are requested, then answers in reverse manifest order.
+  const held: { path: string; resolve: (r: Response) => void }[] = [];
+  const shards = catalog.manifest.shards.length;
+  const fetchFn = (input: string | URL): Promise<Response> => {
+    const path = new URL(input).pathname.slice(1);
+    if (path === 'manifest.json') {
+      return Promise.resolve(new Response(JSON.stringify(catalog.manifest)));
+    }
+    return new Promise((resolve) => {
+      held.push({ path, resolve });
+      if (held.length < shards) return;
+      void (async () => {
+        const order = catalog.manifest.shards.map((ref) => ref.url).reverse();
+        for (const url of order) {
+          held.find((h) => h.path === url)!.resolve(new Response(catalog.files.get(url)!.slice()));
+          // Long enough for that shard to be verified, decoded and indexed first.
+          await new Promise((wait) => setTimeout(wait, 20));
+        }
+      })();
+    });
+  };
+  const ink = await Inkling.load({
+    manifest: 'http://large/manifest.json',
+    fetch: fetchFn,
+    consent: true,
+    store: new MemoryStore(),
+    now: () => NOW,
+  });
+  const recs = await ink.recommend({ n: 10 });
+  assert.equal(held.length, shards);
+  // The cold start ranks the first item of every section equally (prior 1): manifest order.
+  assert.deepEqual(
+    recs.map((r) => r.id),
+    cold.ids,
+  );
 });

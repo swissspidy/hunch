@@ -118,10 +118,14 @@ export function* ranking(
     spread > 1e-9 ? Math.min(1, Math.max(0, (sim - min) / spread)) : 0;
   const wSim = weights.similarity * confidence;
   const wPrior = weights.prior * (1 - confidence);
-  // The best `size` by base, best first, without sorting every candidate: kept sorted as
-  // candidates come in, so the pool is what a full sort would put first.
+  // The best `size` by base, best first, without sorting every candidate: candidates that can
+  // still make it are collected, and the collection is sorted and cut back to `size` whenever it
+  // reaches twice that. The order is strict, so the pool is what a full sort would put first.
+  // O(count log size), and a single sort when every candidate is kept (`rank(ids)`).
   const size = Math.max(n, options.poolSize);
-  const pool: Ranked[] = [];
+  let pool: Ranked[] = [];
+  // The worst candidate kept at the last cut: anything that ranks after it can't make it.
+  let worst: Ranked | undefined;
   for (let k = 0; k < count; k++) {
     if (k % STEP === 0) yield;
     const similarity = sims[k]!;
@@ -130,19 +134,14 @@ export function* ranking(
     const recency = recencies[k]!;
     const base = wSim * relevance + wPrior * prior + weights.recency * recency;
     const index = candidates[k]!;
-    const worst = pool[size - 1];
     if (worst && (worst.base - base || worst.prior - prior || index - worst.index) >= 0) continue;
-    const c = { index, base, similarity, relevance, prior, recency, score: base, redundancy: 0 };
-    let lo = 0;
-    let hi = pool.length;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (byBase(c, pool[mid]!) < 0) hi = mid;
-      else lo = mid + 1;
+    pool.push({ index, base, similarity, relevance, prior, recency, score: base, redundancy: 0 });
+    if (pool.length >= 2 * size) {
+      pool = pool.sort(byBase).slice(0, size);
+      worst = pool[size - 1];
     }
-    pool.splice(lo, 0, c);
-    if (pool.length > size) pool.pop();
   }
+  pool = pool.sort(byBase).slice(0, size);
   if (diversity <= 0) return pool.slice(0, n);
 
   const picked: Ranked[] = [];
@@ -169,6 +168,8 @@ export function* ranking(
       const sim = rescale(input.pairwise(pool[k]!.index, chosen.index));
       if (sim > redundancy[k]!) redundancy[k] = sim;
     }
+    // Each pick compares the rest of the pool: a long list (`rank(ids)`) pauses between picks.
+    yield;
   }
   return picked;
 }

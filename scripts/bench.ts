@@ -212,6 +212,7 @@ function longTaskSummary(total: number, durations: number[]): string {
   );
 }
 
+/** "10 sections in 50 shards": how the synthetic catalog is cut. */
 function shape(catalog: SyntheticCatalog): string {
   return `${sections} sections in ${catalog.manifest.shards.length} shards`;
 }
