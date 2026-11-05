@@ -45,7 +45,9 @@ test('the package holds dist, bin and the docs, and no sources or tests', () => 
   assert.ok(files.includes('LICENSE'));
   assert.deepEqual(
     files.filter(
-      (f) => /^(src|test|scripts|demo)\//.test(f) || (f.endsWith('.ts') && !f.endsWith('.d.ts')),
+      (f) =>
+        /^(src|test|scripts|demo|wordpress)\//.test(f) ||
+        (f.endsWith('.ts') && !f.endsWith('.d.ts')),
     ),
     [],
   );

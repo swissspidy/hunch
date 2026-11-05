@@ -1,0 +1,27 @@
+{
+  "name": "swissspidy/inkling-wordpress",
+  "description": "Development tools for the Inkling WordPress plugin (tests and coding standards). The plugin itself has no Composer dependencies.",
+  "type": "wordpress-plugin",
+  "license": "Apache-2.0",
+  "require": {
+    "php": ">=7.4"
+  },
+  "require-dev": {
+    "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+    "phpcompatibility/phpcompatibility-wp": "^2.1",
+    "phpunit/phpunit": "^9.6",
+    "wp-coding-standards/wpcs": "^3.1"
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    },
+    "platform": {
+      "php": "7.4.33"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "lint": "phpcs"
+  }
+}

@@ -13,5 +13,6 @@
     "test/**/*.test.ts",
     "eval/download-mind.ts"
   ],
+  "ignoreBinaries": ["php"],
   "project": ["src/**/*.ts", "scripts/**/*.ts", "test/**/*.ts", "bin/*.js", "eval/**/*.ts"]
 }
