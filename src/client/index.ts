@@ -173,7 +173,7 @@ export interface ItemExplanation {
   missing: number;
 }
 
-/** What {@link Inkling.export} returns: everything stored about the visitor, as JSON. */
+/** What {@link Inkling.export} returns: the visitor's signals, as JSON (none without consent). */
 export interface SignalExport {
   /** Identifies the document. */
   format: 'inkling/signals';

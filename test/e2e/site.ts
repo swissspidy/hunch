@@ -181,18 +181,27 @@ export async function ready(page: Page, element: string): Promise<void> {
  * IndexedDB writes, and Firefox can still be opening the database when the list is ready.
  */
 export async function read(site: Site, page: Page, id: string): Promise<void> {
+  const since = Date.now();
   await page.goto(`${site.origin}/items/${id}.html`);
   await ready(page, 'inkling-related');
-  await page.waitForFunction(async (item) => {
-    const inkling = await (
-      window as unknown as {
-        Inkling: {
-          shared(m: string): Promise<{ export(): Promise<{ signals: { itemId: string }[] }> }>;
-        };
-      }
-    ).Inkling.shared(document.body.dataset.manifest!);
-    return (await inkling.export()).signals.some((s) => s.itemId === item);
-  }, id);
+  await page.waitForFunction(
+    async (item) => {
+      const inkling = await (
+        window as unknown as {
+          Inkling: {
+            shared(m: string): Promise<{
+              export(): Promise<{ signals: { itemId: string; kind: string; at: number }[] }>;
+            }>;
+          };
+        }
+      ).Inkling.shared(document.body.dataset.manifest!);
+      // This visit's view, not an earlier signal for the item.
+      return (await inkling.export()).signals.some(
+        (s) => s.itemId === item.id && s.kind === 'view' && s.at >= item.since,
+      );
+    },
+    { id, since },
+  );
 }
 
 /** The article a search with `fakeTransformers` finds first. */

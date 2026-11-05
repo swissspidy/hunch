@@ -142,7 +142,7 @@ test('format v1: the writer still writes it', async () => {
   for (const file of await readdir(join(out, 'shards'))) {
     const bytes = await readFile(join(out, 'shards', file));
     assert.deepEqual([...bytes.subarray(0, 12)], [73, 78, 75, 86, 1, 1, 0, 0, 8, 0, 0, 0], file);
-    decodeShard(buffer(bytes));
+    assert.equal(decodeShard(buffer(bytes)).dims, result.manifest.dims, file);
   }
 });
 
@@ -228,6 +228,23 @@ test('a database from a newer release is left alone, not opened or deleted', asy
     assert.equal(await inkling.record('view', 'sourdough'), false);
     const databases = await indexedDB.databases();
     assert.deepEqual(databases, [{ name: 'inkling', version: 2 }]);
+    // Its signal is still there (opened without a version: no upgrade runs).
+    const rows = await new Promise<unknown[]>((resolve, reject) => {
+      const open = indexedDB.open('inkling');
+      open.onsuccess = () => {
+        const get = open.result.transaction('signals').objectStore('signals').getAll();
+        get.onsuccess = () => {
+          open.result.close();
+          resolve(get.result);
+        };
+        get.onerror = () => reject(get.error);
+      };
+      open.onerror = () => reject(open.error);
+    });
+    assert.deepEqual(
+      rows.map((r) => (r as { itemId: string }).itemId),
+      ['rye'],
+    );
   } finally {
     globalThis.indexedDB = original;
   }

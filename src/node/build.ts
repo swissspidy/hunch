@@ -66,7 +66,9 @@ export interface BuildResult {
 
 /**
  * Embeds the catalog (only inputs missing from the embedding cache) and writes `manifest.json`
- * and the shards to `outDir`. The same items, model and options give byte-identical output.
+ * and the shards to `outDir`. The same items, model and options give byte-identical shards, and
+ * a byte-identical manifest when `now` is set. Without it, `generatedAt` is the build time, unless
+ * `outDir` already holds a manifest with the same `version`.
  */
 export async function build(options: BuildOptions): Promise<BuildResult> {
   const { provider, outDir } = options;

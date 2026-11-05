@@ -73,7 +73,10 @@ for (const [name, options] of [
       .map((p) => p.replace(/\.[0-9a-f]{12}\.ink$/, '.ink'));
     // WebKit doesn't hand the `<link rel="preload" as="fetch">` response to the client's
     // fetch(), so it requests the manifest a second time.
-    if (BROWSER === 'webkit') inkling = inkling.filter((p, i) => i === 0 || p !== inkling[0]);
+    if (BROWSER === 'webkit') {
+      const duplicate = inkling.indexOf('/inkling/manifest.json', 1);
+      if (duplicate > 0) inkling.splice(duplicate, 1);
+    }
     // The manifest, then the item's own section (the element's section hint), then the rest.
     assert.deepEqual(inkling.slice(0, 2), ['/inkling/manifest.json', '/inkling/shards/travel.ink']);
     assert.deepEqual(inkling.slice(2).sort(), [

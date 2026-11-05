@@ -22,7 +22,7 @@
   "disableSources": true,
   "navigationLinks": {
     "GitHub": "https://github.com/swissspidy/inkling",
-    "Demo": "../"
+    "Demo": "https://swissspidy.github.io/inkling/"
   },
   "validation": {
     "notExported": true,

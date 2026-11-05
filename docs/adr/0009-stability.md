@@ -31,7 +31,8 @@ counts as breaking, and what is not promised at all.
   shard's reserved bytes are written as 0 and not read. The `space` string is opaque: readers
   only compare it for equality, and its spelling may change with any rebuild.
 - **A reader refuses a version it doesn't know.** `assertManifest()` and `decodeShard()` throw,
-  so `Inkling.load()` rejects and the elements keep the server-rendered fallback
+  so `Inkling.load()` rejects (for the manifest), or the call that first needs the shard does
+  (shards load lazily), and the elements keep the server-rendered fallback
   (`data-inkling-state="error"`). Nothing guesses at a newer format, and nothing mixes it with
   vectors it can read.
 - **The build writes one version, the newest.** A release that introduces version N + 1 is a

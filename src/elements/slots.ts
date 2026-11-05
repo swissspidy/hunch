@@ -133,13 +133,30 @@ export abstract class SlotsElement extends Base {
     }
   }
 
-  /** Resolves once focus is outside the element: at once, unless a slot holds it. */
+  /** Resolves once no slot holds focus: at once, unless one does. */
   private async blurred(): Promise<void> {
-    while (this.contains(document.activeElement)) {
-      await new Promise((resolve) => this.addEventListener('focusout', resolve, { once: true }));
+    while (this.slotHasFocus()) {
+      // Focus leaves (focusout), or the focused slot is removed: Firefox fires no focusout then.
+      await new Promise<void>((resolve) => {
+        const observer = new MutationObserver(done);
+        function done(): void {
+          observer.disconnect();
+          resolve();
+        }
+        this.addEventListener('focusout', done, { once: true });
+        observer.observe(this, { childList: true, subtree: true });
+      });
       // Focus may be moving to another slot: look again once it has landed.
       await new Promise((resolve) => setTimeout(resolve));
     }
+  }
+
+  private slotHasFocus(): boolean {
+    // The focused element itself, also inside open shadow roots (activeElement is their host).
+    let focused = document.activeElement;
+    while (focused?.shadowRoot?.activeElement) focused = focused.shadowRoot.activeElement;
+    const slot = focused?.closest('[data-inkling-slot]');
+    return !!slot && this.contains(slot);
   }
 
   private onClick(event: Event): void {
@@ -162,10 +179,12 @@ function fill(slot: HTMLElement, rec: Recommendation): void {
   if (old) {
     for (const el of [slot, ...slot.querySelectorAll('[aria-label]')]) {
       const label = el.getAttribute('aria-label');
-      if (label?.includes(old))
+      // The title is the label's last occurrence of it: a prefix (`Article: Art`) may hold it too.
+      const at = label?.lastIndexOf(old) ?? -1;
+      if (label && at >= 0)
         el.setAttribute(
           'aria-label',
-          label.replace(old, () => rec.title),
+          label.slice(0, at) + rec.title + label.slice(at + old.length),
         );
     }
   }

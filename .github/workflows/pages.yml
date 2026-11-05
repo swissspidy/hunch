@@ -10,6 +10,7 @@ on:
       - 'scripts/demo.ts'
       - 'scripts/bundle.ts'
       - 'docs/api/**'
+      - 'tsconfig.json'
       - 'package-lock.json'
       - '.github/workflows/pages.yml'
   workflow_dispatch:

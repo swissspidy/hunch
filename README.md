@@ -126,7 +126,7 @@ await inkling.forget(); // deletes everything; forget(itemId) one item's signals
 ```
 
 The [API reference](https://swissspidy.github.io/inkling/api/) documents every entry point:
-the client, `/elements`, `/digest`, `/query`, `/format` and `/build`.
+the client, `/elements`, `/digest`, `/query`, `/format`, `/build` and `/astro`.
 
 ### "Since your last visit"
 

@@ -210,6 +210,16 @@ test('focus stays on a focused slot while the list is ranked', async () => {
     ),
     fallback[1]!.id,
   );
+  // Moving focus to another slot doesn't fill it either.
+  await page.focus('inkling-related [data-inkling-slot]:nth-child(1) a');
+  await page.waitForTimeout(100);
+  assert.equal(await page.getAttribute('inkling-related', 'data-inkling-state'), 'loading');
+  assert.equal(
+    await page.evaluate(() =>
+      document.activeElement?.closest('[data-inkling-slot]')?.getAttribute('data-inkling-id'),
+    ),
+    fallback[0]!.id,
+  );
   // Leaving the list fills it, and focus is where the visitor moved it.
   await page.focus('details.why summary');
   await ready(page, 'inkling-related');
