@@ -20,7 +20,7 @@ How it works:
 2. **Your site publishes the vectors as static files** in `wp-content/uploads/inkling/`: a small `manifest.json` and one shard per category. They are rewritten shortly after a post is published, updated or trashed.
 3. **On your pages**, the plugin renders normal lists of your own posts: the newest posts in the same category after each post, and the newest posts in the "For you" block. In the visitor's browser, Inkling's script (7 KB) re-ranks them in idle time, slot for slot. Nothing moves on the page.
 
-The vectors are the same as those the Inkling command-line tool (`npx inkling build`) makes from your RSS feed with the same model, so you can switch between the two.
+The vectors are the same as those the Inkling command-line tool (`npx @swissspidy/inkling build`) makes from your RSS feed with the same model, so you can switch between the two.
 
 = Blocks =
 
@@ -70,6 +70,10 @@ Changing the dimensions, quantization or sections rewrites the files from the st
 = What is stored on the visitor's device? =
 
 A list of signals: the post's id, the kind (view, click, dwell, follow, hide), a weight and a time, in the site's IndexedDB database `inkling`. At most 2,000 signals, none older than 180 days.
+
+= What does deleting the plugin remove? =
+
+Its settings, the stored vectors and the files in `wp-content/uploads/inkling/`, on every site of a network. Visitors' reading histories are in their own browsers: the personalization controls' "Forget" deletes them.
 
 == Hooks ==
 

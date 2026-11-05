@@ -8,6 +8,7 @@
   const NOTICE = 'inkling-embed';
   let wasSaving = false;
   let running;
+  let queued;
 
   function notice(status, message) {
     dispatch('core/notices').createNotice(status, message, {
@@ -34,18 +35,30 @@
     }
   }
 
+  /**
+   * One embed at a time. A save that finishes during a run is queued and embedded after it
+   * (embedPost() skips the post if its vector is already current).
+   */
+  function run(id) {
+    if (running) {
+      queued = id;
+      return;
+    }
+    running = embedCurrent(id).finally(() => {
+      running = undefined;
+      const next = queued;
+      queued = undefined;
+      if (next !== undefined) run(next);
+    });
+  }
+
   subscribe(() => {
     const editor = select('core/editor');
     if (!editor) return;
     const saving = editor.isSavingPost() && !editor.isAutosavingPost();
     if (wasSaving && !saving && editor.didPostSaveRequestSucceed()) {
       const id = editor.getCurrentPostId();
-      if (editor.getEditedPostAttribute('status') === 'publish' && !running) {
-        // One at a time; a save during the run is picked up by the next save or the index screen.
-        running = embedCurrent(id).finally(() => {
-          running = undefined;
-        });
-      }
+      if (editor.getEditedPostAttribute('status') === 'publish') run(id);
     }
     wasSaving = saving;
   });

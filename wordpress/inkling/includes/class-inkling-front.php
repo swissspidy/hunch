@@ -20,6 +20,7 @@ final class Inkling_Front {
 		add_action( 'init', array( __CLASS__, 'register' ) );
 		add_filter( 'the_content', array( __CLASS__, 'append_related' ), 20 );
 		add_action( 'wp_footer', array( __CLASS__, 'page_element' ), 5 );
+		add_action( 'wp_footer', array( __CLASS__, 'consent_cleanup' ) );
 	}
 
 	/**
@@ -117,8 +118,10 @@ final class Inkling_Front {
 				return '() => document.cookie.split(/;\s*/).includes(' . wp_json_encode( $s['consent_cookie'] ) . ')';
 			case 'function':
 				// The setting is a dotted path of identifiers (see Inkling_Settings::sanitize()).
-				$path = wp_json_encode( explode( '.', $s['consent_function'] ) );
-				return '() => { const f = ' . $path . '.reduce((o, k) => o?.[k], window); return typeof f === "function" ? f() : false; }';
+				// Called on its owner, so a method such as `cmp.allows` keeps its `this`.
+				$path = explode( '.', $s['consent_function'] );
+				$name = wp_json_encode( array_pop( $path ) );
+				return '() => { const o = ' . wp_json_encode( $path ) . '.reduce((o, k) => o?.[k], window); const f = o?.[' . $name . ']; return typeof f === "function" ? f.call(o) : false; }';
 			case 'wp-consent-api':
 				return '() => typeof window.wp_has_consent === "function" && window.wp_has_consent("preferences")';
 			default:
@@ -138,10 +141,12 @@ final class Inkling_Front {
 			return $content;
 		}
 		$post = get_post();
-		if ( ! $post || ! Inkling_Catalog::is_indexed( $post ) || has_block( 'inkling/related', $post ) ) {
+		// A related list already in the content (the block, also inside a synced pattern or a
+		// template part) is not repeated.
+		if ( ! $post || ! Inkling_Catalog::is_indexed( $post ) || preg_match( '/class="[^"]*\binkling-related\b/', $content ) ) {
 			return $content;
 		}
-		return $content . self::related( $post, (int) Inkling_Settings::get( 'related_count' ), '' );
+		return $content . self::related( $post, (int) Inkling_Settings::get( 'related_count' ), '', false );
 	}
 
 	/**
@@ -159,7 +164,7 @@ final class Inkling_Front {
 			return '';
 		}
 		$count = empty( $attributes['count'] ) ? (int) Inkling_Settings::get( 'related_count' ) : (int) $attributes['count'];
-		return self::related( $post, $count, isset( $attributes['heading'] ) ? (string) $attributes['heading'] : '' );
+		return self::related( $post, $count, isset( $attributes['heading'] ) ? (string) $attributes['heading'] : '', true );
 	}
 
 	/**
@@ -181,38 +186,52 @@ final class Inkling_Front {
 			)
 		);
 		$manifest = 'off' === Inkling_Settings::get( 'consent' ) ? null : Inkling_Catalog::manifest_url();
-		return self::list_markup( 'inkling-for-you', $manifest ? array( 'manifest' => $manifest ) : null, $heading, $fallback );
+		return self::list_markup( 'inkling-for-you', $manifest ? array( 'manifest' => $manifest ) : null, $heading, $fallback, true );
 	}
 
 	/**
 	 * The visitor's controls: consent (when the visitor gives it here), pause, export, forget.
+	 * Forget is there even when personalization is off or there is no index yet: something may
+	 * have been stored earlier.
 	 *
 	 * @return string
 	 */
 	public static function render_controls_block() {
-		$manifest = Inkling_Catalog::manifest_url();
 		$consent  = Inkling_Settings::get( 'consent' );
-		if ( ! $manifest || 'off' === $consent ) {
-			return '';
-		}
+		$manifest = 'off' === $consent ? null : Inkling_Catalog::manifest_url();
 		wp_enqueue_script( 'inkling-controls' );
 		wp_enqueue_style( 'inkling' );
 		ob_start();
 		?>
-		<div <?php echo get_block_wrapper_attributes( array( 'class' => 'inkling-controls' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by core. ?> data-inkling-controls data-manifest="<?php echo esc_url( $manifest ); ?>" data-consent="<?php echo esc_attr( $consent ); ?>">
+		<div <?php echo get_block_wrapper_attributes( array( 'class' => 'inkling-controls' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by core. ?> data-inkling-controls data-manifest="<?php echo esc_url( (string) $manifest ); ?>" data-consent="<?php echo esc_attr( $consent ); ?>">
 			<p class="inkling-controls__intro"><?php esc_html_e( 'Recommendations on this site are ranked in your browser. With your consent, it keeps a list of what you read here, on this device only.', 'inkling' ); ?></p>
-			<?php if ( 'optin' === $consent ) : ?>
+			<?php if ( 'optin' === $consent && $manifest ) : ?>
 				<p><label><input type="checkbox" data-inkling-consent disabled> <?php esc_html_e( 'Personalize recommendations', 'inkling' ); ?></label></p>
 			<?php endif; ?>
 			<p class="inkling-controls__buttons">
-				<button type="button" data-inkling-pause disabled><?php esc_html_e( 'Pause', 'inkling' ); ?></button>
-				<button type="button" data-inkling-export disabled><?php esc_html_e( 'Export', 'inkling' ); ?></button>
+				<?php if ( $manifest ) : ?>
+					<button type="button" data-inkling-pause disabled><?php esc_html_e( 'Pause', 'inkling' ); ?></button>
+					<button type="button" data-inkling-export disabled><?php esc_html_e( 'Export', 'inkling' ); ?></button>
+				<?php endif; ?>
 				<button type="button" data-inkling-forget disabled><?php esc_html_e( 'Forget', 'inkling' ); ?></button>
 			</p>
 			<p><output data-inkling-status aria-live="polite"></output></p>
 		</div>
 		<?php
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * With the WP Consent API, withdrawing the "preferences" category deletes what Inkling
+	 * stored, on every page (not only where a list or the controls are).
+	 */
+	public static function consent_cleanup() {
+		if ( 'wp-consent-api' !== Inkling_Settings::get( 'consent' ) ) {
+			return;
+		}
+		wp_print_inline_script_tag(
+			'document.addEventListener("wp_listen_for_consent_change", (e) => { if (e.detail?.preferences !== "deny") return; try { indexedDB.deleteDatabase("inkling").onsuccess = () => document.dispatchEvent(new Event("inkling:forgotten")); } catch {} });'
+		);
 	}
 
 	/**
@@ -238,9 +257,10 @@ final class Inkling_Front {
 	 * @param WP_Post $post    The post.
 	 * @param int     $count   Slots.
 	 * @param string  $heading Heading.
+	 * @param bool    $block   Rendered as a block (with the block's wrapper attributes).
 	 * @return string
 	 */
-	private static function related( WP_Post $post, $count, $heading ) {
+	private static function related( WP_Post $post, $count, $heading, $block ) {
 		$count    = max( 1, min( 12, $count ) );
 		$types    = (array) Inkling_Settings::get( 'post_types' );
 		$query    = array(
@@ -254,7 +274,10 @@ final class Inkling_Front {
 		$section  = Inkling_Catalog::section( $post );
 		$category = 'category' === Inkling_Settings::get( 'sections' ) && $section ? get_cat_ID( $section ) : 0;
 		$fallback = $category ? get_posts( $query + array( 'cat' => $category ) ) : array();
-		if ( count( $fallback ) < $count ) {
+		// With "same section only", the browser shows nothing from other sections, so neither does
+		// the fallback.
+		$same = (bool) Inkling_Settings::get( 'related_same' );
+		if ( count( $fallback ) < $count && ! ( $same && $category ) ) {
 			$query['post__not_in']   = array_merge( array( $post->ID ), wp_list_pluck( $fallback, 'ID' ) );
 			$query['posts_per_page'] = $count - count( $fallback );
 			$fallback                = array_merge( $fallback, get_posts( $query ) );
@@ -269,11 +292,11 @@ final class Inkling_Front {
 			if ( $section ) {
 				$attributes['section'] = $section;
 			}
-			if ( Inkling_Settings::get( 'related_same' ) ) {
+			if ( $same ) {
 				$attributes['sections'] = 'same';
 			}
 		}
-		return self::list_markup( 'inkling-related', $attributes, '' === $heading ? __( 'Related', 'inkling' ) : $heading, $fallback );
+		return self::list_markup( 'inkling-related', $attributes, '' === $heading ? __( 'Related', 'inkling' ) : $heading, $fallback, $block );
 	}
 
 	/**
@@ -283,9 +306,10 @@ final class Inkling_Front {
 	 * @param array|null $attributes The component's attributes, or null for the list alone.
 	 * @param string     $heading    Heading.
 	 * @param WP_Post[]  $posts      The fallback posts.
+	 * @param bool       $block      Rendered as a block: the block's wrapper attributes apply.
 	 * @return string
 	 */
-	private static function list_markup( $element, $attributes, $heading, array $posts ) {
+	private static function list_markup( $element, $attributes, $heading, array $posts, $block ) {
 		if ( ! $posts ) {
 			return '';
 		}
@@ -314,10 +338,11 @@ final class Inkling_Front {
 				esc_html( get_the_date( '', $post ) )
 			);
 		}
-		$class = 'inkling-related' === $element ? 'inkling-related' : 'inkling-for-you';
+		$class   = 'inkling-list ' . ( 'inkling-related' === $element ? 'inkling-related' : 'inkling-for-you' );
+		$wrapper = $block && WP_Block_Supports::$block_to_render ? get_block_wrapper_attributes( array( 'class' => $class ) ) : 'class="' . esc_attr( $class ) . '"';
 		return sprintf(
-			'<section class="inkling-list %1$s"><h2 class="inkling-list__heading">%2$s</h2>%3$s<ol class="inkling-list__items">%4$s</ol>%5$s</section>',
-			esc_attr( $class ),
+			'<section %1$s><h2 class="inkling-list__heading">%2$s</h2>%3$s<ol class="inkling-list__items">%4$s</ol>%5$s</section>',
+			$wrapper,
 			esc_html( $heading ),
 			$open,
 			$slots,

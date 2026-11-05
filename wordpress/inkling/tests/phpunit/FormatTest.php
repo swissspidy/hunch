@@ -64,8 +64,24 @@ final class FormatTest extends TestCase {
 	}
 
 	public function test_slug() {
-		$this->assertSame( 'cafe-culture', Inkling_Format::slug( 'Café Culture' ) );
 		$this->assertSame( 'section', Inkling_Format::slug( '!!!' ) );
+		$this->assertSame( 'night-trains', Inkling_Format::slug( ' Night  Trains! ' ) );
+	}
+
+	public function test_slug_transliterates_accents_with_intl() {
+		if ( ! class_exists( 'Normalizer' ) ) {
+			$this->markTestSkipped( 'NFKD needs the intl extension.' );
+		}
+		$this->assertSame( 'cafe-culture', Inkling_Format::slug( 'Café Culture' ) );
+	}
+
+	public function test_invalid_utf8_becomes_u_fffd_without_mbstring() {
+		foreach ( array( "ok \xff x", "a\xc3", "\xe2\x82 b", "\xed\xa0\x80", "caf\xc3\xa9 \xf0\x9f\xa5\x90" ) as $text ) {
+			$this->assertSame( 1, preg_match( '//u', Inkling_Format::replace_invalid_utf8( $text ) ) );
+		}
+		$this->assertSame( "ok \u{fffd} x", Inkling_Format::replace_invalid_utf8( "ok \xff x" ) );
+		$this->assertSame( "caf\u{e9} \u{1f950}", Inkling_Format::replace_invalid_utf8( "caf\xc3\xa9 \xf0\x9f\xa5\x90" ) );
+		$this->assertSame( "\u{fffd}\u{fffd}\u{fffd}", Inkling_Format::replace_invalid_utf8( "\xed\xa0\x80" ) );
 	}
 
 	public function test_iso_time() {

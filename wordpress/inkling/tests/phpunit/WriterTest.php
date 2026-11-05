@@ -88,6 +88,8 @@ final class WriterTest extends TestCase {
 			$this->assertSame( $shard['bytes'], strlen( $bytes ) );
 		}
 		$this->assertSame( $manifest, json_decode( file_get_contents( $this->dir . '/manifest.json' ), true ) );
+		// Files are written to .tmp and renamed into place: none is left behind.
+		$this->assertSame( array(), array_merge( glob( $this->dir . '/*.tmp' ), glob( $this->dir . '/shards/*.tmp' ) ) );
 	}
 
 	public function test_empty_fields_are_left_out_and_priors_follow_catalog_order() {

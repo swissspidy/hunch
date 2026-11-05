@@ -19,12 +19,23 @@ final class Inkling_Catalog {
 	const HOOK        = 'inkling_regenerate';
 	const STATE       = 'inkling_state';
 	const LOCK        = 'inkling_regenerating';
+	const RETRIES     = 'inkling_retries';
+
+	/**
+	 * Seconds after which a lock left by a run that died (a fatal error, a timeout) is taken over.
+	 */
+	const LOCK_TTL = 600;
+
+	/**
+	 * Failed scheduled runs are retried this often, 2, 4 and 8 minutes apart.
+	 */
+	const MAX_RETRIES = 3;
 
 	/**
 	 * Hooks.
 	 */
 	public static function init() {
-		add_action( self::HOOK, array( __CLASS__, 'regenerate' ) );
+		add_action( self::HOOK, array( __CLASS__, 'scheduled_regenerate' ) );
 		add_action( 'transition_post_status', array( __CLASS__, 'on_transition' ), 10, 3 );
 		add_action( 'wp_update_comment_count', array( __CLASS__, 'on_comment_count' ) );
 		add_action( 'update_option_' . Inkling_Settings::OPTION, array( __CLASS__, 'schedule' ) );
@@ -235,10 +246,12 @@ final class Inkling_Catalog {
 	}
 
 	/**
-	 * Schedules a regeneration in a few seconds, once: many changes in a row write once.
+	 * Schedules a regeneration in 30 seconds, once: many changes in a row write once.
 	 */
 	public static function schedule() {
-		if ( ! wp_next_scheduled( self::HOOK ) ) {
+		$next = wp_next_scheduled( self::HOOK );
+		// A retry or the empty catalog's clean-up may be pending further out: don't wait for it.
+		if ( ! $next || $next > time() + 60 ) {
 			wp_schedule_single_event( time() + 30, self::HOOK );
 		}
 	}
@@ -375,23 +388,86 @@ final class Inkling_Catalog {
 	}
 
 	/**
-	 * Writes the manifest and shards from every published post with a current vector.
+	 * The scheduled run: a failed write is retried a few times, further apart each time.
+	 */
+	public static function scheduled_regenerate() {
+		$result = self::regenerate();
+		if ( ! is_wp_error( $result ) ) {
+			delete_option( self::RETRIES );
+			return;
+		}
+		if ( 'inkling_write_failed' !== $result->get_error_code() ) {
+			return;
+			// Busy: regenerate() has scheduled the next run.
+		}
+		$retries = (int) get_option( self::RETRIES, 0 ) + 1;
+		if ( $retries <= self::MAX_RETRIES ) {
+			update_option( self::RETRIES, $retries, false );
+			wp_schedule_single_event( time() + 60 * ( 2 ** $retries ), self::HOOK );
+		} else {
+			// Given up: the next change or "Build index" starts again.
+			delete_option( self::RETRIES );
+		}
+	}
+
+	/**
+	 * Writes the manifest and shards from every published post with a vector, one run at a time.
 	 *
 	 * @return array|WP_Error The new state: `version`, `count`, `pending`, `generatedAt`.
 	 */
 	public static function regenerate() {
-		if ( get_transient( self::LOCK ) ) {
+		$token = self::lock();
+		if ( null === $token ) {
 			self::schedule();
 			return new WP_Error( 'inkling_busy', 'A regeneration is running.', array( 'status' => 409 ) );
 		}
-		set_transient( self::LOCK, 1, 5 * MINUTE_IN_SECONDS );
 		try {
-			return self::write();
+			$state = self::write();
 		} catch ( Exception $e ) {
-			return new WP_Error( 'inkling_write_failed', $e->getMessage(), array( 'status' => 500 ) );
+			$state = new WP_Error( 'inkling_write_failed', $e->getMessage(), array( 'status' => 500 ) );
+			$saved = get_option( self::STATE, array() );
+			update_option( self::STATE, array_merge( is_array( $saved ) ? $saved : array(), array( 'error' => $e->getMessage() ) ), false );
 		} finally {
-			delete_transient( self::LOCK );
+			self::unlock( $token );
 		}
+		return $state;
+	}
+
+	/**
+	 * Takes the regeneration lock: a row in the options table inserted atomically (INSERT
+	 * IGNORE, as WordPress's own upgrader lock), holding a random token and its expiry. A lock
+	 * past its expiry is taken over with a compare-and-swap on its old value.
+	 *
+	 * @return string|null The lock's value, to release it with; null when another run holds it.
+	 */
+	private static function lock() {
+		global $wpdb;
+		$value = wp_generate_password( 20, false ) . ':' . ( time() + self::LOCK_TTL );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery -- the lock must bypass the options cache.
+		$inserted = $wpdb->query( $wpdb->prepare( "INSERT IGNORE INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')", self::LOCK, $value ) );
+		if ( ! $inserted ) {
+			$held    = (string) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", self::LOCK ) );
+			$expires = (int) substr( (string) strrchr( $held, ':' ), 1 );
+			$taken   = '' !== $held && $expires < time()
+				&& $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s", $value, self::LOCK, $held ) );
+			if ( ! $taken ) {
+				return null;
+			}
+		}
+		// phpcs:enable WordPress.DB.DirectDatabaseQuery
+		wp_cache_delete( self::LOCK, 'options' );
+		return $value;
+	}
+
+	/**
+	 * Releases the lock, unless another run has taken it over meanwhile.
+	 *
+	 * @param string $value The value `lock()` returned.
+	 */
+	private static function unlock( $value ) {
+		global $wpdb;
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s AND option_value = %s", self::LOCK, $value ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		wp_cache_delete( self::LOCK, 'options' );
 	}
 
 	/**
@@ -469,8 +545,19 @@ final class Inkling_Catalog {
 			$state['count']       = $result['manifest']['count'];
 			$state['generatedAt'] = $result['manifest']['generatedAt'];
 		} elseif ( is_file( $location['dir'] . '/manifest.json' ) ) {
+			// No catalog: pages stop pointing at the manifest. Its shards stay one more run for
+			// clients and cached pages holding it, as after any rebuild (ADR 0007), and that run
+			// is scheduled now so they don't stay indefinitely.
 			wp_delete_file( $location['dir'] . '/manifest.json' );
-		}
+			wp_schedule_single_event( time() + HOUR_IN_SECONDS, self::HOOK );
+		} else {
+			// Still no catalog an hour later: no manifest names the remaining shards.
+			foreach ( (array) glob( $location['dir'] . '/shards/*.ink' ) as $file ) {
+				if ( is_string( $file ) ) {
+					wp_delete_file( $file );
+				}
+			}
+		}//end if
 		update_option( self::STATE, $state, false );
 		return $state;
 	}

@@ -74,8 +74,16 @@ final class Inkling_Settings {
 			$value       = is_int( $allowed[0] ) ? (int) $value : (string) $value;
 			$out[ $key ] = in_array( $value, $allowed, true ) ? $value : $defaults[ $key ];
 		}
-		$types             = isset( $input['post_types'] ) ? (array) $input['post_types'] : array();
-		$out['post_types'] = array_values( array_filter( array_map( 'sanitize_key', $types ), 'post_type_exists' ) );
+		$types = isset( $input['post_types'] ) ? (array) $input['post_types'] : array();
+		// Only public types: their posts are published in the shards for anyone to read.
+		$out['post_types'] = array_values(
+			array_filter(
+				array_map( 'sanitize_key', $types ),
+				static function ( $type ) {
+					return 'attachment' !== $type && post_type_exists( $type ) && is_post_type_viewable( $type );
+				}
+			)
+		);
 		if ( ! $out['post_types'] ) {
 			$out['post_types'] = $defaults['post_types'];
 		}

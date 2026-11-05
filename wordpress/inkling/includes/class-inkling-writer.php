@@ -152,10 +152,7 @@ final class Inkling_Writer {
 			'sections'      => $sections,
 			'shards'        => $shards,
 		);
-		self::put( $manifest_path . '.tmp', Inkling_Format::json( $manifest, true ) . "\n" );
-		if ( ! rename( $manifest_path . '.tmp', $manifest_path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- an atomic replace.
-			throw new RuntimeException( 'Inkling: cannot write ' . $manifest_path );
-		}
+		self::put( $manifest_path, Inkling_Format::json( $manifest, true ) . "\n" );
 
 		// Remove shards neither manifest names: clients holding the previous one can still load it.
 		$keep = array();
@@ -256,14 +253,16 @@ final class Inkling_Writer {
 	}
 
 	/**
-	 * Writes a file.
+	 * Writes a file atomically.
 	 *
 	 * @param string $path  Path.
 	 * @param string $bytes Contents.
 	 * @throws RuntimeException When the file cannot be written.
 	 */
 	private static function put( $path, $bytes ) {
-		if ( file_put_contents( $path, $bytes ) !== strlen( $bytes ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- WP_Filesystem may need credentials; uploads is writable.
+		// Written next to it, then renamed over it: a reader never sees a half-written file.
+		if ( file_put_contents( $path . '.tmp', $bytes ) !== strlen( $bytes ) // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- WP_Filesystem may need credentials; uploads is writable.
+			|| ! rename( $path . '.tmp', $path ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.rename_rename -- an atomic replace.
 			throw new RuntimeException( 'Inkling: cannot write ' . $path );
 		}
 	}

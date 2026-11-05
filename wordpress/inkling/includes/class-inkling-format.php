@@ -123,8 +123,7 @@ final class Inkling_Format {
 			return $text;
 		}
 		if ( ! function_exists( 'mb_convert_encoding' ) ) {
-			// Without mbstring, invalid bytes are dropped rather than replaced.
-			return (string) iconv( 'UTF-8', 'UTF-8//IGNORE', $text );
+			return self::replace_invalid_utf8( $text );
 		}
 		$previous = mb_substitute_character();
 		mb_substitute_character( 0xfffd );
@@ -170,6 +169,23 @@ final class Inkling_Format {
 				return isset( $named[ $key ] ) ? $named[ $key ] : $m[0];
 			},
 			$text
+		);
+	}
+
+	/**
+	 * Replaces each byte that is not part of a valid UTF-8 sequence with U+FFFD, in plain PHP
+	 * (the fallback of `valid_utf8()` without mbstring).
+	 *
+	 * @param string $text Text.
+	 * @return string
+	 */
+	public static function replace_invalid_utf8( $text ) {
+		return (string) preg_replace_callback(
+			'/[\x00-\x7f]|[\xc2-\xdf][\x80-\xbf]|\xe0[\xa0-\xbf][\x80-\xbf]|[\xe1-\xec\xee\xef][\x80-\xbf]{2}|\xed[\x80-\x9f][\x80-\xbf]|\xf0[\x90-\xbf][\x80-\xbf]{2}|[\xf1-\xf3][\x80-\xbf]{3}|\xf4[\x80-\x8f][\x80-\xbf]{2}|(.)/s',
+			static function ( $m ) {
+				return isset( $m[1] ) ? "\u{fffd}" : $m[0];
+			},
+			(string) $text
 		);
 	}
 

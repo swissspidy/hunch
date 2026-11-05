@@ -152,6 +152,14 @@ final class Inkling_Admin {
 					}
 					?>
 				</p>
+				<?php if ( ! empty( $status['state']['error'] ) ) : ?>
+					<div class="notice notice-error inline"><p>
+						<?php
+						/* translators: %s: error message */
+						printf( esc_html__( 'The last build failed: %s', 'inkling' ), esc_html( (string) $status['state']['error'] ) );
+						?>
+					</p></div>
+				<?php endif; ?>
 				<p>
 					<button type="button" class="button button-primary" data-inkling-build><?php esc_html_e( 'Build index', 'inkling' ); ?></button>
 					<button type="button" class="button" data-inkling-stop hidden><?php esc_html_e( 'Stop', 'inkling' ); ?></button>

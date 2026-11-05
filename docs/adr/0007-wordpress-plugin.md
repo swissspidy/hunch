@@ -44,6 +44,11 @@ the CLI would write, and a catalog built by either can replace the other.
   vector, and the site refuses a vector whose hash isn't the post's current one (409). So a post
   edited mid-embedding is not stored stale, and **unchanged posts are never embedded again**:
   the stored hash matches.
+- **An edited post keeps its old vector until it is embedded again.** Its title, link and section
+  are published from the post as it is now, but the vector stays the last one embedded. Dropping
+  the post until someone runs "Build index" (posts edited outside the block editor) would take it
+  out of every list for a typo fix; the old vector is still close to the post's meaning. "Build
+  index" lists such posts as pending and embeds them.
 - **The browser sends the model's full output: 768 float32 values, little-endian, base64**
   (4 KB), stored as post meta with the hash and the model key. The site truncates
   (Matryoshka), renormalizes and quantizes when it writes the shards. Like the CLI's cache, this
@@ -78,8 +83,20 @@ manifest names. These classes don't need WordPress.
   round.
 - **Regeneration is debounced:** publishing, updating, trashing or unpublishing a post, storing a
   vector, changing the settings and (with comment priors) a comment count all schedule one
-  WP-Cron event 30 seconds later, if none is pending. A transient lock keeps two runs apart.
-  "Build index" writes immediately. The files go to `wp-content/uploads/inkling/`. The
+  WP-Cron event 30 seconds later, unless one is due within a minute. "Build index" writes
+  immediately.
+- **One run at a time.** The lock is a row in the options table, inserted atomically with
+  `INSERT IGNORE` (as WordPress's own upgrader lock) and holding a random token and an expiry.
+  A run that died (a fatal error, a timeout) leaves a lock that the next run takes over after 10
+  minutes, with a compare-and-swap on its old value, and a run releases only its own lock. A run
+  that finds the lock taken schedules itself again. A scheduled run whose write fails is retried
+  three times, 2, 4 and 8 minutes apart; the error is kept in the state for the settings screen.
+- **Files are replaced atomically:** every shard and the manifest are written to a `.tmp` file
+  and renamed into place, so a web server never serves a half-written file.
+- **An empty catalog** (every post unpublished) deletes the manifest at once, so pages stop
+  pointing at it, and keeps its shards for one more run, as after any rebuild, for clients and
+  cached pages holding it. That run is scheduled an hour later (or is the next run, if one
+  comes sooner); if the catalog is still empty, it deletes the remaining shards. Otherwise the next manifest's write prunes them. The files go to `wp-content/uploads/inkling/`. The
   manifest's URL carries its version (`manifest.json?v=…`), so caches in front of the site see a
   new URL after each rebuild even when they ignore the `.htaccess` cache headers the plugin
   writes for Apache.
@@ -99,11 +116,15 @@ manifest names. These classes don't need WordPress.
   nothing. Before the first build, the lists render without the component and stay as they are.
 - **The personalization controls block** mirrors the demo's "Your data": the consent checkbox
   (when the visitor decides), pause/resume, export (a JSON download) and forget. Unchecking
-  consent forgets, and so does withdrawing the WP Consent API's category.
+  consent forgets. Forget is shown even when personalization is off or there is no index yet,
+  and then deletes the IndexedDB database directly, since something may have been stored
+  earlier. With the WP Consent API, every front-end page listens for the "preferences" category
+  being withdrawn and deletes the database.
 
 ### 4. Security
 
-Every REST route has a permission callback: `edit_post` for a post's input and vector (and the
+Only public post types can be indexed, since their posts are published in the shards. Every
+REST route has a permission callback: `edit_post` for a post's input and vector (and the
 post must be of an indexed type), `manage_options` for the pending list, the status and
 regeneration. The REST API's cookie authentication requires the `wp_rest` nonce, which
 `wp.apiFetch` sends. The settings form uses the Settings API's nonce. Settings are sanitized

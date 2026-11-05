@@ -28,16 +28,18 @@ for (const entry of SHIPPED) {
 }
 files.sort();
 
-const zip = zipFiles(
-  await Promise.all(
+const zip = zipFiles([
+  ...(await Promise.all(
     files.map(async (file) => ({
       name: `inkling/${relative(PLUGIN, file).split(sep).join('/')}`,
       data: await readFile(file),
     })),
-  ),
-);
+  )),
+  // The repository's Apache-2.0 license, at the plugin's root.
+  { name: 'inkling/LICENSE', data: await readFile('LICENSE') },
+]);
 await writeFile(ZIP, zip);
-console.log(`${ZIP}: ${files.length} files, ${(zip.length / 1024).toFixed(1)} KB`);
+console.log(`${ZIP}: ${files.length + 1} files, ${(zip.length / 1024).toFixed(1)} KB`);
 
 /** A plain zip archive (deflate), with a fixed date so the same files give the same bytes. */
 function zipFiles(entries: { name: string; data: Buffer }[]): Buffer {

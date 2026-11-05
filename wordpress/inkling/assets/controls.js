@@ -1,28 +1,75 @@
 /**
  * The personalization controls block, as on the demo's home page: the visitor's consent switch
  * (when the site leaves consent to the visitor), pause or resume, export and forget. Withdrawing
- * consent deletes what was stored.
+ * consent deletes what was stored. Forget works even without an index (no manifest): it then
+ * deletes the database directly.
  */
 (function () {
   'use strict';
   const CONSENT_KEY = 'inkling-consent';
+  const DATABASE = 'inkling';
+  const roots = [...document.querySelectorAll('[data-inkling-controls]')];
+  const updaters = [];
+
+  /** Every controls block on the page shows the same state. */
+  function syncAll() {
+    for (const update of updaters) update().catch((error) => console.error(error));
+  }
+
+  function refreshLists() {
+    for (const list of document.querySelectorAll('inkling-for-you')) list.refresh();
+  }
+
+  /** Deletes everything Inkling stored in this browser, with or without the catalog. */
+  async function forget(manifest) {
+    if (manifest && window.Inkling) {
+      try {
+        await (await window.Inkling.shared(manifest)).forget();
+        return;
+      } catch (error) {
+        console.error(error); // The manifest did not load: delete the database itself.
+      }
+    }
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(DATABASE);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  function storedConsent() {
+    try {
+      return localStorage.getItem(CONSENT_KEY) === 'yes';
+    } catch {
+      return false;
+    }
+  }
 
   function setup(root) {
-    const manifest = root.dataset.manifest;
+    const manifest = root.dataset.manifest || '';
     const consent = root.querySelector('[data-inkling-consent]');
     const pause = root.querySelector('[data-inkling-pause]');
     const status = root.querySelector('[data-inkling-status]');
     const shared = () => window.Inkling.shared(manifest);
     const on = (el, listener) =>
       el?.addEventListener(el.type === 'checkbox' ? 'change' : 'click', () => {
-        listener().catch((error) => console.error(error));
+        listener().catch((error) => {
+          console.error(error);
+          status.value = 'That did not work in this browser.';
+        });
       });
 
     async function update() {
+      if (consent) consent.checked = storedConsent();
+      if (!manifest) {
+        status.value = 'Personalization is off. Forget deletes anything stored earlier.';
+        return;
+      }
       const inkling = await shared();
       if (!(await inkling.consented())) {
-        status.value = 'Personalization is off. Nothing is stored.';
-        pause.textContent = 'Pause';
+        status.value =
+          'Personalization is off: nothing new is recorded. Forget deletes anything stored earlier.';
+        if (pause) pause.textContent = 'Pause';
         return;
       }
       const { signals } = await inkling.export();
@@ -30,38 +77,39 @@
       pause.textContent = paused ? 'Resume' : 'Pause';
       status.value = `${signals.length} ${signals.length === 1 ? 'item' : 'items'} remembered in this browser${paused ? ' (paused)' : ''}.`;
     }
+    updaters.push(update);
 
-    function refresh() {
-      for (const list of document.querySelectorAll('inkling-for-you')) list.refresh();
-    }
-
-    if (consent) {
-      try {
-        consent.checked = localStorage.getItem(CONSENT_KEY) === 'yes';
-      } catch {
-        consent.checked = false;
-      }
-      on(consent, async () => {
-        if (consent.checked) {
+    on(consent, async () => {
+      if (consent.checked) {
+        try {
           localStorage.setItem(CONSENT_KEY, 'yes');
-        } else {
-          localStorage.removeItem(CONSENT_KEY);
-          await (await shared()).forget();
+        } catch {
+          consent.checked = false;
+          status.value =
+            'This browser did not let the site save your choice, so personalization stays off.';
+          return;
         }
-        await update();
-        refresh();
-      });
-    }
+      } else {
+        try {
+          localStorage.removeItem(CONSENT_KEY);
+        } catch {
+          // Nothing was stored, so there is nothing to remove.
+        }
+        await forget(manifest);
+      }
+      syncAll();
+      refreshLists();
+    });
     on(pause, async () => {
       const inkling = await shared();
       if (await inkling.paused()) await inkling.resume();
       else await inkling.pause();
-      await update();
+      syncAll();
     });
     on(root.querySelector('[data-inkling-forget]'), async () => {
-      await (await shared()).forget();
-      await update();
-      refresh();
+      await forget(manifest);
+      syncAll();
+      refreshLists();
     });
     on(root.querySelector('[data-inkling-export]'), async () => {
       const data = await (await shared()).export();
@@ -75,16 +123,14 @@
     });
     // The controls are disabled in the markup until they work.
     for (const control of root.querySelectorAll('input, button')) control.disabled = false;
-    update().catch((error) => console.error(error));
   }
 
-  for (const root of document.querySelectorAll('[data-inkling-controls]')) setup(root);
+  roots.forEach(setup);
+  syncAll();
 
-  // WP Consent API: withdrawing the "preferences" category deletes what was stored.
-  document.addEventListener('wp_listen_for_consent_change', (event) => {
-    if (event.detail?.preferences !== 'deny') return;
-    for (const root of document.querySelectorAll('[data-inkling-controls]')) {
-      window.Inkling.shared(root.dataset.manifest).then((inkling) => inkling.forget());
-    }
+  // Deleted elsewhere on the page (the WP Consent API's withdrawal, see consent_cleanup()).
+  document.addEventListener('inkling:forgotten', () => {
+    syncAll();
+    refreshLists();
   });
 })();
