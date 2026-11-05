@@ -4,7 +4,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { readdir, readFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import type { Manifest, ShardItem } from '../../src/format/manifest.ts';
@@ -69,6 +69,10 @@ test('builds the catalog from the built pages, and rebuilds from the cache', asy
       prior: undefined,
     },
   );
+  // A page-relative og:image is resolved against its page; an absolute one is kept.
+  const image = (id: string) => items.find((item) => item.id === id)?.image;
+  assert.equal(image('/blog/alpine-hut/'), '/blog/alpine-hut/hut.jpg');
+  assert.equal(image('/blog/sourdough/'), 'https://images.example.com/starter.jpg');
   // The article's text is embedded, not the page around it.
   assert.ok(first.calls.some((input) => /sourdough starter, flour, water/.test(input)));
   assert.ok(!first.calls.some((input) => /Related/.test(input)));
@@ -165,16 +169,72 @@ test('items replaces the catalog, and base and out move it', async () => {
 });
 
 test('ids follow build.format, as Astro.url.pathname does', async () => {
+  // A public file where the directory form of a page would be: not the page.
+  const publicDir = await tempDir();
+  await mkdir(join(publicDir, 'blog/rye-bread'), { recursive: true });
+  await writeFile(
+    join(publicDir, 'blog/rye-bread/index.html'),
+    '<title>A public file</title><body>Not the page</body>',
+  );
   const out = await tempDir();
-  await buildFixture(out, { cacheDir: false }, { build: { format: 'file' } });
+  await buildFixture(out, { cacheDir: false }, { build: { format: 'file' }, publicDir });
   const items = await shardItems(join(out, 'inkling'), await readManifest(join(out, 'inkling')));
   assert.deepEqual(items.map((item) => item.id).sort(), [
     '/',
     ...POSTS.map((path) => path.replace(/\/$/, '.html')),
     '/tags.html',
   ]);
+  assert.equal(
+    items.find((item) => item.id === '/blog/rye-bread.html')?.title,
+    'Dense, dark rye bread',
+  );
   const html = await readFile(join(out, 'blog/rye-bread.html'), 'utf8');
   assert.match(html, /<inkling-related item="\/blog\/rye-bread\.html"/);
+  // The fixture's fallback links are in the same form, and leave out the page itself.
+  const fallback = [...html.matchAll(/data-inkling-id="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(fallback.length, 3);
+  assert.ok(fallback.every((id) => id!.endsWith('.html') && id !== '/blog/rye-bread.html'));
+
+  // `preserve`: index pages keep the directory form, other pages end in .html. The tags page
+  // prints its Astro.url.pathname.
+  for (const trailingSlash of ['ignore', 'never'] as const) {
+    const preserved = await tempDir();
+    await buildFixture(
+      preserved,
+      { cacheDir: false },
+      { build: { format: 'preserve' }, trailingSlash },
+    );
+    const ids = (
+      await shardItems(join(preserved, 'inkling'), await readManifest(join(preserved, 'inkling')))
+    ).map((item) => item.id);
+    const tags = await readFile(join(preserved, 'tags/index.html'), 'utf8');
+    const tagsPath = /data-path="([^"]+)"/.exec(tags)![1]!;
+    assert.ok(ids.includes(tagsPath), `${trailingSlash}: ${tagsPath} in ${ids.join(' ')}`);
+    assert.ok(ids.includes('/blog/rye-bread.html'), ids.join(' '));
+  }
+});
+
+test('the manifest URL uses the final base, after every integration', async () => {
+  const out = await tempDir();
+  await buildFixture(
+    out,
+    { cacheDir: false },
+    {
+      // An integration after Inkling's that sets base.
+      integrations: [
+        {
+          name: 'late-base',
+          hooks: {
+            'astro:config:setup': ({ updateConfig }) => void updateConfig({ base: '/late' }),
+          },
+        },
+      ],
+    },
+  );
+  assert.match(
+    await pageScripts(out, 'index.html', '/late/'),
+    /manifest:["'`]\/late\/inkling\/manifest\.json["'`]/,
+  );
 });
 
 test('astro dev serves the last build’s vectors and the components', async () => {
@@ -191,6 +251,17 @@ test('astro dev serves the last build’s vectors and the components', async () 
     assert.match(html, /<inkling-related item="\/blog\/rye-bread\/"/);
     const script = await (await fetch(`${server.origin}/@id/astro:scripts/page.js`)).text();
     assert.match(script, /virtual:inkling\/config[\s\S]*elements/);
+    // Directories are not files: no 200 with an error after it.
+    for (const path of ['/inkling/', '/inkling/shards/', '/inkling/shards']) {
+      assert.notEqual((await fetch(`${server.origin}${path}`)).status, 200, path);
+    }
+    // A site with on-demand pages has its vectors in the client directory.
+    await rm(join(out, 'inkling'), { recursive: true });
+    await mkdir(join(out, 'client/inkling'), { recursive: true });
+    await writeFile(join(out, 'client/inkling/manifest.json'), '{"count":1}');
+    const client = await fetch(`${server.origin}/inkling/manifest.json`);
+    assert.equal(client.status, 200);
+    assert.deepEqual(await client.json(), { count: 1 });
   } finally {
     await server.stop();
   }

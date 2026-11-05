@@ -7,7 +7,8 @@ const posts = Object.values(import.meta.glob('../pages/blog/*.md', { eager: true
   frontmatter: { title: string; section: string };
 }[];
 const self = Astro.url.pathname;
-const href = (post: { url: string }) => `${post.url}/`;
+// Links in the form the build emits: `/blog/post/`, or `/blog/post.html` with build.format 'file'.
+const href = (post: { url: string }) => (self.endsWith('.html') ? `${post.url}.html` : `${post.url}/`);
 const fallback = posts.filter((post) => href(post) !== self).slice(0, 3);
 ---
 
@@ -17,6 +18,7 @@ const fallback = posts.filter((post) => href(post) !== self).slice(0, 3);
     <title>{frontmatter.title}</title>
     <meta property="og:title" content={frontmatter.title} />
     <meta property="article:section" content={frontmatter.section} />
+    {frontmatter.image && <meta property="og:image" content={frontmatter.image} />}
     <meta
       property="article:published_time"
       content={new Date(frontmatter.date).toISOString().slice(0, 10)}

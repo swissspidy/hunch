@@ -60,13 +60,34 @@ test('the site’s InklingConfig keeps its consent hook and gets the manifest', 
     (window as unknown as { InklingConfig: object }).InklingConfig = { consent: () => true };
   });
   const page = await context.newPage();
+  await page.goto(`${site.origin}/`);
+  // Nothing stored before an article page is opened.
+  assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);
   await page.goto(`${site.origin}/blog/rye-bread/`);
   await ready(page, 'inkling-related');
   // <inkling-page> has no manifest attribute either: it recorded the view, with consent.
   await page.waitForFunction(
-    async () => (await indexedDB.databases()).some((db) => db.name === 'inkling'),
+    async () => {
+      if (!(await indexedDB.databases()).some((db) => db.name === 'inkling')) return false;
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const open = indexedDB.open('inkling');
+        open.onsuccess = () => resolve(open.result);
+        open.onerror = () => reject(open.error);
+      });
+      try {
+        if (!db.objectStoreNames.contains('signals')) return false;
+        const signals = await new Promise<{ itemId: string; kind: string }[]>((resolve, reject) => {
+          const all = db.transaction('signals').objectStore('signals').getAll();
+          all.onsuccess = () => resolve(all.result as { itemId: string; kind: string }[]);
+          all.onerror = () => reject(all.error);
+        });
+        return signals.some((s) => s.itemId === '/blog/rye-bread/' && s.kind === 'view');
+      } finally {
+        db.close();
+      }
+    },
     undefined,
-    { timeout: 5000 },
+    { timeout: 5000, polling: 100 },
   );
   assert.equal(
     await page.evaluate(
@@ -74,5 +95,27 @@ test('the site’s InklingConfig keeps its consent hook and gets the manifest', 
     ),
     '/inkling/manifest.json',
   );
+  await context.close();
+});
+
+test('a manifest attribute wins over InklingConfig.manifest', async () => {
+  const context = await site.browser.newContext(DESKTOP);
+  const page = await context.newPage();
+  const requests: string[] = [];
+  page.on('request', (request) => requests.push(new URL(request.url()).pathname));
+  await page.goto(`${site.origin}/blog/rye-bread/`);
+  await ready(page, 'inkling-related');
+  await page.evaluate(() => {
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      `<inkling-related id="other" manifest="/elsewhere/manifest.json" item="/blog/rye-bread/">
+        <ol><li data-inkling-slot><a href="/"><span data-inkling-title>Fallback</span></a></li></ol>
+      </inkling-related>`,
+    );
+  });
+  await page.waitForSelector('#other[data-inkling-state="error"]', { timeout: 10_000 });
+  assert.ok(requests.includes('/elsewhere/manifest.json'), requests.join('\n'));
+  // Its fallback stays.
+  assert.equal(await page.locator('#other [data-inkling-title]').textContent(), 'Fallback');
   await context.close();
 });

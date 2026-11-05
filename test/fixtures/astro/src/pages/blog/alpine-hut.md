@@ -2,6 +2,7 @@
 layout: ../../layouts/Post.astro
 title: A night in an alpine hut
 section: Travel
+image: ./hut.jpg
 date: 2026-09-28
 ---
 

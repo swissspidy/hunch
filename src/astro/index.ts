@@ -7,8 +7,7 @@
  *   export default defineConfig({ integrations: [inkling({ include: ['/blog/*'] })] });
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFileSync, statSync } from 'node:fs';
 import { extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AstroConfig, AstroIntegration, AstroIntegrationLogger } from 'astro';
@@ -19,16 +18,17 @@ import { transformersProvider, type TransformersOptions } from '../node/provider
 import type { EmbeddingProvider } from '../node/providers/types.ts';
 import { parsePage } from '../node/sources/sitemap.ts';
 import type { CatalogItem } from '../node/types.ts';
+import {
+  checkOut,
+  matcher,
+  outDir,
+  pagePath,
+  readPage,
+  resolveImage,
+  type PathFilter,
+} from './pages.ts';
 
-/**
- * Paths to match, without the site's `base`: `/blog/*` matches one segment, `/blog/**` any
- * number. Trailing slashes are ignored. Or a regular expression, or a function.
- */
-export type PathFilter =
-  | string
-  | RegExp
-  | ((path: string) => boolean)
-  | readonly (string | RegExp)[];
+export type { PathFilter } from './pages.ts';
 
 export interface PageContext {
   /** The page's path without the site's `base`, as filters see it (e.g. `/blog/post/`). */
@@ -78,17 +78,15 @@ const VIRTUAL = 'virtual:inkling/config';
 const ALWAYS_EXCLUDED = [/^\/(404|500)\/?$/];
 
 export default function inkling(options: InklingAstroOptions = {}): AstroIntegration {
-  const out = trimSlashes(options.out ?? 'inkling');
-  if (!out || out.split('/').includes('..')) {
-    throw new Error(`inkling: out must be a directory inside the build output, not ${options.out}`);
-  }
+  const out = checkOut(options.out);
   let config: AstroConfig;
   return {
     name: '@swissspidy/inkling',
     hooks: {
-      'astro:config:setup': ({ config: setupConfig, updateConfig, injectScript }) => {
+      'astro:config:setup': ({ updateConfig, injectScript }) => {
         if (options.script === false) return;
-        const manifest = `${withSlash(setupConfig.base)}${out}/manifest.json`;
+        // Read when the module loads, after every integration had its say on `base`.
+        const manifest = () => `${withSlash(config.base)}${out}/manifest.json`;
         updateConfig({ vite: { plugins: [configModule(manifest)] } });
         // The config module runs first: the components read the manifest as they register.
         injectScript('page', `import '${VIRTUAL}';\nimport '@swissspidy/inkling/elements';`);
@@ -98,16 +96,19 @@ export default function inkling(options: InklingAstroOptions = {}): AstroIntegra
       },
       'astro:server:setup': ({ server, logger }) => {
         // Serve the last build's vectors, if there is one: `astro dev` builds no catalog.
+        // Where astro:build:done wrote it: the output directory, or for a site with on-demand
+        // pages, its client directory.
         const prefix = `${withSlash(config.base)}${out}/`;
-        const root = new URL(`${out}/`, config.outDir);
+        const roots = [outDir(config.outDir, out), outDir(config.build.client, out)];
         let warned = false;
         server.middlewares.use((req, res, next) => {
           const path = req.url?.split('?')[0];
           if (!path?.startsWith(prefix)) return next();
-          const file = new URL(path.slice(prefix.length), root);
-          if (!file.href.startsWith(root.href)) return next();
           // Small files, read synchronously: this is the dev server.
-          if (!existsSync(file)) {
+          const file = roots
+            .map((root) => new URL(path.slice(prefix.length), root))
+            .find((url, i) => url.href.startsWith(roots[i]!.href) && isFile(url));
+          if (!file) {
             if (!warned) {
               warned = true;
               logger.warn(
@@ -134,7 +135,7 @@ export default function inkling(options: InklingAstroOptions = {}): AstroIntegra
         try {
           const result = await build({
             items,
-            outDir: fileURLToPath(new URL(`${out}/`, dir)),
+            outDir: fileURLToPath(outDir(dir, out)),
             provider,
             dims: options.dims,
             quantization: options.quantization,
@@ -181,68 +182,19 @@ async function builtPages(
     )
     .sort();
   for (const path of new Set(paths)) {
-    const html = await readPage(dir, path);
-    if (html === undefined) {
+    const page = await readPage(dir, path, config.build.format);
+    if (!page) {
       logger.debug(`${path}: no HTML file (rendered on demand?), left out`);
       continue;
     }
     // The id and link are the page's path with the base, as `Astro.url.pathname` gives it.
-    const id = pagePath(base, path, config);
-    const item = parsePage(id, html);
-    const adjusted = options.page ? options.page(item, { path, html }) : item;
+    const id = pagePath(base, path, page.flat, config.trailingSlash);
+    const parsed = parsePage(id, page.html);
+    const item = parsed.image ? { ...parsed, image: resolveImage(parsed.image, id) } : parsed;
+    const adjusted = options.page ? options.page(item, { path, html: page.html }) : item;
     if (adjusted) items.push(adjusted);
   }
   return items;
-}
-
-/**
- * The page's URL path, as `Astro.url.pathname` gives it when the page is built: Astro's
- * pathname already follows `trailingSlash`; with `build.format: 'file'` (or `'preserve'`, for a
- * page that is not an index) it ends in `.html`.
- */
-function pagePath(base: string, path: string, config: AstroConfig): string {
-  const full = `${base}${path.slice(1)}`;
-  const file = config.build.format === 'file' || config.build.format === 'preserve';
-  return file && path !== '/' && !path.endsWith('/') ? `${full}.html` : full;
-}
-
-/** The HTML file of a built page, whatever the `build.format`. */
-async function readPage(dir: URL, path: string): Promise<string | undefined> {
-  const name = path.slice(1).replace(/\/$/, '');
-  const candidates = name ? [`${name}/index.html`, `${name}.html`] : ['index.html'];
-  for (const candidate of candidates) {
-    try {
-      return await readFile(new URL(candidate, dir), 'utf8');
-    } catch {
-      // Try the next layout.
-    }
-  }
-  return undefined;
-}
-
-/** A matcher for a path filter; trailing slashes are ignored on both sides. */
-function matcher(filter: PathFilter): (path: string) => boolean {
-  if (typeof filter === 'function') return filter;
-  const patterns = (Array.isArray(filter) ? filter : [filter]) as (string | RegExp)[];
-  const res = patterns.map((p) => (typeof p === 'string' ? glob(p) : p));
-  return (path) => {
-    const bare = path.length > 1 ? path.replace(/\/$/, '') : path;
-    return res.some((re) => re.test(path) || re.test(bare));
-  };
-}
-
-function glob(pattern: string): RegExp {
-  const bare = pattern.length > 1 ? pattern.replace(/\/$/, '') : pattern;
-  const source = bare
-    .split(/(\*\*\/?|\*)/)
-    .map((part) => {
-      if (part === '**/') return '(?:.*/)?';
-      if (part === '**') return '.*';
-      if (part === '*') return '[^/]*';
-      return part.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-    })
-    .join('');
-  return new RegExp(`^${source}$`);
 }
 
 function resolveProvider(options: InklingAstroOptions): EmbeddingProvider {
@@ -254,20 +206,24 @@ function resolveProvider(options: InklingAstroOptions): EmbeddingProvider {
 }
 
 /** The module that sets `window.InklingConfig.manifest`, unless the page set one. */
-function configModule(manifest: string) {
+function configModule(manifest: () => string) {
   const resolved = `\0${VIRTUAL}`;
   return {
     name: 'inkling:config',
     resolveId: (id: string) => (id === VIRTUAL ? resolved : undefined),
     load: (id: string) =>
       id === resolved
-        ? `globalThis.InklingConfig = { manifest: ${JSON.stringify(manifest)}, ...globalThis.InklingConfig };\n`
+        ? `globalThis.InklingConfig = { manifest: ${JSON.stringify(manifest())}, ...globalThis.InklingConfig };\n`
         : undefined,
   };
 }
 
-function trimSlashes(path: string): string {
-  return path.replace(/^\/+|\/+$/g, '');
+function isFile(url: URL): boolean {
+  try {
+    return statSync(url).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function withSlash(base: string): string {

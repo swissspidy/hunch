@@ -23,11 +23,14 @@ the Vite config. With it, adding Inkling to an Astro site can be one line in
   the HTML file of every page Astro emitted and extracts it as the sitemap source does: the
   title from `og:title` or `<title>`, the text from `<article>`, `<main>` or `<body>`, the
   section from `article:section`, the tags from `article:tag`, the date from
-  `article:published_time`, and the image from `og:image`. Reading the output, not the
+  `article:published_time`, and the image from `og:image` (a page-relative image is resolved
+  against the page, so it loads from any page that shows the item). Reading the output, not the
   sources, means it works the same for Markdown, MDX, content collections and `.astro` pages,
   and the catalog holds what visitors see.
-  - `include` and `exclude` select pages by path (without `base`): globs (`*` is one segment,
-    `**` any number), regular expressions or a function. 404 and 500 pages are always left out.
+  - `include` and `exclude` select pages by path (without `base`): globs, regular expressions
+    or a function. `*` is one segment (a whole segment needs a character, so `/blog/*` is the
+    posts and not the blog index), `**` any number, and a trailing `/**` also matches the path
+    itself. Trailing slashes are ignored on both sides. 404 and 500 pages are always left out.
   - `page(item, { path, html })` adjusts an item (its section, say) or drops it.
   - `items(context)` replaces the catalog. It receives the built pages as items, so a site can
     filter or enrich them, or return items that are not pages. Content collections can't be
@@ -37,13 +40,19 @@ the Vite config. With it, adding Inkling to an Astro site can be one line in
   - Pages rendered on demand have no HTML file at build time and are left out. A site with
     them uses `items`.
 - **An item's id and link are its path, with `base`, as `Astro.url.pathname` gives it while
-  the page is built.** Astro's page pathnames already follow `trailingSlash`; with
-  `build.format: 'file'` the integration adds `.html`, as `Astro.url.pathname` does. So a
-  layout writes `item={Astro.url.pathname}` and matches the catalog. Paths, not absolute URLs,
+  the page is built.** The integration takes the form from the file Astro emitted: a page
+  written as `name.html` (`build.format: 'file'`, or `'preserve'` for a page that is not an
+  index) ends in `.html`, and a page written as `name/index.html` ends in a slash unless
+  `trailingSlash` is `'never'`. The hook's pathnames alone are not enough: for a `preserve`
+  index page they have no slash, while `Astro.url.pathname` has one. The tests check each
+  format against the path the fixture page prints. So a layout writes `item={Astro.url.pathname}` and matches the catalog. Paths, not absolute URLs,
   so the same manifest works on preview deployments and on `localhost`, and changing `site`
   does not change ids (signals refer to items by id). `site` is not needed.
 - **The vectors go into the build output**, `inkling/` by default (`out`), next to the pages,
-  so they deploy with the site and the manifest URL is `${base}inkling/manifest.json`.
+  so they deploy with the site and the manifest URL is `${base}inkling/manifest.json`, with
+  the `base` Astro settles on after every integration's setup. `out` is a relative path of
+  plain segments (no `.`, `..`, `%` or scheme), and the resolved directory is checked to be
+  inside the build output before anything is written.
 - **The embedding cache lives in `node_modules/.cache/inkling`** by default (`cacheDir`), the
   conventional place for tool caches that survive rebuilds but are not committed. Astro empties
   the build output on every build, so the cache can't live there. In CI, `actions/cache` on
@@ -67,8 +76,9 @@ the Vite config. With it, adding Inkling to an Astro site can be one line in
 - **No `.astro` components.** The slot markup is the site's own (its classes, its fallback
   query), and a component would have to guess both. The README shows the markup for a layout.
 - **`astro dev` serves the last build's vectors.** The dev server builds no catalog (it renders
-  pages on request, so there is no set of built pages), but the integration serves `inkling/`
-  from the build output directory if a build left one there. Before the first build the lists
+  pages on request, so there is no set of built pages), but the integration serves the files
+  of `inkling/` from the build output directory, or from its client directory where a site
+  with on-demand pages has them, if a build left them there. Before the first build the lists
   keep their fallback, and the dev server logs why once.
 
 ## Consequences

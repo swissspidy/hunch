@@ -15,7 +15,6 @@ function config(
     outDir,
     site: 'https://example.com',
     logLevel: 'error',
-    integrations: [inkling({ provider: 'hash', ...options })],
     // The package's own entry point, from the sources rather than dist.
     vite: {
       resolve: {
@@ -27,6 +26,8 @@ function config(
       },
     },
     ...extra,
+    // Others after Inkling's.
+    integrations: [inkling({ provider: 'hash', ...options }), ...(extra.integrations ?? [])],
   };
 }
 

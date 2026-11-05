@@ -227,7 +227,8 @@ export default defineConfig({
 After the pages are built, it reads each one's HTML as the sitemap source does (`og:title`,
 `article:section`, `article:published_time`, `article:tag`, `og:image`, and the text of
 `<article>` or `<main>`), embeds them, and writes `dist/inkling/`. An item's id is its path,
-as `Astro.url.pathname` gives it. In a layout, render the slots and leave out `manifest`:
+as `Astro.url.pathname` gives it, for every `build.format` and `trailingSlash`. In a layout,
+render the slots and leave out `manifest`:
 
 ```astro
 ---
@@ -248,16 +249,16 @@ const related = await sameSectionPosts(Astro.props.section); // your own fallbac
 The consent hook goes in `<head>`, as on any site:
 `<script is:inline>window.InklingConfig = { consent: () => … };</script>`.
 
-| Option                            | Default                       |                                                                          |
-| --------------------------------- | ----------------------------- | ------------------------------------------------------------------------ |
-| `include`, `exclude`              | all pages                     | Paths without `base`: `'/blog/*'`, `'/tags/**'`, a RegExp, or a function |
-| `page(item, { path, html })`      |                               | Change an item (its section, say), or return `null` to drop it           |
-| `items({ pages })`                |                               | The whole catalog: the built pages, filtered or enriched, or other items |
-| `provider`                        | `'transformers'`              | EmbeddingGemma; `'hash'` for tests, or a provider object                 |
-| `cacheDir`                        | `node_modules/.cache/inkling` | The embedding cache, relative to the project; `false` for none           |
-| `out`                             | `'inkling'`                   | Directory in the build output                                            |
-| `dims`, `quantization`, `shardBy` |                               | As for the CLI                                                           |
-| `script`                          | `true`                        | `false` to load the components yourself                                  |
+| Option                            | Default                       |                                                                                                |
+| --------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `include`, `exclude`              | all pages                     | Paths without `base`: `'/blog/*'` (not `/blog/` itself), `'/tags/**'`, a RegExp, or a function |
+| `page(item, { path, html })`      |                               | Change an item (its section, say), or return `null` to drop it                                 |
+| `items({ pages })`                |                               | The whole catalog: the built pages, filtered or enriched, or other items                       |
+| `provider`                        | `'transformers'`              | EmbeddingGemma; `'hash'` for tests, or a provider object                                       |
+| `cacheDir`                        | `node_modules/.cache/inkling` | The embedding cache, relative to the project; `false` for none                                 |
+| `out`                             | `'inkling'`                   | Directory in the build output                                                                  |
+| `dims`, `quantization`, `shardBy` |                               | As for the CLI                                                                                 |
+| `script`                          | `true`                        | `false` to load the components yourself                                                        |
 
 Install `@huggingface/transformers` as a dev dependency for the default provider. A build
 embeds only pages that are new or changed since the cached ones. In CI, restore the cache after

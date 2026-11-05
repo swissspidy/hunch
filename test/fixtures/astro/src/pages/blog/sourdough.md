@@ -2,6 +2,7 @@
 layout: ../../layouts/Post.astro
 title: Keeping a sourdough starter alive
 section: Food
+image: https://images.example.com/starter.jpg
 date: 2026-10-01
 ---
 
