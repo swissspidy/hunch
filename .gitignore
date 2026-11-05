@@ -6,3 +6,4 @@ demo/dist/
 eval/.work/
 eval/.cache/
 eval/.data/
+test/fixtures/astro/.astro/

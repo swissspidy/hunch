@@ -1,0 +1,55 @@
+---
+// An article page: Open Graph and article meta for the catalog, and a "Related" list whose
+// server-rendered slots <inkling-related> fills in place. The integration sets the manifest.
+const { frontmatter } = Astro.props;
+const posts = Object.values(import.meta.glob('../pages/blog/*.md', { eager: true })) as {
+  url: string;
+  frontmatter: { title: string; section: string };
+}[];
+const self = Astro.url.pathname;
+const href = (post: { url: string }) => `${post.url}/`;
+const fallback = posts.filter((post) => href(post) !== self).slice(0, 3);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{frontmatter.title}</title>
+    <meta property="og:title" content={frontmatter.title} />
+    <meta property="article:section" content={frontmatter.section} />
+    <meta
+      property="article:published_time"
+      content={new Date(frontmatter.date).toISOString().slice(0, 10)}
+    />
+    <style>
+      [data-inkling-slot] {
+        height: 3rem;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <inkling-page item={self}></inkling-page>
+    <article>
+      <h1>{frontmatter.title}</h1>
+      <slot />
+    </article>
+    <aside>
+      <h2>Related</h2>
+      <inkling-related item={self} section={frontmatter.section}>
+        <ol>
+          {
+            fallback.map((post) => (
+              <li data-inkling-slot data-inkling-id={href(post)}>
+                <a href={href(post)}>
+                  <span data-inkling-title>{post.frontmatter.title}</span>
+                </a>
+                <span data-inkling-section>{post.frontmatter.section}</span>
+              </li>
+            ))
+          }
+        </ol>
+      </inkling-related>
+    </aside>
+  </body>
+</html>
