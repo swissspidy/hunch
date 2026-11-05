@@ -85,6 +85,7 @@
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
     "@types/node": "^26.6.6",
+    "axe-core": "^4.14.0",
     "esbuild": "^0.28.2",
     "fake-indexeddb": "^6.2.7",
     "knip": "^6.44.1",

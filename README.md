@@ -67,7 +67,8 @@ On an article page, render the fallback list as you would anyway, and wrap it:
 
 `item` is the item's id in the catalog: the feed item's `guid`, or its link. Give the slots a
 fixed height and clamp titles to a fixed number of lines (see
-[`demo/style.css`](demo/style.css)). Each slot is replaced by a copy of itself with the related
+[`demo/style.css`](demo/style.css)). If your CSS removes the list's markers
+(`list-style: none`), add `role="list"` to it: Safari then no longer reports it as a list. Each slot is replaced by a copy of itself with the related
 item's link, title, section, date and image, so nothing moves. If the manifest can't be
 loaded, the fallback stays. The element sets `data-inkling-state` to `loading`, `ready` or
 `error`, and fires `inkling:ready` with the recommendations.

@@ -8,6 +8,10 @@
  * on their text (clamp titles to a fixed number of lines). Listeners attached to a slot do not
  * carry over to its copy: delegate them to the element.
  *
+ * Focus is never moved or lost: while a slot holds focus, the element waits for it to leave
+ * before replacing the slots (it stays `loading` until then). The slots' accessible names follow
+ * their content; an `aria-label` that contains the fallback item's title gets the new title.
+ *
  * Each refresh starts again from the server-rendered slots. When there are fewer results than
  * slots, the remaining slots are hidden rather than left showing a fallback item.
  *
@@ -101,6 +105,9 @@ export abstract class SlotsElement extends Base {
         run,
       );
       if (run !== this.run) return;
+      // Replacing the slot that holds focus would drop focus to the page: wait until it leaves.
+      await this.blurred();
+      if (run !== this.run) return;
       slots.forEach((slot, i) => {
         const copy = original[i]!.cloneNode(true) as HTMLElement;
         if (recommendations) {
@@ -123,6 +130,15 @@ export abstract class SlotsElement extends Base {
     }
   }
 
+  /** Resolves once focus is outside the element: at once, unless a slot holds it. */
+  private async blurred(): Promise<void> {
+    while (this.contains(document.activeElement)) {
+      await new Promise((resolve) => this.addEventListener('focusout', resolve, { once: true }));
+      // Focus may be moving to another slot: look again once it has landed.
+      await new Promise((resolve) => setTimeout(resolve));
+    }
+  }
+
   private onClick(event: Event): void {
     const slot = (event.target as Element | null)?.closest<HTMLElement>('[data-inkling-slot]');
     const id = slot?.dataset.inklingId;
@@ -137,6 +153,19 @@ export abstract class SlotsElement extends Base {
 
 function fill(slot: HTMLElement, rec: Recommendation): void {
   slot.dataset.inklingId = rec.id;
+  // An aria-label that names the fallback item (`Read: <title>`) would give the link the wrong
+  // name: it names the new item instead.
+  const old = slot.querySelector('[data-inkling-title]')?.textContent?.trim();
+  if (old) {
+    for (const el of [slot, ...slot.querySelectorAll('[aria-label]')]) {
+      const label = el.getAttribute('aria-label');
+      if (label?.includes(old))
+        el.setAttribute(
+          'aria-label',
+          label.replace(old, () => rec.title),
+        );
+    }
+  }
   const link = slot.matches('a') ? slot : slot.querySelector('[data-inkling-href], a');
   if (link) {
     // Only web URLs: a javascript: URL from a catalog would run script when clicked.

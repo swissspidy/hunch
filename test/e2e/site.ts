@@ -2,6 +2,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { after, before, type TestContext } from 'node:test';
 import {
   chromium,
@@ -11,6 +12,7 @@ import {
   type BrowserContextOptions,
   type Page,
 } from 'playwright-core';
+import { decodeShard } from '../../src/format/shard.ts';
 
 const ENGINES = { chromium, firefox, webkit };
 type Engine = keyof typeof ENGINES;
@@ -120,4 +122,54 @@ export function slots(page: Page, element: string): Promise<SlotContent[]> {
 
 export async function ready(page: Page, element: string): Promise<void> {
   await page.waitForSelector(`${element}[data-inkling-state="ready"]`, { timeout: 10_000 });
+}
+
+/**
+ * Visits an article and waits until its view is stored. Leaving a page aborts its pending
+ * IndexedDB writes, and Firefox can still be opening the database when the list is ready.
+ */
+export async function read(site: Site, page: Page, id: string): Promise<void> {
+  await page.goto(`${site.origin}/items/${id}.html`);
+  await ready(page, 'inkling-related');
+  await page.waitForFunction(async (item) => {
+    const inkling = await (
+      window as unknown as {
+        Inkling: {
+          shared(m: string): Promise<{ export(): Promise<{ signals: { itemId: string }[] }> }>;
+        };
+      }
+    ).Inkling.shared(document.body.dataset.manifest!);
+    return (await inkling.export()).signals.some((s) => s.itemId === item);
+  }, id);
+}
+
+/** The article a search with `fakeTransformers` finds first. */
+export const TARGET = 'cold-brew';
+
+/**
+ * A stand-in for Transformers.js, served for the CDN URL: its "model" returns the vector of
+ * the `TARGET` article, so that article must come first in a search.
+ */
+export async function fakeTransformers(): Promise<string> {
+  const manifest = JSON.parse(await readFile('demo/dist/inkling/manifest.json', 'utf8'));
+  const ref = manifest.shards.find((s: { section: string }) => s.section === 'Food');
+  const shard = decodeShard(new Uint8Array(await readFile(`demo/dist/inkling/${ref.url}`)).buffer);
+  const row = shard.items.findIndex((item) => item.id === TARGET);
+  // The article's vector, padded to the model's 768 dims: truncation gives it back exactly.
+  const vector = new Array(manifest.model.nativeDims).fill(0);
+  for (let d = 0; d < shard.dims; d++)
+    vector[d] = shard.vectors[row * shard.dims + d]! * shard.invNorms[row]!;
+  return `
+    export const env = {};
+    export const AutoTokenizer = { from_pretrained: async () => (texts) => ({ texts }) };
+    export const AutoModel = {
+      from_pretrained: async (id, options) => {
+        globalThis.__model = { id, ...options };
+        const model = async (inputs) => {
+          globalThis.__inputs = inputs.texts;
+          return { sentence_embedding: { dims: [1, ${vector.length}], data: Float32Array.from(${JSON.stringify(vector)}) } };
+        };
+        return model;
+      },
+    };`;
 }

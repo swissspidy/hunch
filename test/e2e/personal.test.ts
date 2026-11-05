@@ -13,6 +13,7 @@ import {
   assertNoLayoutShift,
   observeLayoutShifts,
   PHONE,
+  read,
   ready,
   serveDemo,
   slots,
@@ -32,24 +33,6 @@ async function context(consent: boolean, options = DESKTOP): Promise<BrowserCont
 async function visit(page: Page, id: string): Promise<void> {
   await page.goto(`${site.origin}/items/${id}.html`);
   await ready(page, 'inkling-related');
-}
-
-/**
- * Visits an article and waits until its view is stored. Leaving a page aborts its pending
- * IndexedDB writes, and Firefox can still be opening the database when the list is ready.
- */
-async function read(page: Page, id: string): Promise<void> {
-  await visit(page, id);
-  await page.waitForFunction(async (item) => {
-    const inkling = await (
-      window as unknown as {
-        Inkling: {
-          shared(m: string): Promise<{ export(): Promise<{ signals: { itemId: string }[] }> }>;
-        };
-      }
-    ).Inkling.shared(document.body.dataset.manifest!);
-    return (await inkling.export()).signals.some((s) => s.itemId === item);
-  }, id);
 }
 
 /** The demo's signals, read from IndexedDB as the page sees them. */
@@ -99,7 +82,7 @@ for (const [name, options] of [
   test(`reading food articles makes "for you" about food, without layout shift (${name})`, async (t) => {
     const ctx = await context(true, options);
     const page = await ctx.newPage();
-    for (const id of FOOD) await read(page, id);
+    for (const id of FOOD) await read(site, page, id);
     const signals = await storedSignals(page);
     assert.deepEqual(
       signals.filter((s) => s.kind === 'view').map((s) => s.itemId),
@@ -127,7 +110,7 @@ for (const [name, options] of [
 test('"Not interested" hides an item for good; "Forget everything" starts over', async () => {
   const ctx = await context(true);
   const page = await ctx.newPage();
-  for (const id of FOOD) await read(page, id);
+  for (const id of FOOD) await read(site, page, id);
   await home(page);
   const first = (await slots(page, 'inkling-for-you'))[0]!.id;
 
@@ -175,7 +158,7 @@ test('"Not interested" hides an item for good; "Forget everything" starts over',
 test('pause stops recording; withdrawing consent deletes the data; export downloads it', async () => {
   const ctx = await context(true);
   const page = await ctx.newPage();
-  await read(page, FOOD[0]!);
+  await read(site, page, FOOD[0]!);
   await home(page);
   await page.waitForFunction(() =>
     document.getElementById('status')!.textContent.startsWith('1 signal stored'),
