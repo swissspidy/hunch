@@ -49,6 +49,8 @@ test('synthetic evaluation: beats popularity, a model switch loses nothing, one 
     'ablation',
     '--out',
     out,
+    '--cache',
+    join(out, 'cache'),
   ]);
   const result = JSON.parse(await readFile(join(out, 'ablation.json'), 'utf8')) as Result;
   const row = (prefix: string) => result.rows.find((r) => r.ranker.startsWith(prefix))!.metrics;
@@ -64,7 +66,7 @@ test('synthetic evaluation: beats popularity, a model switch loses nothing, one 
   assert.equal(result.modelSwitch.identical, result.modelSwitch.total);
 
   // Ablation: the four catalogs of model A share one embedding pass (the first build embeds,
-  // or finds everything cached from an earlier run; the others only truncate and quantize).
+  // the others only truncate and quantize).
   assert.deepEqual(
     result.catalogs.map((c) => c.label),
     [
@@ -76,6 +78,8 @@ test('synthetic evaluation: beats popularity, a model switch loses nothing, one 
     ],
   );
   for (const c of result.catalogs) assert.equal(c.embedded + c.cached, result.items);
+  // From an empty cache: the first catalog of model A embeds everything, the other three nothing.
+  assert.equal(result.catalogs[0]!.embedded, result.items);
   for (const c of result.catalogs.slice(1, 4)) assert.equal(c.embedded, 0, c.label);
   const perItem = (label: string) => result.catalogs.find((c) => c.label === label)!.bytesPerItem;
   assert.ok(perItem('model A (64 dims, float32)') > perItem('model A (64 dims)'));
@@ -118,4 +122,31 @@ test('pairedDifference: mean, standard error and a bootstrap interval of b − a
   assert.deepEqual(pairedDifference(b, zero), noisy);
 
   assert.throws(() => pairedDifference([1, 2], [1]), RangeError);
+  for (const resamples of [0, -1, 2.5, Number.NaN]) {
+    assert.throws(() => pairedDifference(b, zero, resamples), RangeError, String(resamples));
+  }
+});
+
+test('eval run: rejects an empty --variants list and writes results for a single impression', async () => {
+  const out = await tempDir();
+  const run = (...args: string[]) =>
+    promisify(execFile)(process.execPath, [
+      'eval/run.ts',
+      '--dataset',
+      'synthetic',
+      '--models',
+      'a',
+      '--dims',
+      '64,128',
+      '--out',
+      out,
+      '--cache',
+      join(out, 'cache'),
+      ...args,
+    ]);
+  await assert.rejects(run('--variants', ','), /--variants/);
+  await run('--variants', 'default', '--impressions', '1', '--name', 'one');
+  const result = JSON.parse(await readFile(join(out, 'one.json'), 'utf8')) as Result;
+  assert.equal(result.impressions, 1);
+  assert.deepEqual(result.comparisons, []);
 });

@@ -45,6 +45,8 @@ const { values } = parseArgs({
     /** Results file name (without `.json`); derived from the models by default. */
     name: { type: 'string' },
     out: { type: 'string', default: 'eval/results' },
+    /** Embedding cache root (default `eval/.cache`). */
+    cache: { type: 'string', default: 'eval/.cache' },
   },
 });
 
@@ -86,7 +88,8 @@ let available: Record<string, Model>;
 let defaultModels: string;
 if (values.dataset === 'synthetic') {
   const data = synthetic();
-  dataset = data;
+  // `--impressions` caps the synthetic set too (it has fewer than the default 2000).
+  dataset = { ...data, impressions: data.impressions.slice(0, Number(values.impressions)) };
   available = {
     a: { name: 'model A', provider: () => data.providers.a, defaultDims: 128 },
     b: { name: 'model B', provider: () => data.providers.b, defaultDims: 96 },
@@ -114,6 +117,7 @@ if (values.dataset === 'synthetic') {
 const quantizations = list(values.quantization).map((q) => quantizationOf(q, '--quantization'));
 const dimsList = values.dims ? list(values.dims).map((d) => positiveInt(d, '--dims')) : undefined;
 const variantKeys = list(values.variants);
+if (variantKeys.length === 0) throw new Error('--variants: give at least one variant');
 const variants = variantKeys.map((v) => {
   const variant = VARIANTS[v];
   if (!variant) throw new Error(`Unknown variant ${v} (${Object.keys(VARIANTS).join(', ')})`);
@@ -172,7 +176,7 @@ for (const { model, dims: dimsForModel, quantizations: quantsForModel } of plan)
   const id = provider.model.id.replace(/[^\w.-]+/g, '_');
   // One cache file holds one model id and keeps only the entries a build used, so weights
   // variants (q8, q4) of one model need their own directories or they evict each other.
-  const cacheDir = join('eval/.cache', slug, ...(dtype ? [dtype] : []));
+  const cacheDir = join(values.cache, slug, ...(dtype ? [dtype] : []));
   for (const dims of dimsForModel) {
     for (const quantization of quantsForModel) {
       const dir = join(
@@ -240,7 +244,8 @@ if (from && to) {
   );
 }
 
-const comparisons = pairs(catalogs).map(([a, b]) => ({
+// A paired comparison needs at least two impressions.
+const comparisons = (dataset.impressions.length < 2 ? [] : pairs(catalogs)).map(([a, b]) => ({
   a: a.label,
   b: b.label,
   metric: 'ndcg10',
@@ -265,7 +270,18 @@ await mkdir(values.out, { recursive: true });
 const name =
   values.name ??
   (values.dataset === 'mind'
-    ? `mind-${catalogs.map((c) => `${c.model.split('/').pop()}-${c.dims}`).join('-')}`
+    ? `mind-${catalogs
+        .map((c) =>
+          [
+            c.model.split('/').pop(),
+            c.dtype,
+            c.dims,
+            c.quantization === 'int8' ? '' : c.quantization,
+          ]
+            .filter(Boolean)
+            .join('-'),
+        )
+        .join('-')}`
     : slug);
 await writeFile(
   join(values.out, `${name}.json`),

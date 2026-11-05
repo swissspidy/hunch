@@ -77,6 +77,9 @@ export function pairedDifference(
   if (a.length !== b.length || a.length < 2) {
     throw new RangeError('pairedDifference needs two equally long lists of at least 2 scores');
   }
+  if (!Number.isInteger(resamples) || resamples < 1) {
+    throw new RangeError('pairedDifference needs a positive whole number of resamples');
+  }
   const n = a.length;
   const d = Float64Array.from(b, (x, i) => x - a[i]!);
   const avg = d.reduce((s, x) => s + x, 0) / n;

@@ -15,7 +15,9 @@ node eval/run.ts --dataset mind --mind-dir eval/.data/mind --models hash,gemma -
 
 Results go to `eval/results/<name>.json` (`--name` overrides the name). Builds go to
 `eval/.work/`, and embeddings are cached in `eval/.cache/` (one directory per weights variant,
-such as `q8`), so a second run doesn't embed again.
+such as `q8`; `--cache` sets another root), so a second run doesn't embed again. The default
+name includes the weights variant and any float32 quantization, so runs that differ only in those
+don't overwrite each other.
 
 ### Ablation: dimensions, quantization, weights
 
