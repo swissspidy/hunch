@@ -16,6 +16,7 @@ import { decodeShard, type DecodedShard } from '../format/shard.ts';
 import { dotRow } from '../rank/vector.ts';
 import { yieldToPage } from './slices.ts';
 
+/** A `fetch`-compatible function, for the client's `fetch` option. */
 export type Fetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
 export interface Entry {

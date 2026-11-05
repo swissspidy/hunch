@@ -6,9 +6,12 @@
  * forever; the manifest should be served with a short cache lifetime.
  */
 
+/** The manifest's `format`: identifies the document. */
 export const MANIFEST_FORMAT = 'inkling/manifest';
+/** The manifest format version this release writes and reads (ADR 0009). */
 export const MANIFEST_FORMAT_VERSION = 1;
 
+/** How the shards store vector components: int8 (the default) or float32. */
 export type Quantization = 'int8' | 'float32';
 
 /** The model that produced the catalog's vectors. */
@@ -30,6 +33,7 @@ export interface ModelInfo {
   queryPrompt?: string;
 }
 
+/** One shard file, as the manifest lists it. */
 export interface ShardRef {
   /** URL of the shard, relative to the manifest's URL. */
   url: string;
@@ -43,8 +47,11 @@ export interface ShardRef {
   sha256: string;
 }
 
+/** `manifest.json`: the catalog's embedding space, encoding and shards. */
 export interface Manifest {
+  /** Always `inkling/manifest`. */
   format: typeof MANIFEST_FORMAT;
+  /** The format version; a reader refuses versions it doesn't know (ADR 0009). */
   formatVersion: typeof MANIFEST_FORMAT_VERSION;
   /** Content hash of the space and all shards; changes whenever any vector or item changes. */
   version: string;
@@ -56,26 +63,35 @@ export interface Manifest {
    * and document prompt.
    */
   space: string;
+  /** The model the vectors come from. */
   model: ModelInfo;
   /** Dimensions of the published vectors (after truncation). */
   dims: number;
+  /** How the shards store vector components. */
   quantization: Quantization;
   /** Total number of items across all shards. */
   count: number;
   /** All sections, in catalog order. */
   sections: string[];
+  /** The shard files, in catalog order. */
   shards: ShardRef[];
 }
 
 /** An item's metadata as published in a shard. Text is not published. */
 export interface ShardItem {
+  /** The item's stable id in the catalog. */
   id: string;
+  /** The item's URL. */
   url: string;
+  /** The item's title. */
   title: string;
+  /** The item's section, if it has one. */
   section?: string;
+  /** The item's tags. */
   tags?: string[];
   /** ISO 8601 publication date. */
   date?: string;
+  /** URL of the item's image. */
   image?: string;
   /**
    * Site-provided cold-start prior in [0, 1] (popularity or editorial order); 1 is the item

@@ -121,7 +121,7 @@ ${list.map((item) => `    <li><a href="${esc(item.url)}">${esc(item.title)}</a> 
     <h2 id="digest-heading">Since your last visit</h2>
     <inkling-digest manifest="${base}inkling/manifest.json" context="Headlines of a publication about food, science, technology and travel, published since the reader's last visit.">
       <p class="summary" data-inkling-summary>The latest articles. Come back later, with personalization on, for what is new since this visit.</p>
-      <ol class="related">
+      <ol class="related" role="list">
 ${latest}
       </ol>
     </inkling-digest>
@@ -129,7 +129,7 @@ ${latest}
   <section aria-labelledby="for-you-heading">
     <h2 id="for-you-heading">For you</h2>
     <inkling-for-you manifest="${base}inkling/manifest.json">
-      <ol class="related">
+      <ol class="related" role="list">
 ${editorial}
       </ol>
     </inkling-for-you>
@@ -144,10 +144,10 @@ ${editorial}
     <p><label><input type="checkbox" id="consent"> Personalize this site on my device</label></p>
     <p class="controls">
       <button type="button" id="pause">Pause</button>
-      <button type="button" id="export">Export</button>
+      <button type="button" id="export">Export my data</button>
       <button type="button" id="forget">Forget everything</button>
     </p>
-    <p class="status"><output id="status">Personalization is off.</output></p>
+    <p class="status"><output id="status" aria-live="off">Personalization is off. Nothing is stored.</output></p>
     <p class="time-travel">Try "since your last visit" (with personalization on): <a id="travel" href="?as-of=2026-09-15">visit as if it were 15 September 2026</a>, then <a href="./">come back today</a>. The first link forgets this browser's visits, so September is the last visit.</p>
   </section>
 ${sections}
@@ -175,7 +175,7 @@ function articleBody(item: CatalogItem): string {
   <aside aria-labelledby="related-heading">
     <h2 id="related-heading">Related</h2>
     <inkling-related manifest="${base}inkling/manifest.json" item="${esc(item.id)}" section="${esc(item.section ?? '')}">
-      <ol class="related">
+      <ol class="related" role="list">
 ${fallback.map((other) => slot(other, '        ')).join('\n')}
       </ol>
     </inkling-related>

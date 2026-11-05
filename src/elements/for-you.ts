@@ -1,3 +1,6 @@
+import type { Inkling, Recommendation } from '../client/index.ts';
+import { SlotsElement } from './slots.ts';
+
 /**
  * `<inkling-for-you>`: the visitor's recommendations in server-rendered slots.
  *
@@ -6,19 +9,19 @@
  * If the visitor hid an item the fallback shows, the catalog's own order without it is shown.
  * `data-inkling-personalized` says which happened.
  *
- *   <inkling-for-you manifest="/inkling/manifest.json">
- *     <a data-inkling-slot data-inkling-id="post-1" href="/posts/1"><span data-inkling-title>…</span></a>
- *     …
- *   </inkling-for-you>
+ * ```html
+ * <inkling-for-you manifest="/inkling/manifest.json">
+ *   <a data-inkling-slot data-inkling-id="post-1" href="/posts/1"><span data-inkling-title>…</span></a>
+ *   …
+ * </inkling-for-you>
+ * ```
  *
  * Attributes: `manifest` (or `InklingConfig.manifest`), `sections` (comma-separated),
- * `exclude` (comma-separated item ids), `include-seen`, `diversity`. See `slots.ts` for the slots, states and events.
+ * `exclude` (comma-separated item ids), `include-seen`, `diversity`. The slots, states and
+ * events are the module's.
  */
-
-import type { Inkling, Recommendation } from '../client/index.ts';
-import { SlotsElement } from './slots.ts';
-
 export class InklingForYouElement extends SlotsElement {
+  /** @internal Custom element lifecycle, called by the browser. */
   static get observedAttributes(): string[] {
     return ['manifest', 'sections', 'exclude', 'include-seen', 'diversity'];
   }

@@ -67,7 +67,8 @@ On an article page, render the fallback list as you would anyway, and wrap it:
 
 `item` is the item's id in the catalog: the feed item's `guid`, or its link. Give the slots a
 fixed height and clamp titles to a fixed number of lines (see
-[`demo/style.css`](demo/style.css)). Each slot is replaced by a copy of itself with the related
+[`demo/style.css`](demo/style.css)). If your CSS removes the list's markers
+(`list-style: none`), add `role="list"` to it: Safari then no longer reports it as a list. Each slot is replaced by a copy of itself with the related
 item's link, title, section, date and image, so nothing moves. If the manifest can't be
 loaded, the fallback stays. The element sets `data-inkling-state` to `loading`, `ready` or
 `error`, and fires `inkling:ready` with the recommendations.
@@ -124,6 +125,9 @@ await inkling.export(); // { format: 'inkling/signals', signals: [{ itemId, kind
 await inkling.forget(); // deletes everything; forget(itemId) one item's signals
 ```
 
+The [API reference](https://swissspidy.github.io/inkling/api/) documents every entry point:
+the client, `/elements`, `/digest`, `/query`, `/format`, `/build` and `/astro`.
+
 ### "Since your last visit"
 
 `<inkling-digest>` shows what was published since the visitor's previous visit (with consent),
@@ -177,8 +181,9 @@ into the plugin and writes `wordpress/inkling.zip`.
 
 ## The demo
 
-**Live:** [swissspidy.github.io/inkling](https://swissspidy.github.io/inkling/), deployed from
-`main` by [`pages.yml`](.github/workflows/pages.yml). To run it locally:
+**Live:** [swissspidy.github.io/inkling](https://swissspidy.github.io/inkling/), with the
+[API reference](https://swissspidy.github.io/inkling/api/), deployed from `main` by
+[`pages.yml`](.github/workflows/pages.yml). To run it locally:
 
 ```sh
 npm ci
@@ -311,6 +316,21 @@ and before the first build the lists keep their server-rendered fallback.
 4. ✅ Offline evaluation: on MIND, nDCG@10 0.390 vs 0.308 for popularity.
 5. ✅ Optional: a "since your last visit" digest with the built-in Summarizer, and free-text
    search with the catalog's model in the browser.
+
+## Stability
+
+Inkling is 0.x: a breaking change comes in a minor release, with a changeset that says what to
+do. [ADR 0009](docs/adr/0009-stability.md) says what counts as breaking:
+
+- **Published files.** A client refuses a manifest or shard format version it doesn't know (the
+  fallback stays), and keeps reading older versions for at least two minor releases after the
+  build stops writing them. A frozen fixture in the tests pins format version 1.
+- **The visitor's data.** Upgrades migrate the signals in IndexedDB without losing any or
+  changing what they mean. An older client leaves a newer database alone.
+- **The API.** The entry points' exports, the elements' attributes and events, and the CLI
+  follow semantic versioning from 1.0.
+- **Not stable:** the ranking. Weights, scores and the order of results may change in any
+  release.
 
 ## Evaluation
 

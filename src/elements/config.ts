@@ -1,11 +1,10 @@
+import { Inkling, type InklingOptions } from '../client/index.ts';
+
 /**
  * `window.InklingConfig`: options an inline script sets before the components load. They are
  * applied (`Inkling.configure()`) when the components are registered, and `manifest` is the
  * manifest of components that have no `manifest` attribute.
  */
-
-import { Inkling, type InklingOptions } from '../client/index.ts';
-
 export interface InklingConfig extends Omit<InklingOptions, 'manifest'> {
   /** URL of the manifest for components without a `manifest` attribute. */
   manifest?: string;

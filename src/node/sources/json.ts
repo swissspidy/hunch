@@ -3,6 +3,7 @@
 import type { CatalogItem } from '../types.ts';
 import { compact, isoDate } from './feed.ts';
 
+/** Parses a JSON catalog: an array of items, or `{ "items": [...] }`. */
 export function parseJsonCatalog(json: string): CatalogItem[] {
   const data: unknown = JSON.parse(json);
   const list = Array.isArray(data) ? data : (data as { items?: unknown } | null)?.items;

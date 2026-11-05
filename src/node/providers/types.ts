@@ -5,6 +5,7 @@ import type { ModelInfo } from '../../format/manifest.ts';
  * same vectors, so its output can be cached and its space compared across builds.
  */
 export interface EmbeddingProvider {
+  /** The model, as the manifest names it. */
   readonly model: ModelInfo;
   /** Dimensions the model was trained to be truncated to (Matryoshka), if any. */
   readonly matryoshkaDims?: readonly number[];

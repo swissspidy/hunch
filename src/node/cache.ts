@@ -15,6 +15,7 @@ import type { ModelInfo } from '../format/manifest.ts';
 const MAGIC = 0x434b4e49; // "INKC"
 const HEADER = 16;
 
+/** The embedding cache: full-size vectors keyed by model and input, one file per model. */
 export class EmbeddingCache {
   private readonly entries = new Map<string, Float32Array>();
   private readonly used = new Set<string>();
@@ -35,18 +36,21 @@ export class EmbeddingCache {
     return cache;
   }
 
+  /** The cache key of an input (already prompted): a SHA-256 of the model and the input. */
   key(input: string): string {
     return createHash('sha256')
       .update(`${this.model.id}\0${this.model.revision}\0${this.model.dtype ?? ''}\0${input}`)
       .digest('hex');
   }
 
+  /** The cached vector for `key`, if any; marks the entry as used by this build. */
   get(key: string): Float32Array | undefined {
     const v = this.entries.get(key);
     if (v) this.used.add(key);
     return v;
   }
 
+  /** Caches a full-size vector for `key`. */
   set(key: string, vector: Float32Array): void {
     this.entries.set(key, vector);
     this.used.add(key);

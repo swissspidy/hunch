@@ -4,6 +4,8 @@
  *
  * Related items use no visitor data. Personalization ("for you") records signals in the site's
  * own IndexedDB, and only once the site's consent hook says yes (ADR 0001).
+ *
+ * @module @swissspidy/inkling
  */
 
 import type { Manifest, ShardItem } from '../format/manifest.ts';
@@ -29,6 +31,7 @@ import {
 /** `true`, or a function the client asks before every read or write of signals. */
 export type Consent = boolean | (() => boolean | Promise<boolean>);
 
+/** Options for {@link Inkling.load}; all but `manifest` also for {@link Inkling.configure}. */
 export interface InklingOptions {
   /** URL of the site's `manifest.json` (relative URLs resolve against the page). */
   manifest: string | URL;
@@ -55,7 +58,8 @@ export interface InklingOptions {
   now?: () => number;
 }
 
-interface RankingOptions {
+/** Options every ranking method takes. */
+export interface RankingOptions {
   /** How many items to return (default 5). */
   n?: number;
   /** Item ids to leave out. */
@@ -68,6 +72,7 @@ interface RankingOptions {
   weights?: Partial<ScoreWeights>;
 }
 
+/** Options for {@link Inkling.related}. */
 export interface RelatedOptions extends RankingOptions {
   /**
    * Restrict candidates to these sections; `'same'` means the item's own section. Only the
@@ -78,6 +83,7 @@ export interface RelatedOptions extends RankingOptions {
   sectionHint?: string;
 }
 
+/** Options for {@link Inkling.search}. */
 export interface SearchOptions extends RankingOptions {
   /** Restrict results to these sections (only their shards are fetched). */
   sections?: readonly string[];
@@ -90,6 +96,7 @@ export interface SearchOptions extends RankingOptions {
   excludeSeen?: boolean;
 }
 
+/** Options for {@link Inkling.recommend} and {@link Inkling.sinceLastVisit}. */
 export interface RecommendOptions extends RankingOptions {
   /** Restrict candidates to these sections (only their shards are fetched for candidates). */
   sections?: readonly string[];
@@ -101,8 +108,11 @@ export interface RecommendOptions extends RankingOptions {
 
 /** An item the profile leans on: "because you read …". */
 export interface Because {
+  /** The item's id. */
   id: string;
+  /** The item's title. */
   title: string;
+  /** The item's URL. */
   url: string;
   /** Share of the recommendation's profile similarity this item accounts for, in [0, 1]. */
   share: number;
@@ -131,33 +141,49 @@ export interface Explanation {
   because: Because[];
 }
 
+/** A ranked item: its published metadata, its score, and the terms of that score. */
 export interface Recommendation extends ShardItem {
+  /** The ranking function's score (ADR 0001). Comparable within one result list only. */
   score: number;
+  /** Why the item is ranked where it is. */
   why: Explanation;
 }
 
 /** `explain(itemId)`: how the visitor's profile sees one item. */
 export interface ItemExplanation {
+  /** The item's id. */
   id: string;
   /** The profile similarity sim(c), or 0 without a profile. */
   similarity: number;
+  /** Trust in the profile, in [0, 1): 0 without signals. */
   confidence: number;
+  /** The site's cold-start prior in [0, 1]. */
   prior: number;
+  /** Recency term in [0, 1]. */
   recency: number;
+  /** The visitor hid the item: it is never recommended. */
   hidden: boolean;
+  /** The visitor has viewed, clicked, dwelt on or followed the item. */
   seen: boolean;
+  /** The visitor's items that contribute most to the similarity, largest share first. */
   because: Because[];
-  /** Signals stored, and items with signals the current catalog no longer has. */
+  /** Signals stored. */
   signals: number;
+  /** Items with signals that the current catalog no longer has. */
   missing: number;
 }
 
+/** What {@link Inkling.export} returns: the visitor's signals, as JSON (none without consent). */
 export interface SignalExport {
+  /** Identifies the document. */
   format: 'inkling/signals';
+  /** The export format's version. */
   formatVersion: 1;
+  /** When it was exported (ISO 8601). */
   exportedAt: string;
   /** The catalog version the signals were exported next to (for the visitor's reference). */
   manifestVersion: string;
+  /** Every stored signal, oldest first. */
   signals: Signal[];
 }
 
@@ -176,6 +202,11 @@ const NO_PROFILE: Profile = {
   missing: [],
 };
 
+/**
+ * The client for one catalog: related items, and with consent "for you", "since your last
+ * visit", search and the visitor's controls. Create it with {@link Inkling.load}, or share one
+ * per manifest with {@link Inkling.shared}.
+ */
 export class Inkling {
   private static defaults: Omit<InklingOptions, 'manifest'> = {};
   private static instances = new Map<string, Promise<Inkling>>();
@@ -239,6 +270,7 @@ export class Inkling {
     return instance;
   }
 
+  /** The catalog's manifest. */
   get manifest(): Manifest {
     return this.catalog.manifest;
   }
@@ -502,10 +534,12 @@ export class Inkling {
     return this.setPaused(true);
   }
 
+  /** Records signals again after {@link Inkling.pause}. */
   resume(): Promise<void> {
     return this.setPaused(false);
   }
 
+  /** Whether recording is paused (false without consent). */
   async paused(): Promise<boolean> {
     if (!(await this.consented())) return false;
     try {

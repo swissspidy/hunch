@@ -55,9 +55,19 @@ jobs:
       - run: npm test
 
   e2e:
-    name: Demo in Chromium
+    name: Demo in ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - browser: chromium
+            name: Chromium
+          - browser: firefox
+            name: Firefox
+          - browser: webkit
+            name: WebKit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -67,9 +77,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - uses: $/.github/actions/setup-chromium
+      - uses: $/.github/actions/setup-browser
+        with:
+          browser: ${{ matrix.browser }}
       # The demo builds from the committed embedding cache: no model is downloaded.
       - run: npm run test:e2e
+        env:
+          INKLING_BROWSER: ${{ matrix.browser }}
 
   pack:
     name: Package (packed and installed)

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "Inkling API reference",
+  "entryPoints": [
+    "../../src/client/index.ts",
+    "../../src/elements/index.ts",
+    "../../src/digest/index.ts",
+    "../../src/query/index.ts",
+    "../../src/format/index.ts",
+    "../../src/node/index.ts",
+    "../../src/astro/index.ts"
+  ],
+  "tsconfig": "./tsconfig.json",
+  "out": "../../demo/dist/api",
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "sort": ["source-order"],
+  "githubPages": false,
+  "disableSources": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/swissspidy/inkling",
+    "Demo": "https://swissspidy.github.io/inkling/"
+  },
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": true
+  },
+  "treatValidationWarningsAsErrors": true,
+  "requiredToBeDocumented": [
+    "Class",
+    "Function",
+    "Interface",
+    "TypeAlias",
+    "Variable",
+    "Method",
+    "Property",
+    "Accessor",
+    "Constructor"
+  ]
+}

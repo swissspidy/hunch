@@ -3,20 +3,25 @@
  * own pinned model, in the browser, so it lands in the same space as the published vectors.
  * Optional and lazy: nothing here loads until a site asks, and the core never imports it.
  *
- *   const embedder = await createQueryEmbedder(inkling.manifest, {
- *     transformers: () => import('@huggingface/transformers'),
- *   });
- *   const results = await inkling.search(await embedder.embed('night trains'), { n: 5 });
+ * ```js
+ * const embedder = await createQueryEmbedder(inkling.manifest, {
+ *   transformers: () => import('@huggingface/transformers'),
+ * });
+ * const results = await inkling.search(await embedder.embed('night trains'), { n: 5 });
+ * ```
  *
  * The query text never leaves the device. The model's weights are fetched once (from the
  * Hugging Face Hub unless the site hosts them, see `configure`) and kept in the browser's cache
  * by Transformers.js; the requests carry no query or profile data.
+ *
+ * @module @swissspidy/inkling/query
  */
 
 import type { Manifest } from '../format/manifest.ts';
 import { hashEmbed } from '../rank/hash.ts';
 import { normalize } from '../rank/vector.ts';
 
+/** Embeds search queries into the catalog's space. */
 export interface QueryEmbedder {
   /** The model the vectors come from (the manifest's). */
   readonly model: string;
@@ -26,22 +31,39 @@ export interface QueryEmbedder {
   dispose(): Promise<void>;
 }
 
-interface Tensor {
+/** A model output tensor, as far as this module reads it. */
+export interface TransformersTensor {
+  /** The tensor's shape. */
   dims: number[];
+  /** The tensor's values, row-major. */
   data: Float32Array;
 }
-interface Model {
-  (inputs: Record<string, unknown>): Promise<Record<string, Tensor | undefined>>;
+/** A Transformers.js model, as far as this module uses it. */
+export interface TransformersModel {
+  /** Runs the model on tokenized inputs. */
+  (inputs: Record<string, unknown>): Promise<Record<string, TransformersTensor | undefined>>;
+  /** Releases the model. */
   dispose?(): Promise<unknown>;
 }
-type Tokenizer = (texts: string[], options: object) => Record<string, unknown>;
+/** A Transformers.js tokenizer, as far as this module uses it. */
+export type TransformersTokenizer = (texts: string[], options: object) => Record<string, unknown>;
 /** The part of `@huggingface/transformers` this module uses. */
 export interface TransformersModule {
-  AutoTokenizer: { from_pretrained(id: string, options: object): Promise<Tokenizer> };
-  AutoModel: { from_pretrained(id: string, options: object): Promise<Model> };
+  /** Loads the model's tokenizer. */
+  AutoTokenizer: {
+    /** Loads a tokenizer from the Hub (or the configured host). */
+    from_pretrained(id: string, options: object): Promise<TransformersTokenizer>;
+  };
+  /** Loads the model. */
+  AutoModel: {
+    /** Loads a model from the Hub (or the configured host). */
+    from_pretrained(id: string, options: object): Promise<TransformersModel>;
+  };
+  /** Transformers.js's settings, passed to `configure`. */
   env?: object;
 }
 
+/** Options for {@link createQueryEmbedder}. */
 export interface QueryEmbedderOptions {
   /**
    * Transformers.js, or a function that imports it. The default imports the bare specifier

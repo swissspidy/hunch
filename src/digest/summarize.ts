@@ -19,11 +19,15 @@ interface SummarizerApi {
   create(options: SummarizerOptions): Promise<Summarizer>;
 }
 
+/** An item to summarize: a `Recommendation`, or anything with a title. */
 export interface DigestItem {
+  /** The item's title. */
   title: string;
+  /** The item's section, if any. */
   section?: string;
 }
 
+/** Options for {@link summarize} and {@link canSummarize}. */
 export interface SummarizeOptions {
   /** Describes the site for the model (default: generic). */
   sharedContext?: string;

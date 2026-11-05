@@ -3,8 +3,12 @@
  * emitted, writes `manifest.json` and the shards into the build output, and loads the web
  * components on every page with the manifest preset (ADR 0006).
  *
- *   import inkling from '@swissspidy/inkling/astro';
- *   export default defineConfig({ integrations: [inkling({ include: ['/blog/*'] })] });
+ * ```js
+ * import inkling from '@swissspidy/inkling/astro';
+ * export default defineConfig({ integrations: [inkling({ include: ['/blog/*'] })] });
+ * ```
+ *
+ * @module @swissspidy/inkling/astro
  */
 
 import { readFileSync, statSync } from 'node:fs';
@@ -30,6 +34,7 @@ import {
 
 export type { PathFilter } from './pages.ts';
 
+/** A built page, as the `page` option receives it. */
 export interface PageContext {
   /** The page's path without the site's `base`, as filters see it (e.g. `/blog/post/`). */
   path: string;
@@ -37,14 +42,17 @@ export interface PageContext {
   html: string;
 }
 
+/** What the `items` option receives. */
 export interface ItemsContext {
   /** The built pages that passed the filters, as catalog items. */
   pages: CatalogItem[];
   /** The build output directory. */
   dir: URL;
+  /** Astro's resolved config. */
   config: AstroConfig;
 }
 
+/** Options of the integration. Without any, every built page goes into the catalog. */
 export interface InklingAstroOptions {
   /** Pages to include (default: all). */
   include?: PathFilter;
@@ -65,10 +73,15 @@ export interface InklingAstroOptions {
    * `false` for none. Keep it between builds (in CI too) and only changed pages are embedded.
    */
   cacheDir?: string | false;
+  /** Published dimensions, at most the model's (default 256, or the model's if smaller). */
   dims?: number;
+  /** How the shards store vector components (default `int8`). */
   quantization?: Quantization;
+  /** One shard per section (default), or a single shard. */
   shardBy?: 'section' | 'none';
+  /** Split shards larger than this (default 2000 items). */
   maxShardItems?: number;
+  /** Characters of item text embedded (default 4000). */
   maxTextChars?: number;
   /** Load the web components on every page (default `true`). */
   script?: boolean;
@@ -77,6 +90,10 @@ export interface InklingAstroOptions {
 const VIRTUAL = 'virtual:inkling/config';
 const ALWAYS_EXCLUDED = [/^\/(404|500)\/?$/];
 
+/**
+ * The integration: add it to `integrations` in `astro.config.mjs`. After `astro build` the
+ * catalog is in `dist/<out>/`; with `script`, every page loads the web components.
+ */
 export default function inkling(options: InklingAstroOptions = {}): AstroIntegration {
   const out = checkOut(options.out);
   let config: AstroConfig;

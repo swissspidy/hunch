@@ -25,6 +25,21 @@ updates:
       - dependency-name: playwright-core
         update-types: [version-update:semver-minor]
 
+  # TypeDoc for the API reference. TypeScript stays on 6: TypeDoc needs its compiler API,
+  # which TypeScript 7 doesn't have.
+  - package-ecosystem: npm
+    directory: /docs/api
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      api-docs:
+        patterns: ['*']
+    ignore:
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+
   - package-ecosystem: github-actions
     directories: ['/', '/.github/actions/*']
     schedule:

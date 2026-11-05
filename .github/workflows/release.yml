@@ -117,8 +117,9 @@ jobs:
           node-version: 24
           package-manager-cache: false
       - run: npm ci
-      # No browser cache either: a release uses nothing another run saved.
-      - uses: $/.github/actions/setup-chromium
+      # No browser cache either: a release uses nothing another run saved. Chromium only: CI ran
+      # the browser tests in Firefox and WebKit too.
+      - uses: $/.github/actions/setup-browser
         with:
           cache: 'false'
       - run: npm run typecheck

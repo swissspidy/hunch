@@ -76,7 +76,8 @@ can be cached forever.
   unchanged rebuild is byte-identical.
 - **Shard URLs are relative to the manifest.** A site can host the directory anywhere.
 - **Format versioning.** `formatVersion` is an integer. A client accepts only versions it
-  knows. Adding optional fields does not bump it; changing the meaning of a field does.
+  knows. Adding optional fields does not bump it; changing the meaning of a field does. How
+  long readers keep reading older versions: [ADR 0009](0009-stability.md).
 
 ### 2. Vector shards
 

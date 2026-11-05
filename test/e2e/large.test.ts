@@ -14,6 +14,11 @@ import { chromium, type Browser, type Page } from 'playwright-core';
 import type { Inkling } from '../../src/client/index.ts';
 import { bundleGlobal } from '../../scripts/bundle.ts';
 import { syntheticCatalog } from '../../scripts/synthetic.ts';
+import { BROWSER } from './site.ts';
+
+// CPU throttling goes through the Chrome DevTools Protocol, and long tasks are Chromium's only.
+const SKIP =
+  BROWSER === 'chromium' ? false : `CPU throttling and long tasks need Chromium, not ${BROWSER}`;
 
 const ITEMS = 50_000;
 const SECTIONS = 10;
@@ -29,6 +34,7 @@ let browser: Browser;
 let dir = '';
 
 before(async () => {
+  if (SKIP) return;
   const catalog = await syntheticCatalog(ITEMS, 256, SECTIONS, 'int8');
   dir = await mkdtemp(join(tmpdir(), 'inkling-large-'));
   await bundleGlobal(join(dir, 'inkling.js'));
@@ -156,27 +162,35 @@ function check(t: TestContext, run: Run): void {
   assert.ok(longest < run.duration / 2, detail);
 }
 
-test('50,000 items: recommend() leaves no long task, with scheduler.yield()', async (t) => {
-  const page = await browser.newPage();
-  try {
-    const run = await recommendOnce(page);
-    assert.equal(run.yields, true);
-    check(t, run);
-  } finally {
-    await page.close();
-  }
-});
+test(
+  '50,000 items: recommend() leaves no long task, with scheduler.yield()',
+  { skip: SKIP },
+  async (t) => {
+    const page = await browser.newPage();
+    try {
+      const run = await recommendOnce(page);
+      assert.equal(run.yields, true);
+      check(t, run);
+    } finally {
+      await page.close();
+    }
+  },
+);
 
-test('50,000 items: recommend() leaves no long task without scheduler.yield()', async (t) => {
-  const page = await browser.newPage();
-  try {
-    await page.addInitScript(() => {
-      Object.defineProperty(window, 'scheduler', { value: undefined, configurable: true });
-    });
-    const run = await recommendOnce(page);
-    assert.equal(run.yields, false);
-    check(t, run);
-  } finally {
-    await page.close();
-  }
-});
+test(
+  '50,000 items: recommend() leaves no long task without scheduler.yield()',
+  { skip: SKIP },
+  async (t) => {
+    const page = await browser.newPage();
+    try {
+      await page.addInitScript(() => {
+        Object.defineProperty(window, 'scheduler', { value: undefined, configurable: true });
+      });
+      const run = await recommendOnce(page);
+      assert.equal(run.yields, false);
+      check(t, run);
+    } finally {
+      await page.close();
+    }
+  },
+);

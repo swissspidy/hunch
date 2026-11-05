@@ -8,7 +8,14 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { buildFixture } from '../fixtures/astro/build.ts';
 import { tempDir } from '../helpers.ts';
-import { DESKTOP, layoutShift, observeLayoutShifts, ready, serveDir, slots } from './site.ts';
+import {
+  assertNoLayoutShift,
+  DESKTOP,
+  observeLayoutShifts,
+  ready,
+  serveDir,
+  slots,
+} from './site.ts';
 
 const site = serveDir(async () => {
   const out = await tempDir();
@@ -16,7 +23,7 @@ const site = serveDir(async () => {
   return out;
 });
 
-test('the related list fills in place from the integration’s manifest', async () => {
+test('the related list fills in place from the integration’s manifest', async (t) => {
   const context = await site.browser.newContext(DESKTOP);
   const page = await context.newPage();
   const requests: string[] = [];
@@ -45,8 +52,7 @@ test('the related list fills in place from the integration’s manifest', async 
   assert.ok(!related.some((r) => r.id === '/blog/rye-bread/'));
   assert.equal(related[0]!.title, 'Keeping a sourdough starter alive');
   assert.deepEqual(await page.locator('inkling-related').boundingBox(), box);
-  await page.waitForTimeout(300);
-  assert.equal(await layoutShift(page), 0);
+  await assertNoLayoutShift(t, page);
   assert.ok(requests.includes('/inkling/manifest.json'), requests.join('\n'));
   // Without consent, <inkling-page> stores nothing.
   assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);

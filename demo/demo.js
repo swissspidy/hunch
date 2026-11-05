@@ -17,18 +17,21 @@ function hasConsent() {
   }
 }
 
+// The status is a live region, but its first update (the count, on every page load) is not
+// news: the markup keeps it quiet with aria-live="off" until the visitor reaches for one of the
+// controls. From then on it speaks when the text changes.
 async function updateStatus() {
   const status = $('status');
   if (!status) return;
   const inkling = await Inkling.shared(manifest);
-  if (!hasConsent()) {
-    status.value = 'Personalization is off. Nothing is stored.';
-  } else {
+  let text = 'Personalization is off. Nothing is stored.';
+  if (hasConsent()) {
     const { signals } = await inkling.export();
     const paused = await inkling.paused();
     $('pause').textContent = paused ? 'Resume' : 'Pause';
-    status.value = `${signals.length} ${signals.length === 1 ? 'signal' : 'signals'} stored in this browser${paused ? ' (paused)' : ''}.`;
+    text = `${signals.length} ${signals.length === 1 ? 'signal' : 'signals'} stored in this browser${paused ? ' (paused)' : ''}.`;
   }
+  if (status.value !== text) status.value = text;
 }
 
 function refreshForYou() {
@@ -38,6 +41,10 @@ function refreshForYou() {
 const consent = $('consent');
 if (consent) {
   consent.checked = hasConsent();
+  const controls = consent.closest('section');
+  const speak = () => $('status').removeAttribute('aria-live');
+  controls.addEventListener('focusin', speak, { once: true });
+  controls.addEventListener('pointerdown', speak, { once: true });
   on(consent, 'change', async () => {
     const inkling = await Inkling.shared(manifest);
     if (consent.checked) {
@@ -181,7 +188,7 @@ if (searchForm) {
         return li;
       }),
     );
-    status.value = `Ranked on this device. "${query}" was not sent anywhere.`;
+    status.value = `Ranked on this device: ${results.length} ${results.length === 1 ? 'result' : 'results'}. "${query}" was not sent anywhere.`;
   });
   // The form is disabled in the markup, so it can't submit natively (sending the query to the
   // server) before this handler exists.

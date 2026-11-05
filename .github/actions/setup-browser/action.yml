@@ -1,0 +1,43 @@
+# A browser for the jobs that launch one, after `npm ci`: the build playwright-core pins, restored
+# from the cache when that version's is there, and its system libraries only if it does not start.
+name: Set up a browser
+description: Install (or restore) a browser that the installed playwright-core drives.
+
+inputs:
+  browser:
+    description: chromium, firefox or webkit.
+    default: chromium
+  cache:
+    description: Restore and save Playwright's browser cache, keyed on the browser and playwright-core's version in package-lock.json.
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - id: playwright
+      shell: bash
+      env:
+        BROWSER: ${{ inputs.browser }}
+      run: |
+        case "$BROWSER" in
+          chromium | firefox | webkit) ;;
+          *) echo "::error::browser must be chromium, firefox or webkit"; exit 1 ;;
+        esac
+        echo "version=$(node -p 'require("./package-lock.json").packages["node_modules/playwright-core"].version')" >> "$GITHUB_OUTPUT"
+        case "$RUNNER_OS" in
+          macOS) echo "path=~/Library/Caches/ms-playwright" >> "$GITHUB_OUTPUT" ;;
+          Windows) echo "path=~/AppData/Local/ms-playwright" >> "$GITHUB_OUTPUT" ;;
+          *) echo "path=~/.cache/ms-playwright" >> "$GITHUB_OUTPUT" ;;
+        esac
+    - if: inputs.cache == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.playwright.outputs.path }}
+        key: ms-playwright-${{ inputs.browser }}-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+    - shell: bash
+      env:
+        BROWSER: ${{ inputs.browser }}
+      run: |
+        npx playwright-core install "$BROWSER"
+        launch() { node -e "require('playwright-core')[process.argv[1]].launch().then((b) => b.close())" "$BROWSER"; }
+        if [ "$RUNNER_OS" = Linux ]; then launch || npx playwright-core install-deps "$BROWSER"; else launch; fi

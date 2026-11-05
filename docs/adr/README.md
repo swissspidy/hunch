@@ -12,3 +12,4 @@ Each decision, with its status as its own header gives it. A new ADR adds its ro
 | [0006](0006-astro-integration.md)      | The Astro integration                                                       | Accepted                                                        |
 | [0007](0007-wordpress-plugin.md)       | A WordPress plugin, with embedding in the editor's browser                  | Accepted                                                        |
 | [0008](0008-sliced-ranking.md)         | Large catalogs without long tasks: ranking in slices on the main thread     | Accepted                                                        |
+| [0009](0009-stability.md)              | What 0.x promises: formats, stored data, API                                | Accepted (before 0.1.0)                                         |

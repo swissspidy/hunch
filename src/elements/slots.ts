@@ -8,6 +8,10 @@
  * on their text (clamp titles to a fixed number of lines). Listeners attached to a slot do not
  * carry over to its copy: delegate them to the element.
  *
+ * Focus is never moved or lost: while a slot holds focus, the element waits for it to leave
+ * before replacing the slots (it stays `loading` until then). The slots' accessible names follow
+ * their content; an `aria-label` that contains the fallback item's title gets the new title.
+ *
  * Each refresh starts again from the server-rendered slots. When there are fewer results than
  * slots, the remaining slots are hidden rather than left showing a fallback item.
  *
@@ -41,6 +45,7 @@ export abstract class SlotsElement extends Base {
     run: number,
   ): Promise<Recommendation[] | null>;
 
+  /** @internal Custom element lifecycle, called by the browser. */
   connectedCallback(): void {
     if (!this.listening) {
       this.listening = true;
@@ -49,6 +54,7 @@ export abstract class SlotsElement extends Base {
     this.schedule();
   }
 
+  /** @internal Custom element lifecycle, called by the browser. */
   attributeChangedCallback(_name: string, old: string | null, value: string | null): void {
     if (old !== value && this.isConnected) this.schedule();
   }
@@ -102,6 +108,9 @@ export abstract class SlotsElement extends Base {
         run,
       );
       if (run !== this.run) return;
+      // Replacing the slot that holds focus would drop focus to the page: wait until it leaves.
+      await this.blurred();
+      if (run !== this.run) return;
       slots.forEach((slot, i) => {
         const copy = original[i]!.cloneNode(true) as HTMLElement;
         if (recommendations) {
@@ -124,6 +133,32 @@ export abstract class SlotsElement extends Base {
     }
   }
 
+  /** Resolves once no slot holds focus: at once, unless one does. */
+  private async blurred(): Promise<void> {
+    while (this.slotHasFocus()) {
+      // Focus leaves (focusout), or the focused slot is removed: Firefox fires no focusout then.
+      await new Promise<void>((resolve) => {
+        const observer = new MutationObserver(done);
+        function done(): void {
+          observer.disconnect();
+          resolve();
+        }
+        this.addEventListener('focusout', done, { once: true });
+        observer.observe(this, { childList: true, subtree: true });
+      });
+      // Focus may be moving to another slot: look again once it has landed.
+      await new Promise((resolve) => setTimeout(resolve));
+    }
+  }
+
+  private slotHasFocus(): boolean {
+    // The focused element itself, also inside open shadow roots (activeElement is their host).
+    let focused = document.activeElement;
+    while (focused?.shadowRoot?.activeElement) focused = focused.shadowRoot.activeElement;
+    const slot = focused?.closest('[data-inkling-slot]');
+    return !!slot && this.contains(slot);
+  }
+
   private onClick(event: Event): void {
     const slot = (event.target as Element | null)?.closest<HTMLElement>('[data-inkling-slot]');
     const id = slot?.dataset.inklingId;
@@ -138,6 +173,21 @@ export abstract class SlotsElement extends Base {
 
 function fill(slot: HTMLElement, rec: Recommendation): void {
   slot.dataset.inklingId = rec.id;
+  // An aria-label that names the fallback item (`Read: <title>`) would give the link the wrong
+  // name: it names the new item instead.
+  const old = slot.querySelector('[data-inkling-title]')?.textContent?.trim();
+  if (old) {
+    for (const el of [slot, ...slot.querySelectorAll('[aria-label]')]) {
+      const label = el.getAttribute('aria-label');
+      // The title is the label's last occurrence of it: a prefix (`Article: Art`) may hold it too.
+      const at = label?.lastIndexOf(old) ?? -1;
+      if (label && at >= 0)
+        el.setAttribute(
+          'aria-label',
+          label.slice(0, at) + rec.title + label.slice(at + old.length),
+        );
+    }
+  }
   const link = slot.matches('a') ? slot : slot.querySelector('[data-inkling-href], a');
   if (link) {
     // Only web URLs: a javascript: URL from a catalog would run script when clicked.

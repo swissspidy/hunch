@@ -1,18 +1,47 @@
 /** The demo site, served for a browser test file, and helpers to look at its pages. */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
-import { after, before } from 'node:test';
-import { chromium, type Browser, type BrowserContextOptions, type Page } from 'playwright-core';
+import { after, before, type TestContext } from 'node:test';
+import {
+  chromium,
+  firefox,
+  webkit,
+  type Browser,
+  type BrowserContextOptions,
+  type Page,
+} from 'playwright-core';
+import { decodeShard } from '../../src/format/shard.ts';
+
+const ENGINES = { chromium, firefox, webkit };
+type Engine = keyof typeof ENGINES;
+
+/** The browser the tests run in: `INKLING_BROWSER=chromium` (the default), `firefox` or `webkit`. */
+export const BROWSER: Engine = (() => {
+  const name = process.env.INKLING_BROWSER || 'chromium';
+  if (!(name in ENGINES)) {
+    throw new Error(`INKLING_BROWSER must be chromium, firefox or webkit, not ${name}`);
+  }
+  return name as Engine;
+})();
+
+/**
+ * The Layout Instability API (`layout-shift` entries) is Chromium's only: elsewhere a test that
+ * measures layout shift skips that check with this reason. The slots' boxes are still compared.
+ */
+export const NO_LAYOUT_SHIFT_API =
+  BROWSER === 'chromium' ? false : `${BROWSER} has no Layout Instability API (layout-shift)`;
 
 export const DESKTOP: BrowserContextOptions = { viewport: { width: 1280, height: 800 } };
 // A mid-range phone's viewport, touch and pixel density.
 export const PHONE: BrowserContextOptions = {
   viewport: { width: 393, height: 851 },
   deviceScaleFactor: 2.75,
-  isMobile: true,
+  // Firefox has no mobile emulation (meta viewport): Playwright refuses `isMobile` there.
+  ...(BROWSER === 'firefox' ? {} : { isMobile: true }),
   hasTouch: true,
 };
 
@@ -21,7 +50,7 @@ export interface Site {
   browser: Browser;
 }
 
-/** Builds and serves the demo, and launches Chromium, for the tests of the calling file. */
+/** Builds and serves the demo, and launches the browser, for the tests of the calling file. */
 export function serveDemo(): Site {
   const site = { origin: '', browser: undefined as unknown as Browser };
   let server: ChildProcess | undefined;
@@ -39,7 +68,7 @@ export function serveDemo(): Site {
       });
       child.on('exit', (code) => reject(new Error(`demo exited with ${code}:\n${output}`)));
     });
-    site.browser = await chromium.launch();
+    site.browser = await ENGINES[BROWSER].launch();
   });
   after(async () => {
     await site.browser?.close();
@@ -56,7 +85,7 @@ const TYPES: Record<string, string> = {
 };
 
 /**
- * Serves the directory that `prepare` returns (after building it, say) and launches Chromium,
+ * Serves the directory that `prepare` returns (after building it, say) and launches the browser,
  * for the tests of the calling file. `/path/` serves `path/index.html`.
  */
 export function serveDir(prepare: () => Promise<string>): Site {
@@ -89,7 +118,7 @@ export function serveDir(prepare: () => Promise<string>): Site {
     await new Promise<void>((done) => listening.listen(0, '127.0.0.1', done));
     const address = listening.address();
     site.origin = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
-    site.browser = await chromium.launch();
+    site.browser = await ENGINES[BROWSER].launch();
   });
   after(async () => {
     await site.browser?.close();
@@ -98,8 +127,9 @@ export function serveDir(prepare: () => Promise<string>): Site {
   return site;
 }
 
-/** Sums layout shifts from the first paint on (call before navigating). */
+/** Sums layout shifts from the first paint on (call before navigating). Chromium only. */
 export async function observeLayoutShifts(page: Page): Promise<void> {
+  if (NO_LAYOUT_SHIFT_API) return;
   await page.addInitScript(() => {
     const w = window as unknown as { __cls: number };
     w.__cls = 0;
@@ -114,8 +144,16 @@ export async function observeLayoutShifts(page: Page): Promise<void> {
   });
 }
 
-export function layoutShift(page: Page): Promise<number> {
-  return page.evaluate(() => (window as unknown as { __cls: number }).__cls);
+/**
+ * Asserts, as a subtest, that nothing shifted since `observeLayoutShifts`: skipped, with the
+ * reason, where the browser can't measure it.
+ */
+export async function assertNoLayoutShift(t: TestContext, page: Page): Promise<void> {
+  await t.test('no layout shift', { skip: NO_LAYOUT_SHIFT_API }, async () => {
+    await page.waitForTimeout(300);
+    const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
+    assert.equal(cls, 0);
+  });
 }
 
 export interface SlotContent {
@@ -136,4 +174,63 @@ export function slots(page: Page, element: string): Promise<SlotContent[]> {
 
 export async function ready(page: Page, element: string): Promise<void> {
   await page.waitForSelector(`${element}[data-inkling-state="ready"]`, { timeout: 10_000 });
+}
+
+/**
+ * Visits an article and waits until its view is stored. Leaving a page aborts its pending
+ * IndexedDB writes, and Firefox can still be opening the database when the list is ready.
+ */
+export async function read(site: Site, page: Page, id: string): Promise<void> {
+  const since = Date.now();
+  await page.goto(`${site.origin}/items/${id}.html`);
+  await ready(page, 'inkling-related');
+  await page.waitForFunction(
+    async (item) => {
+      const inkling = await (
+        window as unknown as {
+          Inkling: {
+            shared(m: string): Promise<{
+              export(): Promise<{ signals: { itemId: string; kind: string; at: number }[] }>;
+            }>;
+          };
+        }
+      ).Inkling.shared(document.body.dataset.manifest!);
+      // This visit's view, not an earlier signal for the item.
+      return (await inkling.export()).signals.some(
+        (s) => s.itemId === item.id && s.kind === 'view' && s.at >= item.since,
+      );
+    },
+    { id, since },
+  );
+}
+
+/** The article a search with `fakeTransformers` finds first. */
+export const TARGET = 'cold-brew';
+
+/**
+ * A stand-in for Transformers.js, served for the CDN URL: its "model" returns the vector of
+ * the `TARGET` article, so that article must come first in a search.
+ */
+export async function fakeTransformers(): Promise<string> {
+  const manifest = JSON.parse(await readFile('demo/dist/inkling/manifest.json', 'utf8'));
+  const ref = manifest.shards.find((s: { section: string }) => s.section === 'Food');
+  const shard = decodeShard(new Uint8Array(await readFile(`demo/dist/inkling/${ref.url}`)).buffer);
+  const row = shard.items.findIndex((item) => item.id === TARGET);
+  // The article's vector, padded to the model's 768 dims: truncation gives it back exactly.
+  const vector = new Array(manifest.model.nativeDims).fill(0);
+  for (let d = 0; d < shard.dims; d++)
+    vector[d] = shard.vectors[row * shard.dims + d]! * shard.invNorms[row]!;
+  return `
+    export const env = {};
+    export const AutoTokenizer = { from_pretrained: async () => (texts) => ({ texts }) };
+    export const AutoModel = {
+      from_pretrained: async (id, options) => {
+        globalThis.__model = { id, ...options };
+        const model = async (inputs) => {
+          globalThis.__inputs = inputs.texts;
+          return { sentence_embedding: { dims: [1, ${vector.length}], data: Float32Array.from(${JSON.stringify(vector)}) } };
+        };
+        return model;
+      },
+    };`;
 }

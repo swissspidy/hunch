@@ -1,3 +1,7 @@
+import type { Inkling, Recommendation } from '../client/index.ts';
+import { summarize } from '../digest/summarize.ts';
+import { SlotsElement } from './slots.ts';
+
 /**
  * `<inkling-digest>`: what is new since the visitor's last visit, in server-rendered slots,
  * with an optional one-line summary by the browser's built-in Summarizer.
@@ -8,25 +12,23 @@
  * the summary element gets the Summarizer's text where the browser has an on-device model.
  * Otherwise both stay as they are. Give the summary a fixed height, like the slots.
  *
- *   <inkling-digest manifest="/inkling/manifest.json">
- *     <p data-inkling-summary>The latest articles.</p>
- *     <ol><li data-inkling-slot data-inkling-id="post-9">…</li></ol>
- *   </inkling-digest>
+ * ```html
+ * <inkling-digest manifest="/inkling/manifest.json">
+ *   <p data-inkling-summary>The latest articles.</p>
+ *   <ol><li data-inkling-slot data-inkling-id="post-9">…</li></ol>
+ * </inkling-digest>
+ * ```
  *
  * Attributes: `manifest` (or `InklingConfig.manifest`), `sections`, `diversity`, `context`
  * (describes the site for the Summarizer). `data-inkling-new` is the number of new items shown, and
  * `data-inkling-summarized` whether a summary was written. Also fires `inkling:summary` (detail:
  * `{ summary }`).
  */
-
-import type { Inkling, Recommendation } from '../client/index.ts';
-import { summarize } from '../digest/summarize.ts';
-import { SlotsElement } from './slots.ts';
-
 export class InklingDigestElement extends SlotsElement {
   /** The summary element's server-rendered text, put back on every refresh. */
   private placeholder: string | undefined;
 
+  /** @internal Custom element lifecycle, called by the browser. */
   static get observedAttributes(): string[] {
     return ['manifest', 'sections', 'diversity'];
   }

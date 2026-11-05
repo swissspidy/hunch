@@ -108,8 +108,18 @@ time {
   border-radius: 0.5rem;
   background: var(--card);
 }
-.controls button {
+/* Buttons in the page's colours: some browsers' dark-mode buttons are light on light. */
+button {
   font: inherit;
+  color: var(--fg);
+  background: var(--card);
+  border: 1px solid var(--muted);
+  border-radius: 0.3rem;
+}
+button:disabled {
+  color: var(--muted);
+}
+.controls button {
   padding: 0.3rem 0.7rem;
   margin-right: 0.4rem;
 }
@@ -142,5 +152,5 @@ time {
   padding: 0.3rem 0.5rem;
 }
 .search button {
-  font: inherit;
+  padding: 0.3rem 0.7rem;
 }
