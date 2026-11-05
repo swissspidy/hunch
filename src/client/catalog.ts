@@ -14,6 +14,7 @@ import {
 import { sha256Hex } from '../format/sha256.ts';
 import { decodeShard, type DecodedShard } from '../format/shard.ts';
 import { dotRow } from '../rank/vector.ts';
+import { yieldToPage } from './slices.ts';
 
 export type Fetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
@@ -29,6 +30,9 @@ export class Catalog {
   private readonly fetch: Fetch;
   private readonly entries = new Map<string, Entry>();
   private readonly loading = new Map<ShardRef, Promise<void>>();
+  /** Each loaded shard's entries (an id in two shards counts in the first loaded). */
+  private readonly byShard = new Map<ShardRef, Entry[]>();
+  private all: Entry[] | undefined;
 
   private constructor(manifest: Manifest, url: URL, fetchFn: Fetch) {
     this.manifest = manifest;
@@ -45,9 +49,12 @@ export class Catalog {
     return new Catalog(manifest, resolved, fetchFn);
   }
 
-  /** Every loaded entry, in manifest order. */
+  /**
+   * Every loaded entry, in manifest order whatever order the shards arrived in, so ties rank
+   * the same way every time.
+   */
   loaded(): Entry[] {
-    return [...this.entries.values()];
+    return (this.all ??= this.manifest.shards.flatMap((ref) => this.byShard.get(ref) ?? []));
   }
 
   get(id: string): Entry | undefined {
@@ -112,7 +119,11 @@ export class Catalog {
     const response = await this.fetch(url);
     if (!response.ok) throw new Error(`Inkling: shard ${url} returned ${response.status}`);
     const buffer = await response.arrayBuffer();
+    // Shards that arrive together are hashed, decoded and indexed in tasks of their own, so
+    // none of them blocks input for long (ADR 0008).
+    await yieldToPage();
     await verify(buffer, ref, url);
+    await yieldToPage();
     const shard = decodeShard(buffer);
     if (shard.space !== this.manifest.space) {
       throw new Error(
@@ -122,9 +133,16 @@ export class Catalog {
     if (shard.dims !== this.manifest.dims) {
       throw new Error(`Inkling: shard ${url} has ${shard.dims} dims, not ${this.manifest.dims}`);
     }
+    await yieldToPage();
+    const entries: Entry[] = [];
     shard.items.forEach((item, row) => {
-      if (!this.entries.has(item.id)) this.entries.set(item.id, { item, shard, row });
+      if (this.entries.has(item.id)) return;
+      const entry = { item, shard, row };
+      this.entries.set(item.id, entry);
+      entries.push(entry);
     });
+    this.byShard.set(ref, entries);
+    this.all = undefined;
   }
 }
 

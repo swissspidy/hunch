@@ -1,6 +1,7 @@
 /**
  * A synthetic catalog for benchmarks: news-like metadata and random unit vectors (which
- * compress like real ones: barely), as the files a build would publish.
+ * compress like real ones: barely), as the files a build would publish: one shard per section,
+ * split at `maxItems` (2,000, the build's default).
  */
 
 import type { Manifest, Quantization } from '../src/format/manifest.ts';
@@ -18,6 +19,7 @@ export async function syntheticCatalog(
   dims: number,
   sections: number,
   quantization: Quantization,
+  maxItems = 2000,
 ): Promise<SyntheticCatalog> {
   for (const [name, value] of Object.entries({ count, dims, sections })) {
     if (!Number.isInteger(value) || value < 1) {
@@ -40,17 +42,24 @@ export async function syntheticCatalog(
       prior: (n - i) / n,
     }));
     const vectors = items.map(() => normalize(Array.from({ length: dims }, random)));
-    const bytes = encodeShard({ space: 'bench', items }, vectors, dims, quantization);
-    const url = `shards/section-${s}.ink`;
-    files.set(url, bytes);
-    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
-    shards.push({
-      url,
-      section: `section-${s}`,
-      count: n,
-      bytes: bytes.length,
-      sha256: [...digest].map((b) => b.toString(16).padStart(2, '0')).join(''),
-    });
+    for (let start = 0, part = 1; start < n; start += maxItems, part++) {
+      const bytes = encodeShard(
+        { space: 'bench', items: items.slice(start, start + maxItems) },
+        vectors.slice(start, start + maxItems),
+        dims,
+        quantization,
+      );
+      const url = `shards/section-${s}${n > maxItems ? `-${part}` : ''}.ink`;
+      files.set(url, bytes);
+      const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+      shards.push({
+        url,
+        section: `section-${s}`,
+        count: Math.min(maxItems, n - start),
+        bytes: bytes.length,
+        sha256: [...digest].map((b) => b.toString(16).padStart(2, '0')).join(''),
+      });
+    }
   }
   return {
     manifest: {
@@ -63,7 +72,7 @@ export async function syntheticCatalog(
       dims,
       quantization,
       count,
-      sections: shards.map((s) => s.section!),
+      sections: Array.from({ length: sections }, (_, s) => `section-${s}`),
       shards,
     },
     files,
