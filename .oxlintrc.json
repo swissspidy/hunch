@@ -4,7 +4,12 @@
   "categories": {
     "correctness": "error"
   },
-  "ignorePatterns": ["dist/**", "demo/dist/**"],
+  "ignorePatterns": [
+    "dist/**",
+    "demo/dist/**",
+    "wordpress/inkling/vendor/**",
+    "wordpress/inkling/assets/inkling.global.js"
+  ],
   "rules": {
     "typescript/no-floating-promises": [
       "error",

@@ -11,8 +11,8 @@
  *     …
  *   </inkling-for-you>
  *
- * Attributes: `manifest` (required), `sections` (comma-separated), `exclude` (comma-separated
- * item ids), `include-seen`, `diversity`. See `slots.ts` for the slots, states and events.
+ * Attributes: `manifest` (or `InklingConfig.manifest`), `sections` (comma-separated),
+ * `exclude` (comma-separated item ids), `include-seen`, `diversity`. See `slots.ts` for the slots, states and events.
  */
 
 import type { Inkling, Recommendation } from '../client/index.ts';

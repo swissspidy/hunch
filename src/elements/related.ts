@@ -6,9 +6,9 @@
  *     …
  *   </inkling-related>
  *
- * Attributes: `manifest` and `item` (required), `section` (the item's section: its shard loads
- * first), `sections` (`same`, or a comma-separated list), `diversity`. See `slots.ts` for the
- * slots, states and events.
+ * Attributes: `item` and `manifest` (or `InklingConfig.manifest`), `section` (the item's
+ * section: its shard loads first), `sections` (`same`, or a comma-separated list), `diversity`.
+ * See `slots.ts` for the slots, states and events.
  */
 
 import type { Inkling, Recommendation } from '../client/index.ts';

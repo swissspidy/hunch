@@ -9,4 +9,6 @@ Each decision, with its status as its own header gives it. A new ADR adds its ro
 | [0003](0003-personalization-client.md) | Personalization in the client: consent, signals, "for you", controls        | Accepted (milestone 2)                                          |
 | [0004](0004-since-your-last-visit.md)  | "Since your last visit" and the built-in Summarizer                         | Accepted (milestone 5, first part)                              |
 | [0005](0005-query-embedding.md)        | Free-text search with the catalog's model, in the browser                   | Accepted (milestone 5, second part)                             |
+| [0006](0006-astro-integration.md)      | The Astro integration                                                       | Accepted                                                        |
+| [0007](0007-wordpress-plugin.md)       | A WordPress plugin, with embedding in the editor's browser                  | Accepted                                                        |
 | [0008](0008-sliced-ranking.md)         | Large catalogs without long tasks: ranking in slices on the main thread     | Accepted                                                        |

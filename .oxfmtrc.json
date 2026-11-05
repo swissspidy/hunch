@@ -2,5 +2,13 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "printWidth": 100,
   "singleQuote": true,
-  "ignorePatterns": ["dist/**", "demo/dist/**", "CHANGELOG.md", "package-lock.json"]
+  "ignorePatterns": [
+    "dist/**",
+    "demo/dist/**",
+    "CHANGELOG.md",
+    "package-lock.json",
+    "wordpress/inkling/composer.lock",
+    "wordpress/inkling/vendor/**",
+    "wordpress/inkling/assets/inkling.global.js"
+  ]
 }
