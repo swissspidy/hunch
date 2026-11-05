@@ -9,3 +9,4 @@ Each decision, with its status as its own header gives it. A new ADR adds its ro
 | [0003](0003-personalization-client.md) | Personalization in the client: consent, signals, "for you", controls        | Accepted (milestone 2)                                          |
 | [0004](0004-since-your-last-visit.md)  | "Since your last visit" and the built-in Summarizer                         | Accepted (milestone 5, first part)                              |
 | [0005](0005-query-embedding.md)        | Free-text search with the catalog's model, in the browser                   | Accepted (milestone 5, second part)                             |
+| [0009](0009-stability.md)              | What 0.x promises: formats, stored data, API                                | Accepted (before 0.1.0)                                         |

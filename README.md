@@ -238,6 +238,21 @@ and baselines, not for production.
 5. ✅ Optional: a "since your last visit" digest with the built-in Summarizer, and free-text
    search with the catalog's model in the browser.
 
+## Stability
+
+Inkling is 0.x: a breaking change comes in a minor release, with a changeset that says what to
+do. [ADR 0009](docs/adr/0009-stability.md) says what counts as breaking:
+
+- **Published files.** A client refuses a manifest or shard format version it doesn't know (the
+  fallback stays), and keeps reading older versions for at least two minor releases after the
+  build stops writing them. A frozen fixture in the tests pins format version 1.
+- **The visitor's data.** Upgrades migrate the signals in IndexedDB without losing any or
+  changing what they mean. An older client leaves a newer database alone.
+- **The API.** The entry points' exports, the elements' attributes and events, and the CLI
+  follow semantic versioning from 1.0.
+- **Not stable:** the ranking. Weights, scores and the order of results may change in any
+  release.
+
 ## Evaluation
 
 [`eval/`](eval/README.md) replays click logs through the real client and compares Inkling with

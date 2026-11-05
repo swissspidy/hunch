@@ -77,6 +77,11 @@ export const SIGNAL_WEIGHTS: Readonly<Record<Exclude<SignalKind, 'dwell'>, numbe
 
 /** Explicit signals do not decay and are not pruned by age. */
 const EXPLICIT: ReadonlySet<SignalKind> = new Set<SignalKind>(['follow', 'hide']);
+/**
+ * Implicit signals decay and are pruned by age. A kind in neither set comes from a newer
+ * release: it is kept as it is, and not read as anything (ADR 0009).
+ */
+const IMPLICIT: ReadonlySet<SignalKind> = new Set<SignalKind>(['view', 'click', 'dwell']);
 
 /** Dwell weight for a total visible time: 2 × min(seconds / 60, 1), from 10 seconds on. */
 export function dwellWeight(seconds: number): number {
@@ -101,6 +106,7 @@ export function aggregate(
   const out = new Map<string, Aggregate>();
   const latestExplicit = new Map<string, Signal>();
   for (const s of signals) {
+    if (!EXPLICIT.has(s.kind) && !IMPLICIT.has(s.kind)) continue;
     let agg = out.get(s.itemId);
     if (!agg) out.set(s.itemId, (agg = { score: 0, hidden: false, seen: false }));
     if (EXPLICIT.has(s.kind)) {
@@ -128,12 +134,14 @@ export function toPrune(
   const cutoff = now - maxAgeDays * 86_400_000;
   const drop = new Set<number>();
   for (const s of signals) {
-    if (s.seq !== undefined && !EXPLICIT.has(s.kind) && s.at < cutoff) drop.add(s.seq);
+    if (s.seq !== undefined && IMPLICIT.has(s.kind) && s.at < cutoff) drop.add(s.seq);
   }
   const kept = signals.filter((s) => s.seq !== undefined && !drop.has(s.seq));
   if (kept.length > max) {
-    // Oldest implicit first, then oldest explicit.
-    kept.sort((a, b) => Number(EXPLICIT.has(a.kind)) - Number(EXPLICIT.has(b.kind)) || a.at - b.at);
+    // Oldest implicit first, then oldest explicit (and unknown).
+    kept.sort(
+      (a, b) => Number(!IMPLICIT.has(a.kind)) - Number(!IMPLICIT.has(b.kind)) || a.at - b.at,
+    );
     for (const s of kept.slice(0, kept.length - max)) drop.add(s.seq!);
   }
   return [...drop];
