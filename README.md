@@ -99,7 +99,8 @@ start) on the home page:
 
 Without consent nothing is stored (not even an empty database) and the list never changes.
 With consent, items the visitor has read are left out, hidden items never come back, and the
-profile takes over gradually as signals accumulate.
+profile takes over gradually as signals accumulate. `InklingConfig.manifest` sets the manifest
+of components that have no `manifest` attribute.
 
 ### The client
 
@@ -168,6 +169,16 @@ Every result has `why`: `similarity`, `relevance`, `recency`, `prior`, `redundan
 `confidence`, `similarityShare` (how much of the score the profile accounts for: low means an
 editors' pick) and `because` (the visitor's items it leans on).
 
+## WordPress
+
+The [WordPress plugin](wordpress/inkling/readme.txt) needs no Node on the server and no CI.
+Posts are embedded with the same pinned EmbeddingGemma in the editor's browser, in wp-admin, on
+publish and with a "Build index" button. PHP writes the same manifest and shards as the CLI, in
+`wp-content/uploads/inkling/`. It adds related posts after each post, a "For you" block and a
+block with the visitor's controls, with the consent setting of your choice
+([ADR 0007](docs/adr/0007-wordpress-plugin.md)). `npm run wordpress:build` bundles the client
+into the plugin and writes `wordpress/inkling.zip`.
+
 ## The demo
 
 **Live:** [swissspidy.github.io/inkling](https://swissspidy.github.io/inkling/), with the
@@ -208,10 +219,78 @@ inkling inspect [manifest.json]
 `{ id, url, title, text, section?, tags?, date?, image?, popularity? }`. A loader module's default
 export returns that array. `popularity` (or, without it, catalog order) sets the cold-start
 order. The same build step is a library, `@swissspidy/inkling/build`, for build helpers in
-Astro, Next.js or static site generators.
+Next.js or static site generators (Astro has [its own integration](#astro)).
 
 The `hash` provider is a deterministic lexical embedding that needs no model. It is for tests
 and baselines, not for production.
+
+## Astro
+
+The integration builds the vectors as part of `astro build` and loads the components on every
+page ([ADR 0006](docs/adr/0006-astro-integration.md)):
+
+```js
+// astro.config.mjs
+import { defineConfig } from 'astro/config';
+import inkling from '@swissspidy/inkling/astro';
+
+export default defineConfig({
+  integrations: [inkling({ include: ['/blog/*'] })],
+});
+```
+
+After the pages are built, it reads each one's HTML as the sitemap source does (`og:title`,
+`article:section`, `article:published_time`, `article:tag`, `og:image`, and the text of
+`<article>` or `<main>`), embeds them, and writes `dist/inkling/`. An item's id is its path,
+as `Astro.url.pathname` gives it, for every `build.format` and `trailingSlash`. In a layout,
+render the slots and leave out `manifest`:
+
+```astro
+---
+const related = await sameSectionPosts(Astro.props.section); // your own fallback query
+---
+<inkling-page item={Astro.url.pathname}></inkling-page>
+<inkling-related item={Astro.url.pathname} section={Astro.props.section}>
+  <ol>
+    {related.slice(0, 4).map((post) => (
+      <li data-inkling-slot data-inkling-id={post.url}>
+        <a href={post.url}><span data-inkling-title>{post.title}</span></a>
+      </li>
+    ))}
+  </ol>
+</inkling-related>
+```
+
+The consent hook goes in `<head>`, as on any site:
+`<script is:inline>window.InklingConfig = { consent: () => … };</script>`.
+
+| Option                            | Default                       |                                                                                                |
+| --------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `include`, `exclude`              | all pages                     | Paths without `base`: `'/blog/*'` (not `/blog/` itself), `'/tags/**'`, a RegExp, or a function |
+| `page(item, { path, html })`      |                               | Change an item (its section, say), or return `null` to drop it                                 |
+| `items({ pages })`                |                               | The whole catalog: the built pages, filtered or enriched, or other items                       |
+| `provider`                        | `'transformers'`              | EmbeddingGemma; `'hash'` for tests, or a provider object                                       |
+| `cacheDir`                        | `node_modules/.cache/inkling` | The embedding cache, relative to the project; `false` for none                                 |
+| `out`                             | `'inkling'`                   | Directory in the build output                                                                  |
+| `dims`, `quantization`, `shardBy` |                               | As for the CLI                                                                                 |
+| `script`                          | `true`                        | `false` to load the components yourself                                                        |
+
+Install `@huggingface/transformers` as a dev dependency for the default provider. A build
+embeds only pages that are new or changed since the cached ones. In CI, restore the cache after
+`npm ci` (which empties `node_modules`) and before the build:
+
+```yaml
+- run: npm ci
+- uses: actions/cache@v4
+  with:
+    path: node_modules/.cache/inkling
+    key: inkling-${{ github.run_id }}
+    restore-keys: inkling-
+- run: npx astro build
+```
+
+`astro dev` builds no vectors. It serves those of the last `astro build` from `dist/inkling/`,
+and before the first build the lists keep their server-rendered fallback.
 
 ## Privacy
 

@@ -16,8 +16,9 @@ import { SlotsElement } from './slots.ts';
  * </inkling-for-you>
  * ```
  *
- * Attributes: `manifest` (required), `sections` (comma-separated), `exclude` (comma-separated
- * item ids), `include-seen`, `diversity`. The slots, states and events are the module's.
+ * Attributes: `manifest` (or `InklingConfig.manifest`), `sections` (comma-separated),
+ * `exclude` (comma-separated item ids), `include-seen`, `diversity`. The slots, states and
+ * events are the module's.
  */
 export class InklingForYouElement extends SlotsElement {
   /** @internal Custom element lifecycle, called by the browser. */

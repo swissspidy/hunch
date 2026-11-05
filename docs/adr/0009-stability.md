@@ -72,7 +72,7 @@ counts as breaking, and what is not promised at all.
 ### The public API
 
 - **What is public:** the exports of the package's entry points (`.`, `./elements`,
-  `./digest`, `./query`, `./format`, `./build`, `./inkling.global.js`) and their TypeScript
+  `./digest`, `./query`, `./format`, `./build`, `./astro`, `./inkling.global.js`) and their TypeScript
   types, as the [API reference](https://swissspidy.github.io/inkling/api/) lists them;
   `window.InklingConfig`; the elements' names, attributes, events (`inkling:ready`,
   `inkling:error`, `inkling:summary`) and the `data-inkling-*` attributes they read and set

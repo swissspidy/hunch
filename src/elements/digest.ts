@@ -19,8 +19,8 @@ import { SlotsElement } from './slots.ts';
  * </inkling-digest>
  * ```
  *
- * Attributes: `manifest` (required), `sections`, `diversity`, `context` (describes the site for
- * the Summarizer). `data-inkling-new` is the number of new items shown, and
+ * Attributes: `manifest` (or `InklingConfig.manifest`), `sections`, `diversity`, `context`
+ * (describes the site for the Summarizer). `data-inkling-new` is the number of new items shown, and
  * `data-inkling-summarized` whether a summary was written. Also fires `inkling:summary` (detail:
  * `{ summary }`).
  */

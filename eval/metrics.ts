@@ -55,3 +55,46 @@ function ndcg(labels: readonly number[], k: number): number {
   const ideal = dcg([...labels].sort((a, b) => b - a));
   return ideal === 0 ? 0 : dcg(labels) / ideal;
 }
+
+export interface PairedDifference {
+  /** Mean of `b[i] − a[i]`. */
+  mean: number;
+  /** Standard error of that mean. */
+  stderr: number;
+  /** 95% percentile bootstrap interval of the mean, resampling impressions. */
+  ci95: [number, number];
+}
+
+/**
+ * How much `b` beats `a` when both scored the same impressions: the mean per-impression
+ * difference, its standard error, and a seeded (so reproducible) bootstrap interval.
+ */
+export function pairedDifference(
+  b: readonly number[],
+  a: readonly number[],
+  resamples = 2000,
+): PairedDifference {
+  if (a.length !== b.length || a.length < 2) {
+    throw new RangeError('pairedDifference needs two equally long lists of at least 2 scores');
+  }
+  if (!Number.isInteger(resamples) || resamples < 1) {
+    throw new RangeError('pairedDifference needs a positive whole number of resamples');
+  }
+  const n = a.length;
+  const d = Float64Array.from(b, (x, i) => x - a[i]!);
+  const avg = d.reduce((s, x) => s + x, 0) / n;
+  const variance = d.reduce((s, x) => s + (x - avg) ** 2, 0) / (n - 1);
+  let seed = 0x9e3779b9;
+  const means = new Float64Array(resamples);
+  for (let r = 0; r < resamples; r++) {
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      sum += d[Math.floor((seed / 4294967296) * n)]!;
+    }
+    means[r] = sum / n;
+  }
+  means.sort();
+  const at = (q: number) => means[Math.min(resamples - 1, Math.floor(q * resamples))]!;
+  return { mean: avg, stderr: Math.sqrt(variance / n), ci95: [at(0.025), at(0.975)] };
+}

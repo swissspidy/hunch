@@ -1,4 +1,5 @@
 import { Inkling } from '../client/index.ts';
+import { manifestOf } from './config.ts';
 import { Base } from './slots.ts';
 
 /**
@@ -14,7 +15,7 @@ export class InklingPageElement extends Base {
 
   /** @internal Custom element lifecycle, called by the browser. */
   connectedCallback(): void {
-    const manifest = this.getAttribute('manifest');
+    const manifest = manifestOf(this);
     const item = this.getAttribute('item');
     if (!manifest || !item) return;
     let stopped = false;

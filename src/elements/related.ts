@@ -11,9 +11,9 @@ import { SlotsElement } from './slots.ts';
  * </inkling-related>
  * ```
  *
- * Attributes: `manifest` and `item` (required), `section` (the item's section: its shard loads
- * first), `sections` (`same`, or a comma-separated list), `diversity`. The slots, states and
- * events are the module's.
+ * Attributes: `item` and `manifest` (or `InklingConfig.manifest`), `section` (the item's
+ * section: its shard loads first), `sections` (`same`, or a comma-separated list), `diversity`.
+ * The slots, states and events are the module's.
  */
 export class InklingRelatedElement extends SlotsElement {
   /** @internal Custom element lifecycle, called by the browser. */

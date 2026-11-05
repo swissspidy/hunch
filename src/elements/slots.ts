@@ -21,6 +21,7 @@
  */
 
 import { Inkling, type Recommendation } from '../client/index.ts';
+import { manifestOf } from './config.ts';
 
 // HTMLElement does not exist during server rendering; the classes are then never defined.
 export const Base: typeof HTMLElement =
@@ -64,7 +65,7 @@ export abstract class SlotsElement extends Base {
   }
 
   protected inkling(): Promise<Inkling> {
-    const manifest = this.getAttribute('manifest');
+    const manifest = manifestOf(this);
     if (!manifest) return Promise.reject(new Error(`<${this.localName}> needs a manifest`));
     return Inkling.shared(manifest);
   }

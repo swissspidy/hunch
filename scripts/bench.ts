@@ -3,7 +3,10 @@
  * budget), in Node; with `--browser`, in Chromium with the CPU slowed 4× (DevTools' mid-range
  * mobile preset), IndexedDB signals included (ADR 0003).
  *
- *   node scripts/bench.ts [--items 10000] [--dims 256] [--sections 10] [--browser]
+ * The browser run also counts long tasks (over 50 ms on the main thread) while a returning
+ * visitor's page loads the catalog and ranks "for you" for the first time (ADR 0008).
+ *
+ *   node scripts/bench.ts [--items 10000[,50000,…]] [--dims 256] [--sections 10] [--browser]
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -25,19 +28,23 @@ const { values } = parseArgs({
     browser: { type: 'boolean', default: false },
   },
 });
-const count = Number(values.items);
+const counts = values.items.split(',').map(Number);
 const dims = Number(values.dims);
 const sections = Number(values.sections);
-if (!(sections >= 1 && count >= sections)) {
-  throw new RangeError(`--sections must be from 1 to --items (${count}), not ${values.sections}`);
-}
+let count = 0;
 // Every section has at least this many items; benchmark ids stay within them.
-const perSection = Math.floor(count / sections);
+let perSection = 0;
 /** The i-th benchmark item: sections in turn, so every id exists. */
 const itemId = (i: number) => `s${i % sections}-item-${Math.floor(i / sections) % perSection}`;
 
-if (values.browser) await browser();
-else for (const q of ['int8', 'float32'] as Quantization[]) await node(q);
+for (count of counts) {
+  if (!(Number.isInteger(count) && sections >= 1 && count >= sections)) {
+    throw new RangeError(`--sections must be from 1 to --items (${count}), not ${values.sections}`);
+  }
+  perSection = Math.floor(count / sections);
+  if (values.browser) await browser();
+  else for (const q of ['int8', 'float32'] as Quantization[]) await node(q);
+}
 
 async function node(quantization: Quantization): Promise<void> {
   const catalog = await syntheticCatalog(count, dims, sections, quantization);
@@ -68,7 +75,7 @@ async function node(quantization: Quantization): Promise<void> {
   for (let i = 0; i < 50; i++) await ink.record('view', itemId(i * 7));
   const recommend = await time(20, () => ink.recommend({ n: 10 }));
   const heap = process.memoryUsage();
-  console.log(`${count} items, ${dims} dims, ${quantization}, ${sections} shards (Node)`);
+  console.log(`${count} items, ${dims} dims, ${quantization}, ${shape(catalog)} (Node)`);
   console.log(
     `  shards       ${mb(raw)} (${mb(vectorBytes)} vectors, ${mb(raw - vectorBytes)} metadata), ${mb(gz)} gzipped`,
   );
@@ -113,35 +120,71 @@ async function browser(): Promise<void> {
   const b = await chromium.launch();
   try {
     const page = await b.newPage();
+    // Long tasks (> 50 ms on the main thread), from the first script on.
+    await page.addInitScript(() => {
+      const w = window as unknown as { __longTasks: { start: number; duration: number }[] };
+      w.__longTasks = [];
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) {
+          w.__longTasks.push({ start: e.startTime, duration: e.duration });
+        }
+      }).observe({ type: 'longtask', buffered: true });
+    });
+    await page.goto(origin);
+    // A returning visitor: 50 signals in IndexedDB from an earlier page.
+    await page.evaluate(
+      async ({ sections, perSection }) => {
+        const id = (i: number) => `s${i % sections}-item-${Math.floor(i / sections) % perSection}`;
+        const I = (window as unknown as { Inkling: typeof Inkling }).Inkling;
+        const ink = await I.load({ manifest: '/manifest.json', consent: true });
+        for (let i = 0; i < 50; i++) await ink.record('view', id(i * 7));
+      },
+      { sections, perSection },
+    );
     await page.goto(origin);
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await cdp.send('Performance.enable');
     const result = await page.evaluate(
-      async ({ sections, perSection }) => {
+      async ({ sections, perSection, options }) => {
         // As itemId() below: an id that exists whatever the catalog's size.
         const id = (i: number) => `s${i % sections}-item-${Math.floor(i / sections) % perSection}`;
-        const I = (window as unknown as { Inkling: typeof Inkling }).Inkling;
+        const w = window as unknown as {
+          Inkling: typeof Inkling;
+          __longTasks: { start: number; duration: number }[];
+        };
+        const I = w.Inkling;
+        // Load + first recommend(), as a returning visitor's "for you" would.
         const t0 = performance.now();
-        const ink = await I.load({ manifest: '/manifest.json', consent: true });
-        await ink.related('s0-item-0', { sections: 'same' });
-        const first = performance.now() - t0;
-        await ink.related('s0-item-0');
-        const all = performance.now() - t0;
+        const ink = await I.load({ manifest: '/manifest.json', consent: true, ...options });
+        await ink.recommend({ n: 10 });
         const t1 = performance.now();
-        for (let i = 0; i < 10; i++) await ink.related(id(i), { n: 10 });
-        const related = (performance.now() - t1) / 10;
-        for (let i = 0; i < 50; i++) await ink.record('view', id(i * 7));
+        const firstRecommend = t1 - t0;
+        // Let the observer deliver the last entries.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const longTasks = w.__longTasks
+          .filter((t) => t.start >= t0 && t.start < t1)
+          .map((t) => t.duration);
+        // The rest on a fresh client, so the first section's load is measured on its own.
         const t2 = performance.now();
-        for (let i = 0; i < 10; i++) await ink.recommend({ n: 10 });
-        const recommend = (performance.now() - t2) / 10;
-        await ink.forget();
-        return { first, all, related, recommend };
+        const fresh = await I.load({ manifest: '/manifest.json', consent: true, ...options });
+        await fresh.related('s0-item-0', { sections: 'same' });
+        const first = performance.now() - t2;
+        await fresh.related('s0-item-0');
+        const all = performance.now() - t2;
+        const t3 = performance.now();
+        for (let i = 0; i < 10; i++) await fresh.related(id(i), { n: 10 });
+        const related = (performance.now() - t3) / 10;
+        const t4 = performance.now();
+        for (let i = 0; i < 10; i++) await fresh.recommend({ n: 10 });
+        const recommend = (performance.now() - t4) / 10;
+        await fresh.forget();
+        return { firstRecommend, longTasks, first, all, related, recommend };
       },
-      { sections, perSection },
+      { sections, perSection, options: {} },
     );
     const metrics = await cdp.send('Performance.getMetrics').catch(() => ({ metrics: [] }));
-    console.log(`${count} items, ${dims} dims, int8, ${sections} shards (Chromium, CPU 4× slower)`);
+    console.log(`${count} items, ${dims} dims, int8, ${shape(catalog)} (Chromium, CPU 4× slower)`);
     console.log(
       `  load         ${result.first.toFixed(0)} ms first section, ${result.all.toFixed(0)} ms all (local server)`,
     );
@@ -149,6 +192,7 @@ async function browser(): Promise<void> {
     console.log(
       `  recommend()  ${result.recommend.toFixed(1)} ms with 50 IndexedDB signals (n = 10)`,
     );
+    console.log(`  long tasks   ${longTaskSummary(result.firstRecommend, result.longTasks)}`);
     const heap = metrics.metrics.find((m: { name: string }) => m.name === 'JSHeapUsedSize');
     if (heap) console.log(`  JS heap      ${mb(heap.value)} used`);
   } finally {
@@ -156,6 +200,21 @@ async function browser(): Promise<void> {
     server.close();
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/** Long tasks during load + first recommend(): count, longest, and blocking time over 50 ms. */
+function longTaskSummary(total: number, durations: number[]): string {
+  const longest = durations.length ? Math.max(...durations) : 0;
+  const blocking = durations.reduce((sum, d) => sum + d - 50, 0);
+  return (
+    `${durations.length} over 50 ms in load + first recommend() (${total.toFixed(0)} ms), ` +
+    `longest ${longest.toFixed(0)} ms, ${blocking.toFixed(0)} ms blocking`
+  );
+}
+
+/** "10 sections in 50 shards": how the synthetic catalog is cut. */
+function shape(catalog: SyntheticCatalog): string {
+  return `${sections} sections in ${catalog.manifest.shards.length} shards`;
 }
 
 async function time(runs: number, fn: (i: number) => Promise<unknown>): Promise<number> {

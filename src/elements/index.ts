@@ -1,7 +1,7 @@
 /**
  * Inkling's web components, registered on import: `<inkling-related>`, `<inkling-for-you>`,
- * `<inkling-page>` and `<inkling-digest>`. Call `Inkling.configure({ consent })` before
- * importing this module if the components should personalize.
+ * `<inkling-page>` and `<inkling-digest>`. Call `Inkling.configure({ consent })`, or set
+ * `window.InklingConfig`, before importing this module if the components should personalize.
  *
  * The list components (`related`, `for-you`, `digest`) fill server-rendered slots. The server
  * renders a fixed number of slots (`[data-inkling-slot]`) holding a fallback. Once the browser
@@ -24,6 +24,7 @@ import { defineElements } from './define.ts';
 
 defineElements();
 
+export type { InklingConfig } from './config.ts';
 export { defineElements } from './define.ts';
 export { InklingDigestElement } from './digest.ts';
 export { InklingForYouElement } from './for-you.ts';

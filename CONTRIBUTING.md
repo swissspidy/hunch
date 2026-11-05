@@ -18,16 +18,16 @@ node bin/inkling.js --help      # the CLI, from the sources
 
 ## Checks
 
-| Command                | What it checks                                                                             |
-| ---------------------- | ------------------------------------------------------------------------------------------ |
-| `npm run typecheck`    | TypeScript 7 over `src`, `test` and `scripts`                                              |
-| `npm run lint`         | oxlint (type-aware) and knip (unused files, exports, dependencies)                         |
-| `npm run format:check` | oxfmt (`npm run format` fixes it)                                                          |
-| `npm test`             | Unit tests in `test/unit`                                                                  |
-| `npm run size`         | The client's gzipped size against its budget                                               |
-| `npm run test:e2e`     | The demo in a browser: related items, layout shift, requests, accessibility (axe-core)     |
-| `npm run test:pack`    | The packed package, installed into an empty project                                        |
-| `npm run bench`        | Shard sizes and ranking time for 10,000 items (`-- --browser`: in Chromium, CPU 4× slower) |
+| Command                | What it checks                                                                                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`    | TypeScript 7 over `src`, `test` and `scripts`                                                                                                         |
+| `npm run lint`         | oxlint (type-aware) and knip (unused files, exports, dependencies)                                                                                    |
+| `npm run format:check` | oxfmt (`npm run format` fixes it)                                                                                                                     |
+| `npm test`             | Unit tests in `test/unit`                                                                                                                             |
+| `npm run size`         | The client's gzipped size against its budget                                                                                                          |
+| `npm run test:e2e`     | The demo and the Astro fixture in a browser: related items, layout shift, requests, accessibility (axe-core)                                          |
+| `npm run test:pack`    | The packed package, installed into an empty project                                                                                                   |
+| `npm run bench`        | Shard sizes and ranking time for 10,000 items (`-- --browser`: in Chromium, CPU 4× slower, with long tasks; `-- --items 10000,100000`: several sizes) |
 
 The browser tests run in Chromium, or in the browser `INKLING_BROWSER` names (`chromium`,
 `firefox` or `webkit`; CI runs all three). They need that browser for the installed
@@ -45,6 +45,22 @@ comments of the public entry points (run it after `npm run demo`, which empties 
 TypeDoc needs the TypeScript compiler API, which TypeScript 7 doesn't have, so it lives in
 `docs/api/` with its own lockfile and TypeScript 6: install it once with
 `npm ci --prefix docs/api`. It fails on an undocumented export or a broken `{@link}`.
+
+## The WordPress plugin
+
+[`wordpress/inkling/`](wordpress/inkling/readme.txt) is plain PHP with its own dev tools
+([ADR 0007](docs/adr/0007-wordpress-plugin.md)). With PHP 7.4 or later and Composer:
+
+```sh
+cd wordpress/inkling
+composer install
+vendor/bin/phpunit              # the encoder, without WordPress
+vendor/bin/phpcs                # WordPress coding standards
+```
+
+`npm test` also runs the PHP encoder against the Node build, byte for byte, when `php` is
+installed. `npm run wordpress:build` bundles the client into the plugin and writes
+`wordpress/inkling.zip`.
 
 ## The demo's embeddings
 

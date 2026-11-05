@@ -7,6 +7,9 @@
     "demo/dist/**",
     "CHANGELOG.md",
     "package-lock.json",
-    "test/fixtures/format-v*/**"
+    "test/fixtures/format-v*/**",
+    "wordpress/inkling/composer.lock",
+    "wordpress/inkling/vendor/**",
+    "wordpress/inkling/assets/inkling.global.js"
   ]
 }

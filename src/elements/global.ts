@@ -4,18 +4,12 @@
  * Inkling.shared(manifest)`, `await Inkling.load({ manifest })`).
  *
  * Options in `window.InklingConfig`, set by an inline script before this one, are applied
- * before any component starts: the place for the site's consent hook.
+ * before any component starts: the place for the site's consent hook, and for a default
+ * `manifest` (see `config.ts`).
  */
 
-import { Inkling, type InklingOptions } from '../client/index.ts';
+import { Inkling } from '../client/index.ts';
 import { defineElements } from './define.ts';
 
-const scope = globalThis as {
-  Inkling?: typeof Inkling;
-  InklingConfig?: Omit<InklingOptions, 'manifest'>;
-};
-if (scope.InklingConfig) Inkling.configure(scope.InklingConfig);
-scope.Inkling = Inkling;
-
-// After configure(): registering upgrades the components already in the page.
+(globalThis as { Inkling?: typeof Inkling }).Inkling = Inkling;
 defineElements();

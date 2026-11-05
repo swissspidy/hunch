@@ -9,10 +9,11 @@
  */
 
 import type { Manifest, ShardItem } from '../format/manifest.ts';
-import { DEFAULT_WEIGHTS, rank, recency, type ScoreWeights } from '../rank/rank.ts';
+import { DEFAULT_WEIGHTS, ranking, recency, type ScoreWeights } from '../rank/rank.ts';
 import { normalize } from '../rank/vector.ts';
 import { Catalog, type Entry, type Fetch } from './catalog.ts';
 import { buildProfile, profileSimilarity, type Profile } from './profile.ts';
+import { SLICE_ITEMS, slicer, type Pause } from './slices.ts';
 import {
   aggregate,
   dwellWeight,
@@ -297,9 +298,10 @@ export class Inkling {
     await this.catalog.loadSections(sections);
     const exclude = new Set(options.exclude);
     exclude.add(itemId);
-    const pool = this.candidates(sections, (e) => !exclude.has(e.item.id));
+    const pause = slicer();
+    const pool = await this.candidates(sections, (e) => !exclude.has(e.item.id), pause);
     const query = this.catalog.vector(target);
-    return this.rankEntries(pool, (e) => this.catalog.cosine(query, e), 1, options);
+    return this.rankEntries(pool, (e) => this.catalog.cosine(query, e), 1, options, pause);
   }
 
   // Personalization --------------------------------------------------------------------------
@@ -373,12 +375,17 @@ export class Inkling {
     await this.catalog.loadSections(options.sections);
     const exclude = new Set(options.exclude);
     const after = options.after;
-    const pool = this.candidates(options.sections, (e) => {
-      const agg = personal.aggregates.get(e.item.id);
-      if (after !== undefined && !(Date.parse(e.item.date ?? '') > after)) return false;
-      return !exclude.has(e.item.id) && !agg?.hidden && (options.includeSeen || !agg?.seen);
-    });
-    return this.rankPersonal(pool, personal, options);
+    const pause = slicer();
+    const pool = await this.candidates(
+      options.sections,
+      (e) => {
+        const agg = personal.aggregates.get(e.item.id);
+        if (after !== undefined && !(Date.parse(e.item.date ?? '') > after)) return false;
+        return !exclude.has(e.item.id) && !agg?.hidden && (options.includeSeen || !agg?.seen);
+      },
+      pause,
+    );
+    return this.rankPersonal(pool, personal, options, pause);
   }
 
   /**
@@ -405,10 +412,15 @@ export class Inkling {
     const personal = await this.personal(personalize > 0);
     await this.catalog.loadSections(options.sections);
     const exclude = new Set(options.exclude);
-    const pool = this.candidates(options.sections, (e) => {
-      const agg = personal.aggregates.get(e.item.id);
-      return !exclude.has(e.item.id) && !agg?.hidden && !(options.excludeSeen && agg?.seen);
-    });
+    const pause = slicer();
+    const pool = await this.candidates(
+      options.sections,
+      (e) => {
+        const agg = personal.aggregates.get(e.item.id);
+        return !exclude.has(e.item.id) && !agg?.hidden && !(options.excludeSeen && agg?.seen);
+      },
+      pause,
+    );
     const weight = personal.profile.positive ? personalize : 0;
     return this.rankEntries(
       pool,
@@ -417,6 +429,7 @@ export class Inkling {
         weight * this.profileSimilarity(personal.profile, e),
       1,
       { diversity: 0, ...options, weights: { recency: 0, ...options.weights } },
+      pause,
     );
   }
 
@@ -481,10 +494,11 @@ export class Inkling {
     });
     // By default the site's list is the cold-start order: its positions are the prior.
     const position = new Map(known.map((e, i) => [e.item.id, 1 - i / known.length]));
-    const ranked = this.rankPersonal(
+    const ranked = await this.rankPersonal(
       known,
       personal,
       { ...options, n: known.length },
+      slicer(),
       options.prior === 'catalog' ? undefined : (e) => position.get(e.item.id)!,
     );
     return [...ranked.map((r) => r.id), ...unknown, ...hidden];
@@ -623,17 +637,26 @@ export class Inkling {
     return { aggregates, profile, signals: signals.length };
   }
 
-  private candidates(
+  /** The loaded entries in `sections` that `keep` keeps, in slices (ADR 0008). */
+  private async candidates(
     sections: readonly string[] | undefined,
     keep: (e: Entry) => boolean,
-  ): Entry[] {
-    return this.catalog
-      .loaded()
-      .filter(
-        (e) =>
+    pause: Pause,
+  ): Promise<Entry[]> {
+    const all = this.catalog.loaded();
+    const pool: Entry[] = [];
+    for (let from = 0; from < all.length; from += SLICE_ITEMS) {
+      await pause();
+      for (const e of all.slice(from, from + SLICE_ITEMS)) {
+        if (
           keep(e) &&
-          (!sections || (e.item.section !== undefined && sections.includes(e.item.section))),
-      );
+          (!sections || (e.item.section !== undefined && sections.includes(e.item.section)))
+        ) {
+          pool.push(e);
+        }
+      }
+    }
+    return pool;
   }
 
   private profileSimilarity(profile: Profile, entry: Entry): number {
@@ -660,20 +683,22 @@ export class Inkling {
       });
   }
 
-  private rankPersonal(
+  private async rankPersonal(
     pool: Entry[],
     personal: Personal,
     options: RankingOptions,
+    pause: Pause,
     prior?: (e: Entry) => number,
-  ): Recommendation[] {
+  ): Promise<Recommendation[]> {
     const { profile } = personal;
     // Without a profile the site's order stands as it is: no recency, no reshuffling.
     const cold = profile.confidence === 0;
-    const recs = this.rankEntries(
+    const recs = await this.rankEntries(
       pool,
       (e) => this.profileSimilarity(profile, e),
       profile.confidence,
       cold ? { ...options, diversity: 0, weights: { ...options.weights, recency: 0 } } : options,
+      pause,
       prior,
     );
     if (profile.positive) {
@@ -682,13 +707,19 @@ export class Inkling {
     return recs;
   }
 
-  private rankEntries(
+  /**
+   * Ranks `pool`. Scoring runs in slices, and `pause` yields to the page between them, so a
+   * large catalog does not block input (ADR 0008). Where the slices fall does not change the
+   * result.
+   */
+  private async rankEntries(
     pool: Entry[],
     similarity: (e: Entry) => number,
     confidence: number,
     options: RankingOptions,
+    pause: Pause,
     prior: (e: Entry) => number = (e) => e.item.prior,
-  ): Recommendation[] {
+  ): Promise<Recommendation[]> {
     const n = options.n ?? 5;
     const now = this.now();
     const halfLife = options.recencyHalfLifeDays ?? 30;
@@ -698,7 +729,7 @@ export class Inkling {
       if (!v) vectors.set(i, (v = this.catalog.vector(pool[i]!)));
       return v;
     };
-    const ranked = rank(
+    const steps = ranking(
       pool.map((_, i) => i),
       {
         similarity: (i) => similarity(pool[i]!),
@@ -714,6 +745,12 @@ export class Inkling {
         poolSize: Math.max(4 * n, 50),
       },
     );
+    let step = steps.next();
+    while (!step.done) {
+      await pause();
+      step = steps.next();
+    }
+    const ranked = step.value;
     const w = { ...DEFAULT_WEIGHTS, ...options.weights };
     return ranked.map((r) => ({
       ...pool[r.index]!.item,
