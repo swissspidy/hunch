@@ -124,6 +124,9 @@ await inkling.export(); // { format: 'inkling/signals', signals: [{ itemId, kind
 await inkling.forget(); // deletes everything; forget(itemId) one item's signals
 ```
 
+The [API reference](https://swissspidy.github.io/inkling/api/) documents every entry point:
+the client, `/elements`, `/digest`, `/query`, `/format` and `/build`.
+
 ### "Since your last visit"
 
 `<inkling-digest>` shows what was published since the visitor's previous visit (with consent),
@@ -167,8 +170,9 @@ editors' pick) and `because` (the visitor's items it leans on).
 
 ## The demo
 
-**Live:** [swissspidy.github.io/inkling](https://swissspidy.github.io/inkling/), deployed from
-`main` by [`pages.yml`](.github/workflows/pages.yml). To run it locally:
+**Live:** [swissspidy.github.io/inkling](https://swissspidy.github.io/inkling/), with the
+[API reference](https://swissspidy.github.io/inkling/api/), deployed from `main` by
+[`pages.yml`](.github/workflows/pages.yml). To run it locally:
 
 ```sh
 npm ci

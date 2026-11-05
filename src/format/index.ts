@@ -1,3 +1,9 @@
+/**
+ * The manifest and shard format (ADR 0001), for tools that read or write it.
+ *
+ * @module @swissspidy/inkling/format
+ */
+
 export {
   MANIFEST_FORMAT,
   MANIFEST_FORMAT_VERSION,

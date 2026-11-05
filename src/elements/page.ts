@@ -1,16 +1,18 @@
+import { Inkling } from '../client/index.ts';
+import { Base } from './slots.ts';
+
 /**
  * `<inkling-page>`: records that the visitor viewed an item, and how long they stayed (with
  * consent). Renders nothing.
  *
- *   <inkling-page manifest="/inkling/manifest.json" item="post-42"></inkling-page>
+ * ```html
+ * <inkling-page manifest="/inkling/manifest.json" item="post-42"></inkling-page>
+ * ```
  */
-
-import { Inkling } from '../client/index.ts';
-import { Base } from './slots.ts';
-
 export class InklingPageElement extends Base {
   private stop: (() => void) | undefined;
 
+  /** @internal Custom element lifecycle, called by the browser. */
   connectedCallback(): void {
     const manifest = this.getAttribute('manifest');
     const item = this.getAttribute('item');
@@ -25,6 +27,7 @@ export class InklingPageElement extends Base {
     );
   }
 
+  /** @internal Custom element lifecycle, called by the browser. */
   disconnectedCallback(): void {
     this.stop?.();
     this.stop = undefined;

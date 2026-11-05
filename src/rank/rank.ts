@@ -16,9 +16,13 @@
  * is deterministic.
  */
 
+/** The weights of the ranking function's terms (ADR 0001). Not stable: they may change in any release. */
 export interface ScoreWeights {
+  /** Weight of the (rescaled) similarity, scaled by the confidence in the query. */
   similarity: number;
+  /** Weight of the site's cold-start prior, scaled by the lack of confidence. */
   prior: number;
+  /** Weight of the recency boost. */
   recency: number;
 }
 

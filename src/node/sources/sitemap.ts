@@ -11,7 +11,9 @@ import { compact, isoDate } from './feed.ts';
 
 type Node = Record<string, unknown>;
 
+/** Options for {@link loadSitemap}. */
 export interface SitemapOptions {
+  /** Fetches a URL's body as text (the sitemap's, and each page's). */
   fetchText: (url: string) => Promise<string>;
   /** Pages fetched at once (default 4). */
   concurrency?: number;
@@ -19,6 +21,7 @@ export interface SitemapOptions {
   limit?: number;
 }
 
+/** Loads the pages a sitemap (or sitemap index) lists, as catalog items. */
 export async function loadSitemap(url: string, options: SitemapOptions): Promise<CatalogItem[]> {
   const concurrency = options.concurrency ?? 4;
   if (!Number.isInteger(concurrency) || concurrency < 1) {
@@ -69,6 +72,10 @@ async function sitemapUrls(
   );
 }
 
+/**
+ * A page as a catalog item: title, section, tags, date and image from its Open Graph and
+ * article meta tags, text from `<article>`, `<main>` or `<body>`. The id is the URL.
+ */
 export function parsePage(url: string, html: string, lastmod?: string): CatalogItem {
   const meta = (name: string): string | undefined => {
     const re = new RegExp(

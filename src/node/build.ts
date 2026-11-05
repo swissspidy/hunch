@@ -24,13 +24,17 @@ import { documentInput, type EmbeddingProvider } from './providers/types.ts';
 import { compact } from './sources/feed.ts';
 import type { CatalogItem } from './types.ts';
 
+/** Options for {@link build}. */
 export interface BuildOptions {
+  /** The catalog. Ids must be unique. */
   items: readonly CatalogItem[];
   /** Directory for `manifest.json` and `shards/`. */
   outDir: string;
+  /** The model that embeds the items. */
   provider: EmbeddingProvider;
   /** Published dimensions, at most the model's (default 256, or the model's if smaller). */
   dims?: number;
+  /** How the shards store vector components (default `int8`). */
   quantization?: Quantization;
   /** Embedding cache directory; `false` for none (default `.inkling-cache`). */
   cacheDir?: string | false;
@@ -42,10 +46,13 @@ export interface BuildOptions {
   maxTextChars?: number;
   /** Build time; kept from the previous manifest when nothing changed. */
   now?: Date;
+  /** Receives progress messages (default: none). */
   log?: (message: string) => void;
 }
 
+/** What {@link build} wrote. */
 export interface BuildResult {
+  /** The manifest written to `outDir/manifest.json`. */
   manifest: Manifest;
   /** Inputs embedded by the model in this build. */
   embedded: number;
@@ -57,6 +64,10 @@ export interface BuildResult {
   bytes: number;
 }
 
+/**
+ * Embeds the catalog (only inputs missing from the embedding cache) and writes `manifest.json`
+ * and the shards to `outDir`. The same items, model and options give byte-identical output.
+ */
 export async function build(options: BuildOptions): Promise<BuildResult> {
   const { provider, outDir } = options;
   const log = options.log ?? (() => {});

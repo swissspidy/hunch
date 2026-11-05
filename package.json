@@ -73,6 +73,7 @@
     "test:pack": "node --test --test-reporter=spec \"test/pack/*.test.ts\"",
     "size": "node scripts/size.ts",
     "demo": "node scripts/demo.ts",
+    "api": "npm run --prefix docs/api build",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",
     "bench": "node scripts/bench.ts",

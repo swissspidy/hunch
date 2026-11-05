@@ -4,12 +4,19 @@
  * is derived from these on every page.
  */
 
+/**
+ * What the visitor did: viewed, clicked, stayed on (`dwell`), asked for more like it
+ * (`follow`) or hid an item.
+ */
 export type SignalKind = 'view' | 'click' | 'dwell' | 'follow' | 'hide';
 
+/** One thing the visitor did with one item. */
 export interface Signal {
   /** Assigned by the store. */
   seq?: number;
+  /** The item's id in the catalog. */
   itemId: string;
+  /** What happened. */
   kind: SignalKind;
   /** Signed weight before decay. */
   weight: number;
@@ -17,7 +24,9 @@ export interface Signal {
   at: number;
 }
 
+/** A store's state beside its signals. */
 export interface SignalState {
+  /** Recording is paused. */
   paused: boolean;
   /** The visitor's last activity on the site, epoch milliseconds. */
   lastSeen?: number;
@@ -38,8 +47,11 @@ export function nextVisit(state: SignalState, now: number, gapMs: number): Signa
 
 /** Where signals live. `IndexedDbStore` in browsers, `MemoryStore` elsewhere and in tests. */
 export interface SignalStore {
+  /** Stores a signal, assigning its `seq`. */
   add(signal: Signal): Promise<void>;
+  /** Every stored signal, oldest first. */
   all(): Promise<Signal[]>;
+  /** Deletes the signals with these `seq`s. */
   delete(seqs: readonly number[]): Promise<void>;
   /** Removes everything this store holds, including its database. */
   destroy(): Promise<void>;
@@ -127,6 +139,7 @@ export function toPrune(
   return [...drop];
 }
 
+/** Signals in memory, gone with the page: for tests, and where there is no IndexedDB. */
 export class MemoryStore implements SignalStore {
   private signals: Signal[] = [];
   private seq = 0;
@@ -170,6 +183,7 @@ export class IndexedDbStore implements SignalStore {
   private readonly name: string;
   private opening: Promise<IDBDatabase> | undefined;
 
+  /** A store in the IndexedDB database `name`. Nothing is opened until first use. */
   constructor(name = 'inkling') {
     this.name = name;
   }

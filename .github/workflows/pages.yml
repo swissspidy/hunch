@@ -9,6 +9,7 @@ on:
       - 'src/**'
       - 'scripts/demo.ts'
       - 'scripts/bundle.ts'
+      - 'docs/api/**'
       - 'package-lock.json'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -23,7 +24,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build the demo
+    name: Build the demo and the API reference
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -34,10 +35,17 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            docs/api/package-lock.json
       - run: npm ci
+      # TypeDoc and the TypeScript 6 it needs, apart from the package's TypeScript 7.
+      - run: npm ci --prefix docs/api --ignore-scripts
       # From the committed embedding cache: fails rather than downloading the model if the feed
       # changed without the cache (run `npm run demo` locally and commit demo/inkling-cache).
       - run: node scripts/demo.ts --base "/${GITHUB_REPOSITORY#*/}/"
+      # Into demo/dist/api: fails on an undocumented export or a broken link.
+      - run: npm run api
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         if: github.event_name != 'pull_request'
         with:

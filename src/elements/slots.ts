@@ -44,6 +44,7 @@ export abstract class SlotsElement extends Base {
     run: number,
   ): Promise<Recommendation[] | null>;
 
+  /** @internal Custom element lifecycle, called by the browser. */
   connectedCallback(): void {
     if (!this.listening) {
       this.listening = true;
@@ -52,6 +53,7 @@ export abstract class SlotsElement extends Base {
     this.schedule();
   }
 
+  /** @internal Custom element lifecycle, called by the browser. */
   attributeChangedCallback(_name: string, old: string | null, value: string | null): void {
     if (old !== value && this.isConnected) this.schedule();
   }

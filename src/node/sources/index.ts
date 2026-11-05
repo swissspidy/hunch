@@ -11,14 +11,21 @@ import { parseFeed } from './feed.ts';
 import { normalizeItem, parseJsonCatalog } from './json.ts';
 import { loadSitemap } from './sitemap.ts';
 
+/** The kinds of catalog source {@link loadSource} reads. */
 export type SourceKind = 'json' | 'feed' | 'sitemap' | 'module';
 
+/** Options for {@link loadSource}. */
 export interface LoadOptions {
+  /** The source's kind (default: guessed from the file name and content). */
   kind?: SourceKind;
   /** For sitemaps: stop after this many pages. */
   limit?: number;
 }
 
+/**
+ * Loads a catalog from a file or URL: JSON, RSS/Atom, a sitemap, or a local JavaScript module
+ * whose default export returns the items.
+ */
 export async function loadSource(
   source: string,
   options: LoadOptions = {},

@@ -6,23 +6,33 @@
 
 import type { EmbeddingProvider } from './types.ts';
 
+/** EmbeddingGemma, the default model: its pinned revision, sizes and prompts. */
 export const EMBEDDING_GEMMA = {
+  /** The model's id on the Hugging Face Hub. */
   id: 'onnx-community/embeddinggemma-300m-ONNX',
   /** Pinned: the vectors of a space must never change under it. */
   revision: '5090578d9565bb06545b4552f76e6bc2c93e4a66',
+  /** The model's output size. */
   nativeDims: 768,
+  /** The sizes the model was trained to be truncated to. */
   matryoshkaDims: [768, 512, 256, 128],
+  /** How an item becomes the model's input. */
   documentPrompt: 'title: {title} | text: {text}',
+  /** How a search query becomes the model's input. */
   queryPrompt: 'task: search result | query: {query}',
 } as const;
 
+/** Options for {@link transformersProvider}. */
 export interface TransformersOptions {
+  /** Model id on the Hugging Face Hub (default: EmbeddingGemma). */
   model?: string;
+  /** Pinned revision (a commit hash); required for models other than EmbeddingGemma. */
   revision?: string;
   /** Weights variant, e.g. `fp32`, `q8`, `q4` (default `q8`). */
   dtype?: string;
   /** Required for models other than EmbeddingGemma. */
   nativeDims?: number;
+  /** Template for items, `{title}` and `{text}` replaced (default: EmbeddingGemma's). */
   documentPrompt?: string;
   /** Template for search queries (`{query}`), published for the browser's query embedder. */
   queryPrompt?: string;
@@ -46,6 +56,10 @@ interface Model {
   dispose?(): Promise<unknown>;
 }
 
+/**
+ * A provider that embeds with a sentence-embedding model through Transformers.js (an optional
+ * peer dependency, imported only when an input misses the embedding cache).
+ */
 export function transformersProvider(options: TransformersOptions = {}): EmbeddingProvider {
   const isGemma = !options.model || options.model === EMBEDDING_GEMMA.id;
   const id = options.model ?? EMBEDDING_GEMMA.id;

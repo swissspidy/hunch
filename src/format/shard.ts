@@ -27,15 +27,23 @@ const FIXED_HEADER = 20;
 
 const QUANT_CODES: Record<Quantization, number> = { int8: 1, float32: 2 };
 
+/** The JSON header of a shard file. */
 export interface ShardHeader {
+  /** The embedding space of the vectors (the manifest's `space`). */
   space: string;
+  /** The items, in row order. */
   items: ShardItem[];
 }
 
+/** A decoded shard file. */
 export interface DecodedShard {
+  /** The embedding space of the vectors (the manifest's `space`). */
   space: string;
+  /** Components per vector. */
   dims: number;
+  /** How the components are stored. */
   quantization: Quantization;
+  /** The items, in row order. */
   items: ShardItem[];
   /** Row-major vector components (`items.length * dims`). */
   vectors: Int8Array | Float32Array;

@@ -8,6 +8,7 @@ const ARRAYS = new Set(['item', 'entry', 'category', 'link']);
 
 type Node = Record<string, unknown>;
 
+/** Parses an RSS 2.0, RSS 1.0 (RDF) or Atom 1.0 feed. An item's id is its `guid`, or its link. */
 export function parseFeed(xml: string): CatalogItem[] {
   const parser = new XMLParser({
     ignoreAttributes: false,
