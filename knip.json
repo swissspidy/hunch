@@ -8,11 +8,20 @@
     "src/elements/global.ts",
     "src/format/index.ts",
     "src/node/index.ts",
+    "src/astro/index.ts",
     "src/node/cli.ts",
     "scripts/*.ts",
     "test/**/*.test.ts",
-    "eval/download-mind.ts"
+    "eval/download-mind.ts",
+    "test/fixtures/astro/src/**/*.astro"
   ],
   "ignoreBinaries": ["php"],
-  "project": ["src/**/*.ts", "scripts/**/*.ts", "test/**/*.ts", "bin/*.js", "eval/**/*.ts"]
+  "project": [
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts",
+    "test/fixtures/astro/src/**/*.astro",
+    "bin/*.js",
+    "eval/**/*.ts"
+  ]
 }

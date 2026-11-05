@@ -6,13 +6,14 @@
  */
 
 import { Inkling } from '../client/index.ts';
+import { manifestOf } from './config.ts';
 import { Base } from './slots.ts';
 
 export class InklingPageElement extends Base {
   private stop: (() => void) | undefined;
 
   connectedCallback(): void {
-    const manifest = this.getAttribute('manifest');
+    const manifest = manifestOf(this);
     const item = this.getAttribute('item');
     if (!manifest || !item) return;
     let stopped = false;
