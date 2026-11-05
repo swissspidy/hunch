@@ -51,6 +51,25 @@ test('the package holds dist, bin and the docs, and no sources or tests', () => 
   );
 });
 
+test('the Astro integration loads without Astro installed', async () => {
+  assert.ok(files.includes('dist/astro/index.js'));
+  const { stdout } = await run(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `import inkling from '@swissspidy/inkling/astro';
+const integration = inkling({ provider: 'hash' });
+console.log(integration.name, Object.keys(integration.hooks).join(','));`,
+    ],
+    { cwd: project },
+  );
+  assert.equal(
+    stdout.trim(),
+    '@swissspidy/inkling astro:config:setup,astro:config:done,astro:server:setup,astro:build:done',
+  );
+});
+
 test('the installed CLI builds a catalog, and the client ranks it', async () => {
   await run(
     process.execPath,
