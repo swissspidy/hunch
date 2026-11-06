@@ -119,13 +119,15 @@ interface PhpResult {
   inputs: { input: string; hash: string }[];
   fnv1a: string;
   space: string;
+  /** What Inkling_Catalog::model() picks for the job's `weights`. */
+  model: unknown;
 }
 
 function runPhp(
   dir: string,
   catalog: readonly CatalogItem[],
   options: Options,
-  extra: { html?: string[]; inputs?: { title: string; text: string }[] } = {},
+  extra: { html?: string[]; inputs?: { title: string; text: string }[]; weights?: string } = {},
 ): PhpResult {
   const { dtype: _, ...rest } = options;
   const job = {
@@ -139,6 +141,7 @@ function runPhp(
     })),
     html: extra.html ?? [],
     inputs: extra.inputs ?? [],
+    ...(extra.weights && { weights: extra.weights }),
   };
   const out = spawnSync('php', [fileURLToPath(DRIVER)], {
     input: JSON.stringify(job),
@@ -278,5 +281,11 @@ test(
     assert.notEqual(q4Result.inputs[0]!.hash, result.inputs[0]!.hash);
     assert.equal(q4Result.space, (await runNode(await tempDir(), items, q4)).manifest.space);
     assert.notEqual(q4Result.space, result.space);
+    // The plugin's own model for each Model weights setting: the CLI's, key order included (the
+    // manifests are compared byte for byte).
+    for (const weights of ['q8', 'q4']) {
+      const picked = runPhp(await tempDir(), items, q4, { weights }).model;
+      assert.equal(JSON.stringify(picked), JSON.stringify(modelFor({ ...q4, dtype: weights })));
+    }
   },
 );
