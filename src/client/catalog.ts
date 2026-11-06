@@ -25,8 +25,13 @@ import { yieldToPage, type Pause } from './slices.ts';
 /** A `fetch`-compatible function, for the client's `fetch` option. */
 export type Fetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
-/** Rows per `dots` call between pauses: about a millisecond of work in the WebAssembly kernel. */
-const SPAN = 8192;
+/**
+ * Multiply-adds per `dots` call, between pause checks: about a millisecond in the JavaScript
+ * kernel on a slow phone. The WebAssembly kernel takes up to MAX_SPAN rows a call.
+ */
+const JS_WORK = 1 << 18;
+/** Half-lives whose recency factors are kept at once. */
+const RECENCY_CACHES = 4;
 /** Rows a run of candidates may skip and still be computed in one pass (cheaper than a call). */
 const GAP = 16;
 
@@ -51,17 +56,20 @@ export class Catalog {
   private readonly byShard = new Map<ShardRef, Int32Array>();
   private all: Int32Array | undefined;
   private scratch: Float64Array | undefined;
-  /** 2^((time - t0) / half-life) per row, for one half-life: see `recencies`. */
-  private recency:
-    | { halfLife: number; t0: number; count: number; factors: Float64Array }
-    | undefined;
+  /** 2^((time - t0) / half-life) per row, by half-life: see `recencies`. */
+  private readonly recency = new Map<
+    number,
+    { t0: number; count: number; factors: Float64Array }
+  >();
 
   private constructor(manifest: Manifest, url: URL, fetchFn: Fetch, kernel: 'wasm' | 'js') {
     this.manifest = manifest;
     this.url = url;
     this.fetch = fetchFn;
     this.store = createVectorStore(manifest.dims, manifest.quantization, kernel);
-    this.sectionIndex = new Map((manifest.sections ?? []).map((s, i) => [s, i]));
+    this.sectionIndex = new Map(
+      (Array.isArray(manifest.sections) ? manifest.sections : []).map((s, i) => [s, i]),
+    );
   }
 
   static async load(
@@ -113,6 +121,11 @@ export class Catalog {
   /** The row index of a section name (-1 when the manifest doesn't list it). */
   sectionOf(name: string): number {
     return this.sectionIndex.get(name) ?? -1;
+  }
+
+  /** Sections known so far: the manifest's, and any its shards add. */
+  get sectionCount(): number {
+    return this.sectionIndex.size;
   }
 
   /** Loads the shards of the given sections (all shards when `sections` is omitted). */
@@ -167,16 +180,20 @@ export class Catalog {
   ): Promise<void> {
     // Shared by every call: filled and read with no await in between.
     const scratch = (this.scratch ??= new Float64Array(MAX_SPAN));
-    let done = 0;
+    // Rows per call: bounded by the work, so a JavaScript call stays short however many dims.
+    const span =
+      this.store.kind === 'wasm'
+        ? MAX_SPAN
+        : Math.min(MAX_SPAN, Math.max(1, Math.floor(JS_WORK / this.manifest.dims)));
     for (let i = 0; i < rows.length;) {
-      // The run: rows ascending with small gaps, at most MAX_SPAN rows from first to last.
+      // The run: rows ascending with small gaps, at most `span` rows from first to last.
       const first = rows[i]!;
       let j = i + 1;
       while (
         j < rows.length &&
         rows[j]! > rows[j - 1]! &&
         rows[j]! - rows[j - 1]! <= GAP &&
-        rows[j]! - first < MAX_SPAN
+        rows[j]! - first < span
       ) {
         j++;
       }
@@ -186,11 +203,8 @@ export class Catalog {
         const row = rows[k]!;
         out[k] = scratch[row - first]! * this.invNorm[row]!;
       }
-      done += last + 1 - first;
-      if (done >= SPAN) {
-        done = 0;
-        await pause();
-      }
+      // The slicer yields only once its time is up: a check costs a clock read.
+      await pause();
       i = j;
     }
   }
@@ -208,15 +222,15 @@ export class Catalog {
         out[k] = recencyAt(this.time[rows[k]!]!, now, halfLifeDays);
       return;
     }
-    let cache = this.recency;
+    let cache = this.recency.get(halfLifeDays);
     // A new reference time once `now` drifts far from it, so 2^x stays in range.
-    if (!cache || cache.halfLife !== halfLifeDays || Math.abs(now - cache.t0) > 256 * ms) {
-      cache = this.recency = {
-        halfLife: halfLifeDays,
-        t0: now,
-        count: 0,
-        factors: new Float64Array(0),
-      };
+    if (!cache || Math.abs(now - cache.t0) > 256 * ms) {
+      cache = { t0: now, count: 0, factors: new Float64Array(0) };
+      // A few half-lives at once, so calls that alternate between them don't rebuild.
+      if (this.recency.size >= RECENCY_CACHES) {
+        this.recency.delete(this.recency.keys().next().value!);
+      }
+      this.recency.set(halfLifeDays, cache);
     }
     const count = this.store.count;
     if (cache.count < count) {
@@ -283,7 +297,7 @@ export class Catalog {
       this.items[row] = item;
       this.prior[row] = item.prior;
       this.time[row] = item.date ? Date.parse(item.date) : NaN;
-      this.section[row] = item.section === undefined ? -1 : this.sectionOf(item.section);
+      this.section[row] = item.section === undefined ? -1 : this.sectionId(item.section);
       // The row stays stored either way; a duplicate id is just never a candidate.
       if (this.ids.has(item.id)) return;
       this.ids.set(item.id, row);
@@ -291,6 +305,16 @@ export class Catalog {
     });
     this.byShard.set(ref, Int32Array.from(rows));
     this.all = undefined;
+  }
+
+  /**
+   * A section's index, added when the manifest doesn't list it, so filtering by section works
+   * as it did by name whatever the manifest says.
+   */
+  private sectionId(name: string): number {
+    let index = this.sectionIndex.get(name);
+    if (index === undefined) this.sectionIndex.set(name, (index = this.sectionIndex.size));
+    return index;
   }
 
   /** Makes room in the columns for `rows` rows. */

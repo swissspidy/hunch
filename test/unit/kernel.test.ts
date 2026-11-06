@@ -92,3 +92,32 @@ test('the store grows past its first allocation, and a full span works', () => {
     for (const r of [0, 1, MAX_SPAN - 1]) assert.ok(Math.abs(out[r]! - want[r]!) < 1e-2);
   }
 });
+
+test('without WebAssembly, or where it fails to compile, the store falls back to JavaScript', () => {
+  const dims = 64;
+  const data = rows(50, dims, 'int8', 5);
+  const query = Float32Array.from({ length: dims }, random(6));
+  const want = exact(query, data, dims, 50);
+  const real = globalThis.WebAssembly;
+  const g = globalThis as { WebAssembly?: typeof WebAssembly };
+  const throwing = {
+    ...real,
+    // As a Content Security Policy without 'wasm-unsafe-eval' makes it.
+    Module: function () {
+      throw new real.CompileError('WebAssembly.Module(): Refused to compile');
+    },
+  } as unknown as typeof WebAssembly;
+  for (const replacement of [undefined, throwing]) {
+    g.WebAssembly = replacement;
+    try {
+      const store = createVectorStore(dims, 'int8');
+      assert.equal(store.kind, 'js');
+      store.append(data, 50);
+      const out = new Float64Array(50);
+      store.dots(query, 0, 50, out);
+      want.forEach((w, r) => assert.ok(Math.abs(out[r]! - w) < 1e-9));
+    } finally {
+      g.WebAssembly = real;
+    }
+  }
+});

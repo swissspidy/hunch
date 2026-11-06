@@ -106,7 +106,8 @@ export function rank(
 
 /**
  * Ranks candidates from their columns: `index` in the result is the candidate's position in
- * them. It pauses between the diversity picks, so a caller can yield to the page in between
+ * them. It pauses after scoring, after choosing the pool and between the diversity picks, so a
+ * caller can yield to the page in between
  * (ADR 0008); where it pauses does not change the result. Scoring and choosing the pool run
  * over typed arrays, with objects only for the pool.
  */
@@ -139,6 +140,8 @@ export function* ranking(
     const rel = flat ? 0 : Math.min(1, Math.max(0, (sims[k]! - min) / spread));
     base[k] = wSim * rel + wPrior * priors[k]! + wRec * recencies[k]!;
   }
+  // Scoring and choosing the pool are a pass each over the candidates: pause in between.
+  yield;
   // Higher base first, then higher prior, then the earlier candidate: a strict order, so the
   // result is deterministic.
   const order = (a: number, b: number): number =>
@@ -169,6 +172,7 @@ export function* ranking(
     }
   }
   const top = kept.subarray(0, m).sort(order).subarray(0, size);
+  yield;
   const pool: Ranked[] = Array.from(top, (k) => {
     const similarity = sims[k]!;
     return {

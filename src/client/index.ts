@@ -672,7 +672,7 @@ export class Inkling {
     const { section, time } = this.catalog;
     let allowed: Uint8Array | undefined;
     if (sections) {
-      allowed = new Uint8Array(this.catalog.manifest.sections.length);
+      allowed = new Uint8Array(this.catalog.sectionCount);
       for (const name of sections) {
         const index = this.catalog.sectionOf(name);
         if (index >= 0) allowed[index] = 1;
@@ -782,6 +782,7 @@ export class Inkling {
     }
     const recencies = new Float64Array(count);
     catalog.recencies(rows, now, halfLife, recencies);
+    await pause();
     const vectors = new Map<number, Float32Array>();
     const vectorOf = (k: number): Float32Array => {
       let v = vectors.get(k);

@@ -71,7 +71,7 @@ test('rank() picks exactly what a full sort of every candidate picked', () => {
   assert.equal(cases, 60);
 });
 
-test('ranking() pauses after every MMR pick, whatever the result', () => {
+test('ranking() pauses after scoring, after the pool and after every MMR pick', () => {
   const candidates = Array.from({ length: 2000 }, (_, i) => i);
   const options = {
     n: 10,
@@ -94,8 +94,8 @@ test('ranking() pauses after every MMR pick, whatever the result', () => {
     pauses++;
     step = steps.next();
   }
-  // Scoring and choosing the pool run over typed arrays in one go; one pause per MMR pick.
-  assert.equal(pauses, 10);
+  // One pause after scoring, one after choosing the pool, and one per MMR pick.
+  assert.equal(pauses, 12);
   assert.deepEqual(step.value, rank(candidates, ranked, options));
   // Nothing to rank: no pause at all.
   const none = { similarity: [], prior: [], recency: [], pairwise: () => 0 };
@@ -188,6 +188,12 @@ test('20,000 items: same ids and scores without scheduler.yield() (new tasks ins
 
 test('20,000 items: the JavaScript kernel gives the same results as the WebAssembly one', async () => {
   assertSameResults(await rankingCalls(Inkling, new MemoryStore(), catalog, 'js'), expected);
+});
+
+test('20,000 items: a manifest without a sections list filters by section as before', async () => {
+  const { sections: _, ...manifest } = catalog.manifest;
+  const bare = { ...catalog, manifest: manifest as typeof catalog.manifest };
+  assertSameResults(await rankingCalls(Inkling, new MemoryStore(), bare), expected);
 });
 
 test('ties come in manifest order, whatever order the shards arrive in', async () => {
