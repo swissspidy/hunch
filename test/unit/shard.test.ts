@@ -175,3 +175,26 @@ test('the JavaScript SHA-256 matches node:crypto', async () => {
     );
   }
 });
+
+test('a shard holds up to 65,535 sections (0xffff means none)', () => {
+  const shard = (sections: number) =>
+    encodeShard(
+      {
+        space: 's',
+        items: Array.from({ length: sections + 1 }, (_, i) => ({
+          id: `${i}`,
+          url: '/',
+          title: '',
+          ...(i < sections ? { section: `s${i}` } : {}),
+          prior: 1,
+        })),
+      },
+      Array.from({ length: sections + 1 }, () => Float32Array.of(1)),
+      1,
+      'int8',
+    );
+  const decoded = decodeShard(copy(shard(0xffff)));
+  assert.equal(decoded.sections.length, 0xffff);
+  assert.deepEqual([...decoded.section.subarray(-2)], [0xfffe, -1]);
+  assert.throws(() => shard(0x10000), /too many sections/);
+});

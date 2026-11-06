@@ -88,23 +88,30 @@ final class Inkling_Shard {
 				throw new LengthException( sprintf( 'Inkling: row %d has %d bytes, not %d', $i, strlen( $row ), $dims * $width ) );
 			}
 		}
-		$n        = count( $items );
-		$sections = array();
-		$ids      = array();
-		$priors   = '';
-		$times    = '';
-		$lengths  = '';
-		$codes    = '';
-		$metadata = '';
+		$n             = count( $items );
+		$sections      = array();
+		$section_index = array();
+		$ids           = array();
+		$priors        = '';
+		$times         = '';
+		$lengths       = '';
+		$codes         = '';
+		$metadata      = '';
 		foreach ( $items as $i => $item ) {
 			$ids[] = (string) $item['id'];
 			$code  = self::NO_SECTION;
 			if ( isset( $item['section'] ) ) {
-				$code = array_search( (string) $item['section'], $sections, true );
-				if ( false === $code ) {
-					$code       = count( $sections );
-					$sections[] = (string) $item['section'];
+				// Keyed with a prefix, so a numeric section name stays a string key.
+				$key = 's:' . $item['section'];
+				if ( ! isset( $section_index[ $key ] ) ) {
+					// 0xffff means no section: at most 65,535 sections.
+					if ( count( $sections ) >= self::NO_SECTION ) {
+						throw new LengthException( 'Inkling: too many sections in one shard' );
+					}
+					$section_index[ $key ] = count( $sections );
+					$sections[]            = (string) $item['section'];
 				}
+				$code = $section_index[ $key ];
 			}
 			$priors .= pack( 'e', (float) $item['prior'] );
 			$times  .= self::time( isset( $item['date'] ) ? (string) $item['date'] : '' );
@@ -113,7 +120,7 @@ final class Inkling_Shard {
 			$meta      = Inkling_Format::json( $item );
 			$lengths  .= pack( 'V', strlen( $meta ) );
 			$metadata .= $meta;
-		}
+		}//end foreach
 		$json     = Inkling_Format::json(
 			array(
 				'space'    => $space,
@@ -131,9 +138,11 @@ final class Inkling_Shard {
 	}
 
 	/**
-	 * A date's time in ms since the epoch as float64 bytes, as `Date.parse()` reads ISO 8601
-	 * (`YYYY-MM-DD`, or with `THH:MM[:SS[.sss]]` and `Z` or an offset). Anything else is NaN,
-	 * as is no date.
+	 * A date's time in ms since the epoch as float64 bytes, as `Date.parse()` reads ISO 8601:
+	 * `YYYY`, `YYYY-MM` or `YYYY-MM-DD` (or a six-digit signed year), optionally followed by
+	 * `THH:MM[:SS[.sss]]` and `Z` or an offset. A day past the month's end rolls over into the
+	 * next month and `24:00` is the next midnight, as in JavaScript. Anything else is NaN, as is
+	 * no date, and so is a time without an offset (JavaScript reads it in the local time zone).
 	 *
 	 * @param string $date The item's date.
 	 * @return string 8 bytes.
@@ -141,19 +150,50 @@ final class Inkling_Shard {
 	public static function time( $date ) {
 		// The NaN JavaScript writes.
 		$nan = "\0\0\0\0\0\0\xf8\x7f";
-		if ( preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m ) ) {
-			return pack( 'e', (float) gmmktime( 0, 0, 0, (int) $m[2], (int) $m[3], (int) $m[1] ) * 1000 );
-		}
-		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}:\d{2})$/', $date, $m ) ) {
+		if ( ! preg_match( '/^([+-]\d{6}|\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}:\d{2}))?$/', $date, $m ) || '-000000' === $m[1] ) {
 			return $nan;
 		}
-		if ( (int) $m[2] < 1 || (int) $m[2] > 12 || (int) $m[3] < 1 || (int) $m[3] > 31 || (int) $m[4] > 23 || (int) $m[5] > 59 || (int) $m[6] > 59 ) {
+		$m      = array_pad( $m, 9, '' );
+		$year   = (int) $m[1];
+		$month  = '' === $m[2] ? 1 : (int) $m[2];
+		$day    = '' === $m[3] ? 1 : (int) $m[3];
+		$hour   = (int) $m[4];
+		$minute = (int) $m[5];
+		$second = (int) $m[6];
+		$ms     = '' === $m[7] ? 0 : (int) str_pad( substr( $m[7], 0, 3 ), 3, '0' );
+		$offset = 0;
+		if ( '' !== $m[8] && 'Z' !== $m[8] ) {
+			$offset_hours   = (int) substr( $m[8], 1, 2 );
+			$offset_minutes = (int) substr( $m[8], 4, 2 );
+			if ( $offset_hours > 23 || $offset_minutes > 59 ) {
+				return $nan;
+			}
+			$offset = ( '-' === $m[8][0] ? -1 : 1 ) * ( $offset_hours * 60 + $offset_minutes ) * 60000;
+		}
+		$midnight = 24 === $hour && 0 === $minute + $second + $ms;
+		if ( $month < 1 || $month > 12 || $day < 1 || $day > 31 || ( $hour > 23 && ! $midnight ) || $minute > 59 || $second > 59 ) {
 			return $nan;
 		}
-		$seconds = gmmktime( (int) $m[4], (int) $m[5], (int) $m[6], (int) $m[2], (int) $m[3], (int) $m[1] );
-		$ms      = '' === $m[7] ? 0 : (int) str_pad( substr( $m[7], 0, 3 ), 3, '0' );
-		$offset  = 'Z' === $m[8] ? 0 : ( '-' === $m[8][0] ? -1 : 1 ) * ( (int) substr( $m[8], 1, 2 ) * 3600 + (int) substr( $m[8], 4, 2 ) * 60 );
-		return pack( 'e', (float) ( ( $seconds - $offset ) * 1000 + $ms ) );
+		$ms += ( ( $hour * 60 + $minute ) * 60 + $second ) * 1000;
+		return pack( 'e', (float) ( self::days( $year, $month, $day ) * 86400000 + $ms - $offset ) );
+	}
+
+	/**
+	 * Days from 1970-01-01 to a date in the proleptic Gregorian calendar (Howard Hinnant's
+	 * `days_from_civil`), with no two-digit-year rules: a day past the month's end counts on.
+	 *
+	 * @param int $year  Year.
+	 * @param int $month Month, 1 to 12.
+	 * @param int $day   Day, 1 to 31.
+	 * @return int
+	 */
+	private static function days( $year, $month, $day ) {
+		$year -= $month <= 2 ? 1 : 0;
+		$era   = intdiv( $year >= 0 ? $year : $year - 399, 400 );
+		$yoe   = $year - $era * 400;
+		$doy   = intdiv( 153 * ( $month > 2 ? $month - 3 : $month + 9 ) + 2, 5 ) + $day - 1;
+		$doe   = $yoe * 365 + intdiv( $yoe, 4 ) - intdiv( $yoe, 100 ) + $doy;
+		return $era * 146097 + $doe - 719468;
 	}
 
 	/**

@@ -104,7 +104,8 @@ export function encodeShard(
     }
     metadata.push(encoder.encode(JSON.stringify(rest)));
   }
-  if (sections.length >= NO_SECTION) throw new RangeError('encodeShard: too many sections');
+  // 0xffff means no section: at most 65,535 sections.
+  if (sections.length > NO_SECTION) throw new RangeError('encodeShard: too many sections');
   const json = encoder.encode(
     JSON.stringify({ space: header.space, sections, ids: items.map((item) => item.id) }),
   );

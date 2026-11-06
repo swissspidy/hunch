@@ -113,4 +113,25 @@ final class ShardTest extends TestCase {
 		$this->expectException( LengthException::class );
 		Inkling_Shard::row( array( 1, 2 ), 3, 'int8' );
 	}
+
+	public function test_a_shard_holds_at_most_65535_sections() {
+		$shard = static function ( $sections ) {
+			$items = array();
+			$rows  = array();
+			for ( $i = 0; $i < $sections; $i++ ) {
+				$items[] = array(
+					'id'      => (string) $i,
+					'url'     => '/',
+					'title'   => '',
+					'section' => 's' . $i,
+					'prior'   => 1,
+				);
+				$rows[]  = "\x7f";
+			}
+			return Inkling_Shard::encode( 's', $items, $rows, 1, 'int8' );
+		};
+		$this->assertNotEmpty( $shard( 0xffff ) );
+		$this->expectException( LengthException::class );
+		$shard( 0x10000 );
+	}
 }
