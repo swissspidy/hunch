@@ -141,7 +141,7 @@ final class Inkling_Writer {
 		}
 		$manifest = array(
 			'format'        => 'inkling/manifest',
-			'formatVersion' => 1,
+			'formatVersion' => 2,
 			'version'       => $version,
 			'generatedAt'   => ( $previous && isset( $previous['version'], $previous['generatedAt'] ) && $previous['version'] === $version ) ? $previous['generatedAt'] : $now,
 			'space'         => $space,

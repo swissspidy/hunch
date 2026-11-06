@@ -4,7 +4,11 @@
  * split at `maxItems` (2,000, the build's default).
  */
 
-import type { Manifest, Quantization } from '../src/format/manifest.ts';
+import {
+  MANIFEST_FORMAT_VERSION,
+  type Manifest,
+  type Quantization,
+} from '../src/format/manifest.ts';
 import { encodeShard } from '../src/format/shard.ts';
 import { normalize } from '../src/rank/vector.ts';
 
@@ -64,7 +68,7 @@ export async function syntheticCatalog(
   return {
     manifest: {
       format: 'inkling/manifest',
-      formatVersion: 1,
+      formatVersion: MANIFEST_FORMAT_VERSION,
       version: 'bench',
       generatedAt: new Date(0).toISOString(),
       space: 'bench',

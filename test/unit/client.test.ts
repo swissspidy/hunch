@@ -113,9 +113,9 @@ test('manifests of another format are refused', async () => {
   await assert.rejects(
     Inkling.load({
       manifest: MANIFEST,
-      fetch: bad({ format: 'inkling/manifest', formatVersion: 2 }),
+      fetch: bad({ format: 'inkling/manifest', formatVersion: 3 }),
     }),
-    /format version 2/,
+    /format version 3/,
   );
   const base = {
     format: 'inkling/manifest',

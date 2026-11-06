@@ -13,8 +13,8 @@ final class ShardTest extends TestCase {
 	 * From src/format/shard.ts: `encodeShard({ space: 's', items }, vectors, 5, …)` with the
 	 * vectors truncated from 6 to 5 dims.
 	 */
-	const INT8    = '494e4b56010100000500000002000000bf0000007b227370616365223a2273222c226974656d73223a5b7b226964223a2261222c2275726c223a222f612f222c227469746c65223a22436166c3a920e2809c31e2809d222c2273656374696f6e223a22466f6f64222c2274616773223a5b2278225d2c2264617465223a22323032362d30312d30315430303a30303a30302e3030305a222c227072696f72223a317d2c7b226964223a2262222c2275726c223a222f622f222c227469746c65223a2242222c227072696f72223a302e357d5d7d005f8110203f1933b46681';
-	const FLOAT32 = '494e4b56010200000500000002000000bf0000007b227370616365223a2273222c226974656d73223a5b7b226964223a2261222c2275726c223a222f612f222c227469746c65223a22436166c3a920e2809c31e2809d222c2273656374696f6e223a22466f6f64222c2274616773223a5b2278225d2c2264617465223a22323032362d30312d30315430303a30303a30302e3030305a222c227072696f72223a317d2c7b226964223a2262222c2275726c223a222f622f222c227469746c65223a2242222c227072696f72223a302e357d5d7d00e9a20b3f8c2e3abf8c2eba3d8c2e3a3e8c2eba3e7d130a3e7d138a3e3c1dcfbe7d130a3f5d982cbf';
+	const INT8    = '494e4b56020100000500000002000000310000006d0000007b227370616365223a2273222c2273656374696f6e73223a5b22466f6f64225d2c22696473223a5b2261222c2262225d7d00000000000000000000000000f03f000000000000e03f000080aa6db77942000000000000f87f54000000190000000000ffff5f8110203f1933b466817b2275726c223a222f612f222c227469746c65223a22436166c3a920e2809c31e2809d222c2274616773223a5b2278225d2c2264617465223a22323032362d30312d30315430303a30303a30302e3030305a227d7b2275726c223a222f622f222c227469746c65223a2242227d';
+	const FLOAT32 = '494e4b56020200000500000002000000310000006d0000007b227370616365223a2273222c2273656374696f6e73223a5b22466f6f64225d2c22696473223a5b2261222c2262225d7d00000000000000000000000000f03f000000000000e03f000080aa6db77942000000000000f87f54000000190000000000ffffe9a20b3f8c2e3abf8c2eba3d8c2e3a3e8c2eba3e7d130a3e7d138a3e3c1dcfbe7d130a3f5d982cbf7b2275726c223a222f612f222c227469746c65223a22436166c3a920e2809c31e2809d222c2274616773223a5b2278225d2c2264617465223a22323032362d30312d30315430303a30303a30302e3030305a227d7b2275726c223a222f622f222c227469746c65223a2242227d';
 
 	private function items() {
 		return array(
@@ -52,14 +52,14 @@ final class ShardTest extends TestCase {
 	}
 
 	public function test_vectors_start_at_a_multiple_of_four() {
-		foreach ( array( '', 'x', 'xy', 'xyz', "\u{e9}" ) as $title ) {
-			$bytes  = Inkling_Shard::encode(
+		foreach ( array( '', 'x', 'xy', 'xyz', "\u{e9}" ) as $id ) {
+			$bytes   = Inkling_Shard::encode(
 				's',
 				array(
 					array(
-						'id'    => 'a',
+						'id'    => $id,
 						'url'   => '/',
-						'title' => $title,
+						'title' => 'T',
 						'prior' => 1,
 					),
 				),
@@ -67,10 +67,29 @@ final class ShardTest extends TestCase {
 				3,
 				'int8'
 			);
-			$header = unpack( 'V', substr( $bytes, 16, 4 ) )[1];
-			$start  = strlen( $bytes ) - 3;
-			$this->assertSame( 0, $start % 4 );
-			$this->assertSame( str_repeat( "\0", $start - 20 - $header ), substr( $bytes, 20 + $header, $start - 20 - $header ) );
+			$lengths = unpack( 'Vheader/Vmetadata', substr( $bytes, 16, 8 ) );
+			$vectors = strlen( $bytes ) - $lengths['metadata'] - 3;
+			$columns = ( 24 + $lengths['header'] + 7 ) & ~7;
+			$this->assertSame( 0, $vectors % 4 );
+			$this->assertSame( 0, $columns % 8 );
+			// One item: prior, time, metadata length, section, then padding.
+			$this->assertSame( $columns + 8 + 8 + 4 + 2 + 2, $vectors );
+		}
+	}
+
+	public function test_dates_are_read_as_date_parse_reads_them() {
+		$cases = array(
+			'2026-01-01T00:00:00.000Z'  => '000080aa6db77942',
+			'2026-01-01'                => '000080aa6db77942',
+			'2026-01-01T02:30:00+02:30' => '000080aa6db77942',
+			'2026-01-01T00:00:00.1234Z' => '00b087aa6db77942',
+			'2026-01-01T00:00Z'         => '000080aa6db77942',
+			'2026-02-30T00:00:00Z'      => '00008083bdca7942',
+			'yesterday'                 => '000000000000f87f',
+			''                          => '000000000000f87f',
+		);
+		foreach ( $cases as $date => $hex ) {
+			$this->assertSame( $hex, bin2hex( Inkling_Shard::time( $date ) ), $date );
 		}
 	}
 
