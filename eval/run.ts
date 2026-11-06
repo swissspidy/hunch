@@ -15,6 +15,9 @@
  * quantization happen at build). `name@dims` or `name@dims/quantization` in `--models` pins
  * one model to a single catalog. Neighbouring catalogs of one model are compared on nDCG@10,
  * per impression, with a standard error and a bootstrap 95% interval.
+ *
+ * `--batch-size` (default 16) sets the inputs per forward pass. Lower it if embedding runs out
+ * of memory: q4 weights keep the token embeddings unquantized and need more.
  */
 
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
@@ -36,6 +39,7 @@ const { values } = parseArgs({
     dataset: { type: 'string', default: 'synthetic' },
     'mind-dir': { type: 'string' },
     impressions: { type: 'string', default: '2000' },
+    'batch-size': { type: 'string', default: '16' },
     models: { type: 'string' },
     /** Comma-separated; default 256 for MIND, each synthetic model's own size. */
     dims: { type: 'string' },
@@ -83,6 +87,7 @@ const VARIANTS: Record<string, [string, RankOptions]> = {
   diversity: ['profile + popularity + diversity 0.2', { prior: 'catalog' }],
 };
 
+const batchSize = positiveInt(values['batch-size'], '--batch-size');
 let dataset: Dataset;
 let available: Record<string, Model>;
 let defaultModels: string;
@@ -100,7 +105,7 @@ if (values.dataset === 'synthetic') {
   dataset = await loadMind({ dir: values['mind-dir'], impressions: Number(values.impressions) });
   const gemma = (dtype: string): Model => ({
     name: `EmbeddingGemma ${dtype}`,
-    provider: () => transformersProvider({ dtype, batchSize: 16 }),
+    provider: () => transformersProvider({ dtype, batchSize }),
     defaultDims: 256,
   });
   available = {

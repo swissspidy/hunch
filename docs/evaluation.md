@@ -148,7 +148,12 @@ bootstrap 95% interval (2,000 resamples of impressions).
   q4 as an option; q8 stays the default until more than one dataset says otherwise.
 - **The q4 row measured `model_q4`, which browsers can't run.** q4 now means
   `model_no_gather_q4` ([ADR 0005](adr/0005-query-embedding.md)), whose vectors are within cosine
-  0.998 of `model_q4`'s on the test posts.
+  0.998 of `model_q4`'s. On the same 10,000 impressions it scores 0.3904 nDCG@10 at 256/int8
+  (default weights; profile only: 0.3881), against 0.3856 for q8: **+0.0048** (standard error
+  0.0010, 95% interval +0.0029 to +0.0068), about the gain `model_q4` showed (+0.0054). So the
+  browser file costs nothing either. Its embedding needed `--batch-size 2`: with 16 long
+  inputs per pass, its unquantized token embeddings took the process past 14 GB. Results:
+  [`mind-q4-browser-10k.json`](../eval/results/mind-q4-browser-10k.json).
 - **Model switch:** histories recorded on the `hash` catalog and ranked on EmbeddingGemma's
   matched a fresh profile in **10,000 of 10,000** impressions.
 
