@@ -3,10 +3,8 @@
  * decoding yield to the page between slices; where the slices fall never changes a result.
  */
 
-/** A ranking yields to the page once it has run this long… */
+/** A ranking yields to the page once it has run this long. */
 const SLICE_MS = 10;
-/** …checked every this many candidates. */
-export const SLICE_ITEMS = 512;
 
 /**
  * Lets the page handle input and render: through `scheduler.yield()` where there is one (the

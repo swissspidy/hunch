@@ -1,8 +1,12 @@
 /**
  * Ranking calls on a large synthetic catalog, for the test that slicing (ADR 0008) leaves every
  * result as it was. `test/fixtures/large-catalog.json` holds what the client returned for them
- * before ranking was sliced.
+ * before ranking was sliced, and `assertSameResults` compares with it: the same ids, and the
+ * same scores to within 1e-8 (the similarity kernel's arithmetic differs from the old code's
+ * float64 sums in the last bits, ADR 0010).
  */
+
+import assert from 'node:assert/strict';
 
 import type { Inkling, SignalStore } from '../../src/client/index.ts';
 import type { SyntheticCatalog } from '../../scripts/synthetic.ts';
@@ -27,6 +31,7 @@ export async function rankingCalls(
   Client: Client,
   store: SignalStore,
   catalog: SyntheticCatalog,
+  kernel?: 'wasm' | 'js',
 ): Promise<Result[]> {
   const fetchFn = (input: string | URL) => {
     const path = new URL(input).pathname.slice(1);
@@ -42,6 +47,7 @@ export async function rankingCalls(
     consent: true,
     store,
     now: () => NOW,
+    ...(kernel && { kernel }),
   });
   const id = (i: number) => `s${i % SECTIONS}-item-${Math.floor(i / SECTIONS)}`;
   const results: Result[] = [];
@@ -72,4 +78,18 @@ export async function rankingCalls(
   const ranked = await ink.rank(list);
   results.push({ call: 'rank', ids: ranked, scores: [] });
   return results;
+}
+
+/** The same ids in the same order, and scores within 1e-8 of the expected ones. */
+export function assertSameResults(actual: Result[], expected: Result[]): void {
+  assert.deepEqual(
+    actual.map((r) => [r.call, r.ids]),
+    expected.map((r) => [r.call, r.ids]),
+  );
+  actual.forEach((r, i) => {
+    r.scores.forEach((score, k) => {
+      const want = expected[i]!.scores[k]!;
+      assert.ok(Math.abs(score - want) < 1e-8, `${r.call} #${k}: ${score} vs ${want}`);
+    });
+  });
 }

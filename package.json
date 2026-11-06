@@ -82,7 +82,8 @@
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",
     "bench": "node scripts/bench.ts",
     "eval": "node eval/run.ts",
-    "wordpress:build": "node scripts/wordpress.ts"
+    "wordpress:build": "node scripts/wordpress.ts",
+    "kernel": "node scripts/kernel.ts"
   },
   "dependencies": {
     "fast-xml-parser": "^5.12.0"
@@ -100,7 +101,8 @@
     "oxlint": "^1.91.0",
     "oxlint-tsgolint": "^7.0.2005",
     "playwright-core": "1.63.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "wabt": "^1.0.37"
   },
   "peerDependencies": {
     "@huggingface/transformers": "^4.3.2",

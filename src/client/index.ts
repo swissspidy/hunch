@@ -11,9 +11,9 @@
 import type { Manifest, ShardItem } from '../format/manifest.ts';
 import { DEFAULT_WEIGHTS, ranking, recency, type ScoreWeights } from '../rank/rank.ts';
 import { normalize } from '../rank/vector.ts';
-import { Catalog, type Entry, type Fetch } from './catalog.ts';
+import { Catalog, type Fetch } from './catalog.ts';
 import { buildProfile, profileSimilarity, type Profile } from './profile.ts';
-import { SLICE_ITEMS, slicer, type Pause } from './slices.ts';
+import { slicer, type Pause } from './slices.ts';
 import {
   aggregate,
   dwellWeight,
@@ -56,6 +56,12 @@ export interface InklingOptions {
   fetch?: Fetch;
   /** Clock, in epoch milliseconds (tests). */
   now?: () => number;
+  /**
+   * The similarity kernel: WebAssembly SIMD where the browser runs it (the default, `'wasm'`),
+   * else plain JavaScript; `'js'` forces JavaScript. Both give the same results to within
+   * float32 rounding (ADR 0010).
+   */
+  kernel?: 'wasm' | 'js';
 }
 
 /** Options every ranking method takes. */
@@ -242,7 +248,7 @@ export class Inkling {
       }
     }
     const fetchFn = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
-    const catalog = await Catalog.load(options.manifest, fetchFn);
+    const catalog = await Catalog.load(options.manifest, fetchFn, options.kernel);
     return new Inkling(catalog, options);
   }
 
@@ -275,9 +281,19 @@ export class Inkling {
     return this.catalog.manifest;
   }
 
+  /**
+   * Which similarity kernel runs: `'wasm'` (WebAssembly SIMD) or `'js'`, where the browser has
+   * no WebAssembly SIMD, a Content Security Policy forbids compiling WebAssembly (it needs
+   * `'wasm-unsafe-eval'`), or the catalog isn't int8.
+   */
+  get kernel(): 'wasm' | 'js' {
+    return this.catalog.kernel;
+  }
+
   /** Looks up an item's published metadata. */
   async item(id: string, sectionHint?: string): Promise<ShardItem | undefined> {
-    return (await this.catalog.find(id, sectionHint))?.item;
+    const row = await this.catalog.find(id, sectionHint);
+    return row === undefined ? undefined : this.catalog.item(row);
   }
 
   // Related items ----------------------------------------------------------------------------
@@ -288,20 +304,16 @@ export class Inkling {
    */
   async related(itemId: string, options: RelatedOptions = {}): Promise<Recommendation[]> {
     const target = await this.catalog.find(itemId, options.sectionHint);
-    if (!target) return [];
+    if (target === undefined) return [];
+    const section = this.catalog.item(target).section;
     const sections =
-      options.sections === 'same'
-        ? target.item.section === undefined
-          ? []
-          : [target.item.section]
-        : options.sections;
+      options.sections === 'same' ? (section === undefined ? [] : [section]) : options.sections;
     await this.catalog.loadSections(sections);
-    const exclude = new Set(options.exclude);
-    exclude.add(itemId);
     const pause = slicer();
-    const pool = await this.candidates(sections, (e) => !exclude.has(e.item.id), pause);
-    const query = this.catalog.vector(target);
-    return this.rankEntries(pool, (e) => this.catalog.cosine(query, e), 1, options, pause);
+    const rows = this.candidates(sections, this.skipped([...(options.exclude ?? []), itemId]));
+    const sims = new Float64Array(rows.length);
+    await this.catalog.cosines(this.catalog.vector(target), rows, sims, pause);
+    return this.rankRows(rows, sims, 1, options, pause);
   }
 
   // Personalization --------------------------------------------------------------------------
@@ -373,19 +385,10 @@ export class Inkling {
   async recommend(options: RecommendOptions = {}): Promise<Recommendation[]> {
     const personal = await this.personal();
     await this.catalog.loadSections(options.sections);
-    const exclude = new Set(options.exclude);
-    const after = options.after;
     const pause = slicer();
-    const pool = await this.candidates(
-      options.sections,
-      (e) => {
-        const agg = personal.aggregates.get(e.item.id);
-        if (after !== undefined && !(Date.parse(e.item.date ?? '') > after)) return false;
-        return !exclude.has(e.item.id) && !agg?.hidden && (options.includeSeen || !agg?.seen);
-      },
-      pause,
-    );
-    return this.rankPersonal(pool, personal, options, pause);
+    const skip = this.skipped(options.exclude, personal, !options.includeSeen);
+    const rows = this.candidates(options.sections, skip, options.after);
+    return this.rankPersonal(rows, personal, options, pause);
   }
 
   /**
@@ -411,22 +414,21 @@ export class Inkling {
     // Signals (with consent) for hidden and seen items, and the profile when personalizing.
     const personal = await this.personal(personalize > 0);
     await this.catalog.loadSections(options.sections);
-    const exclude = new Set(options.exclude);
     const pause = slicer();
-    const pool = await this.candidates(
-      options.sections,
-      (e) => {
-        const agg = personal.aggregates.get(e.item.id);
-        return !exclude.has(e.item.id) && !agg?.hidden && !(options.excludeSeen && agg?.seen);
-      },
-      pause,
-    );
+    const skip = this.skipped(options.exclude, personal, options.excludeSeen === true);
+    const rows = this.candidates(options.sections, skip);
+    const sims = new Float64Array(rows.length);
+    await this.catalog.cosines(vector, rows, sims, pause);
     const weight = personal.profile.positive ? personalize : 0;
-    return this.rankEntries(
-      pool,
-      (e) =>
-        (1 - weight) * this.catalog.cosine(vector, e) +
-        weight * this.profileSimilarity(personal.profile, e),
+    if (weight > 0) {
+      const profile = await this.profileSimilarities(personal.profile, rows, pause);
+      for (let k = 0; k < rows.length; k++) {
+        sims[k] = (1 - weight) * sims[k]! + weight * profile[k]!;
+      }
+    }
+    return this.rankRows(
+      rows,
+      sims,
       1,
       { diversity: 0, ...options, weights: { recency: 0, ...options.weights } },
       pause,
@@ -483,23 +485,24 @@ export class Inkling {
     } = {},
   ): Promise<string[]> {
     const personal = await this.personal();
-    const entries = await Promise.all(ids.map((id) => this.catalog.find(id)));
-    const known: Entry[] = [];
+    const found = await Promise.all(ids.map((id) => this.catalog.find(id)));
+    const known: number[] = [];
     const unknown: string[] = [];
     const hidden: string[] = [];
     ids.forEach((id, i) => {
+      const row = found[i];
       if (personal.aggregates.get(id)?.hidden) hidden.push(id);
-      else if (entries[i]) known.push(entries[i]);
+      else if (row !== undefined) known.push(row);
       else unknown.push(id);
     });
     // By default the site's list is the cold-start order: its positions are the prior.
-    const position = new Map(known.map((e, i) => [e.item.id, 1 - i / known.length]));
+    const position = Float64Array.from(known, (_, i) => 1 - i / known.length);
     const ranked = await this.rankPersonal(
-      known,
+      Int32Array.from(known),
       personal,
       { ...options, n: known.length },
       slicer(),
-      options.prior === 'catalog' ? undefined : (e) => position.get(e.item.id)!,
+      options.prior === 'catalog' ? undefined : position,
     );
     return [...ranked.map((r) => r.id), ...unknown, ...hidden];
   }
@@ -509,19 +512,20 @@ export class Inkling {
     itemId: string,
     options: { recencyHalfLifeDays?: number } = {},
   ): Promise<ItemExplanation | undefined> {
-    const entry = await this.catalog.find(itemId);
-    if (!entry) return undefined;
+    const row = await this.catalog.find(itemId);
+    if (row === undefined) return undefined;
+    const item = this.catalog.item(row);
     const personal = await this.personal();
     const agg = personal.aggregates.get(itemId);
     return {
       id: itemId,
-      similarity: this.profileSimilarity(personal.profile, entry),
+      similarity: this.profileSimilarity(personal.profile, row),
       confidence: personal.profile.confidence,
-      prior: entry.item.prior,
-      recency: recency(entry.item.date, this.now(), options.recencyHalfLifeDays ?? 30),
+      prior: item.prior,
+      recency: recency(item.date, this.now(), options.recencyHalfLifeDays ?? 30),
       hidden: agg?.hidden ?? false,
       seen: agg?.seen ?? false,
-      because: this.because(personal.profile, entry),
+      because: this.because(personal.profile, row),
       signals: personal.signals,
       missing: personal.profile.missing.length,
     };
@@ -622,54 +626,98 @@ export class Inkling {
     const aggregates = aggregate(signals, this.now(), this.options.signalHalfLifeDays ?? 21);
     if (!withProfile) return { aggregates, profile: NO_PROFILE, signals: signals.length };
     // The shards of every item with signals, so the profile sees all of them.
-    const entries = new Map<string, Entry | undefined>();
+    const rows = new Map<string, number | undefined>();
     await Promise.all(
-      [...aggregates.keys()].map(async (id) => entries.set(id, await this.catalog.find(id))),
+      [...aggregates.keys()].map(async (id) => rows.set(id, await this.catalog.find(id))),
     );
     const profile = buildProfile(
       aggregates,
       (id) => {
-        const entry = entries.get(id);
-        return entry && this.catalog.vector(entry);
+        const row = rows.get(id);
+        return row === undefined ? undefined : this.catalog.vector(row);
       },
       this.catalog.manifest.dims,
     );
     return { aggregates, profile, signals: signals.length };
   }
 
-  /** The loaded entries in `sections` that `keep` keeps, in slices (ADR 0008). */
-  private async candidates(
+  /**
+   * Rows never to rank: the excluded ids, the visitor's hidden items and, with `seen`, the ones
+   * they have seen. A byte per row, so selecting candidates reads no strings.
+   */
+  private skipped(exclude: Iterable<string> = [], personal?: Personal, seen = false): Uint8Array {
+    const skip = new Uint8Array(this.catalog.prior.length);
+    for (const id of exclude) {
+      const row = this.catalog.get(id);
+      if (row !== undefined) skip[row] = 1;
+    }
+    for (const [id, agg] of personal?.aggregates ?? []) {
+      if (!agg.hidden && !(seen && agg.seen)) continue;
+      const row = this.catalog.get(id);
+      if (row !== undefined) skip[row] = 1;
+    }
+    return skip;
+  }
+
+  /**
+   * The loaded rows in `sections`, in manifest order, minus `skip` and, with `after`, minus
+   * items published at or before it.
+   */
+  private candidates(
     sections: readonly string[] | undefined,
-    keep: (e: Entry) => boolean,
-    pause: Pause,
-  ): Promise<Entry[]> {
+    skip: Uint8Array,
+    after?: number,
+  ): Int32Array {
     const all = this.catalog.loaded();
-    const pool: Entry[] = [];
-    for (let from = 0; from < all.length; from += SLICE_ITEMS) {
-      await pause();
-      for (const e of all.slice(from, from + SLICE_ITEMS)) {
-        if (
-          keep(e) &&
-          (!sections || (e.item.section !== undefined && sections.includes(e.item.section)))
-        ) {
-          pool.push(e);
-        }
+    const { section, time } = this.catalog;
+    let allowed: Uint8Array | undefined;
+    if (sections) {
+      allowed = new Uint8Array(this.catalog.sectionCount);
+      for (const name of sections) {
+        const index = this.catalog.sectionOf(name);
+        if (index >= 0) allowed[index] = 1;
       }
     }
-    return pool;
+    const rows = new Int32Array(all.length);
+    let count = 0;
+    for (let k = 0; k < all.length; k++) {
+      const row = all[k]!;
+      if (skip[row]) continue;
+      if (allowed && !(section[row]! >= 0 && allowed[section[row]!])) continue;
+      if (after !== undefined && !(time[row]! > after)) continue;
+      rows[count++] = row;
+    }
+    return rows.subarray(0, count);
   }
 
-  private profileSimilarity(profile: Profile, entry: Entry): number {
+  /** sim(c) to the visitor's profile for each of `rows` (0 without a profile). */
+  private async profileSimilarities(
+    profile: Profile,
+    rows: Int32Array,
+    pause: Pause,
+  ): Promise<Float64Array> {
+    const sims = new Float64Array(rows.length);
+    if (!profile.positive) return sims;
+    await this.catalog.cosines(profile.positive, rows, sims, pause);
+    if (profile.negative) {
+      const negative = new Float64Array(rows.length);
+      await this.catalog.cosines(profile.negative, rows, negative, pause);
+      for (let k = 0; k < rows.length; k++) sims[k] = profileSimilarity(sims[k]!, negative[k]!);
+    }
+    return sims;
+  }
+
+  private profileSimilarity(profile: Profile, row: number): number {
     if (!profile.positive) return 0;
-    const neg = profile.negative ? this.catalog.cosine(profile.negative, entry) : 0;
-    return profileSimilarity(this.catalog.cosine(profile.positive, entry), neg);
+    const neg = profile.negative ? this.catalog.cosine(profile.negative, row) : 0;
+    return profileSimilarity(this.catalog.cosine(profile.positive, row), neg);
   }
 
-  /** The profile items with the largest score × similarity to `entry`, top three. */
-  private because(profile: Profile, entry: Entry): Because[] {
+  /** The profile items with the largest score × similarity to `row`, top three. */
+  private because(profile: Profile, row: number): Because[] {
     const parts = profile.contributors.map((c) => ({
       c,
-      part: c.score * Math.max(0, this.catalog.cosine(c.vector, entry)),
+      part: c.score * Math.max(0, this.catalog.cosine(c.vector, row)),
     }));
     const total = parts.reduce((sum, p) => sum + p.part, 0);
     if (total <= 0) return [];
@@ -678,24 +726,25 @@ export class Inkling {
       .sort((a, b) => b.part - a.part)
       .slice(0, 3)
       .map(({ c, part }) => {
-        const item = this.catalog.get(c.itemId)!.item;
+        const item = this.catalog.item(this.catalog.get(c.itemId)!);
         return { id: item.id, title: item.title, url: item.url, share: part / total };
       });
   }
 
   private async rankPersonal(
-    pool: Entry[],
+    rows: Int32Array,
     personal: Personal,
     options: RankingOptions,
     pause: Pause,
-    prior?: (e: Entry) => number,
+    prior?: ArrayLike<number>,
   ): Promise<Recommendation[]> {
     const { profile } = personal;
     // Without a profile the site's order stands as it is: no recency, no reshuffling.
     const cold = profile.confidence === 0;
-    const recs = await this.rankEntries(
-      pool,
-      (e) => this.profileSimilarity(profile, e),
+    const sims = await this.profileSimilarities(profile, rows, pause);
+    const recs = await this.rankRows(
+      rows,
+      sims,
       profile.confidence,
       cold ? { ...options, diversity: 0, weights: { ...options.weights, recency: 0 } } : options,
       pause,
@@ -708,39 +757,50 @@ export class Inkling {
   }
 
   /**
-   * Ranks `pool`. Scoring runs in slices, and `pause` yields to the page between them, so a
-   * large catalog does not block input (ADR 0008). Where the slices fall does not change the
-   * result.
+   * Ranks `rows` given each one's similarity to the query. The columns are gathered once; the
+   * diversity picks pause between them (ADR 0008). Where it pauses does not change the result.
    */
-  private async rankEntries(
-    pool: Entry[],
-    similarity: (e: Entry) => number,
+  private async rankRows(
+    rows: Int32Array,
+    similarity: Float64Array,
     confidence: number,
     options: RankingOptions,
     pause: Pause,
-    prior: (e: Entry) => number = (e) => e.item.prior,
+    prior?: ArrayLike<number>,
   ): Promise<Recommendation[]> {
     const n = options.n ?? 5;
     const now = this.now();
     const halfLife = options.recencyHalfLifeDays ?? 30;
+    const { catalog } = this;
+    // Gathered with plain loops: `Float64Array.from(rows, fn)` iterates, many times slower.
+    const count = rows.length;
+    let priors = prior;
+    if (!priors) {
+      const gathered = new Float64Array(count);
+      for (let k = 0; k < count; k++) gathered[k] = catalog.prior[rows[k]!]!;
+      priors = gathered;
+    }
+    const recencies = new Float64Array(count);
+    catalog.recencies(rows, now, halfLife, recencies);
+    await pause();
     const vectors = new Map<number, Float32Array>();
-    const vectorOf = (i: number): Float32Array => {
-      let v = vectors.get(i);
-      if (!v) vectors.set(i, (v = this.catalog.vector(pool[i]!)));
+    const vectorOf = (k: number): Float32Array => {
+      let v = vectors.get(k);
+      if (!v) vectors.set(k, (v = catalog.vector(rows[k]!)));
       return v;
     };
+    const w = { ...DEFAULT_WEIGHTS, ...options.weights };
     const steps = ranking(
-      pool.map((_, i) => i),
       {
-        similarity: (i) => similarity(pool[i]!),
-        prior: (i) => prior(pool[i]!),
-        recency: (i) => recency(pool[i]!.item.date, now, halfLife),
-        pairwise: (i, j) => this.catalog.cosine(vectorOf(j), pool[i]!),
+        similarity,
+        prior: priors,
+        recency: recencies,
+        pairwise: (i, j) => catalog.cosine(vectorOf(j), rows[i]!),
       },
       {
         n,
         confidence,
-        weights: { ...DEFAULT_WEIGHTS, ...options.weights },
+        weights: w,
         diversity: options.diversity ?? 0.2,
         poolSize: Math.max(4 * n, 50),
       },
@@ -750,10 +810,8 @@ export class Inkling {
       await pause();
       step = steps.next();
     }
-    const ranked = step.value;
-    const w = { ...DEFAULT_WEIGHTS, ...options.weights };
-    return ranked.map((r) => ({
-      ...pool[r.index]!.item,
+    return step.value.map((r) => ({
+      ...catalog.item(rows[r.index]!),
       score: r.score,
       why: {
         similarityShare: share(
