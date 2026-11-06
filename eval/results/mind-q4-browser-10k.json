@@ -1,0 +1,122 @@
+{
+  "dataset": "MIND small (dev, 10000 impressions)",
+  "impressions": 10000,
+  "items": 24784,
+  "rows": [
+    {
+      "ranker": "random",
+      "metrics": {
+        "auc": 0.5016238529300224,
+        "mrr": 0.2219476089428148,
+        "ndcg5": 0.2265205918685054,
+        "ndcg10": 0.2883836060888026,
+        "recall10": 0.5205786566211161
+      }
+    },
+    {
+      "ranker": "popularity",
+      "metrics": {
+        "auc": 0.5368006646222039,
+        "mrr": 0.2384943965457898,
+        "ndcg5": 0.24582037560926404,
+        "ndcg10": 0.309969260167377,
+        "recall10": 0.548849042623999
+      }
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (256 dims): profile only",
+      "catalog": "EmbeddingGemma q8 (256 dims)",
+      "metrics": {
+        "auc": 0.6219945668059614,
+        "mrr": 0.2963790145759637,
+        "ndcg5": 0.3256193577149821,
+        "ndcg10": 0.38243551996475394,
+        "recall10": 0.6271328442390435
+      },
+      "rankMs": 1.5675207939000093
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q8 (256 dims): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q8 (256 dims)",
+      "metrics": {
+        "auc": 0.6267832123875806,
+        "mrr": 0.29890076693100326,
+        "ndcg5": 0.3289339477620782,
+        "ndcg10": 0.38563820923745806,
+        "recall10": 0.631134233127932
+      },
+      "rankMs": 1.5284473511000127
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q4 (256 dims): profile only",
+      "catalog": "EmbeddingGemma q4 (256 dims)",
+      "metrics": {
+        "auc": 0.6240877886613784,
+        "mrr": 0.3005306405004264,
+        "ndcg5": 0.33207620954398215,
+        "ndcg10": 0.3880996805092201,
+        "recall10": 0.6332295607170093
+      },
+      "rankMs": 1.5632418003991246
+    },
+    {
+      "ranker": "Inkling, EmbeddingGemma q4 (256 dims): profile + popularity (default weights)",
+      "catalog": "EmbeddingGemma q4 (256 dims)",
+      "metrics": {
+        "auc": 0.6289165855796706,
+        "mrr": 0.3026708663855212,
+        "ndcg5": 0.33343449636958,
+        "ndcg10": 0.3904084014555326,
+        "recall10": 0.6356208702408186
+      },
+      "rankMs": 1.5300445572963917
+    }
+  ],
+  "modelSwitch": {
+    "identical": 10000,
+    "total": 10000
+  },
+  "catalogs": [
+    {
+      "label": "EmbeddingGemma q8 (256 dims)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q8",
+      "dims": 256,
+      "quantization": "int8",
+      "default": true,
+      "items": 24784,
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 11690392,
+      "manifestBytes": 5393,
+      "bytesPerItem": 471.6910910264687,
+      "buildSeconds": 1.1651448179999997
+    },
+    {
+      "label": "EmbeddingGemma q4 (256 dims)",
+      "model": "onnx-community/embeddinggemma-300m-ONNX",
+      "dtype": "q4",
+      "dims": 256,
+      "quantization": "int8",
+      "default": true,
+      "items": 24784,
+      "embedded": 24647,
+      "cached": 137,
+      "shardBytes": 11690828,
+      "manifestBytes": 5445,
+      "bytesPerItem": 471.70868302130407,
+      "buildSeconds": 6175.352428117
+    }
+  ],
+  "comparisons": [
+    {
+      "a": "EmbeddingGemma q8 (256 dims)",
+      "b": "EmbeddingGemma q4 (256 dims)",
+      "metric": "ndcg10",
+      "variant": "profile + popularity (default weights)",
+      "mean": 0.0047701922180732595,
+      "stderr": 0.0010017707889569247,
+      "ci95": [0.002868525101074377, 0.006794971388890087]
+    }
+  ]
+}

@@ -33,6 +33,8 @@ node eval/run.ts --dataset mind --mind-dir eval/.data/mind --impressions 10000 \
 - `name@dims` or `name@dims/quantization` in `--models` gives that model one catalog only.
   Models: `hash`, `gemma` (q8 weights, the CLI's default), `gemma-q4`, `gemma-fp32`.
 - `--variants` picks the rankings run per catalog: `profile`, `default`, `diversity`.
+- `--batch-size` (default 16) sets the inputs per forward pass. `gemma-q4` needs 2 on a 16 GB
+  machine: its token embeddings are unquantized, and 16 long inputs took the process past 14 GB.
 - The results file then also lists each catalog's size (shard bytes per item, manifest bytes),
   the mean `rank()` time per impression, and paired comparisons of neighbouring catalogs of a
   model (adjacent sizes, int8 vs float32, weights variants): the mean nDCG@10 difference over
