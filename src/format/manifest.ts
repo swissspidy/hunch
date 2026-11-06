@@ -20,8 +20,13 @@ export interface ModelInfo {
   id: string;
   /** Pinned revision (a commit hash for Hugging Face models). */
   revision: string;
-  /** Weights variant the build ran with (e.g. `q8`); informational. */
+  /** Weights variant the build ran with (e.g. `q8`); part of the space. */
   dtype?: string;
+  /**
+   * The ONNX file, when not the model's default one (Transformers.js's `model_file_name`, e.g.
+   * `model_no_gather` for EmbeddingGemma's q4 weights, which browsers can run). Part of the space.
+   */
+  file?: string;
   /** The model's own output size before Matryoshka truncation. */
   nativeDims: number;
   /** Template used to turn an item into the model's input, `{title}` and `{text}` replaced. */
@@ -103,7 +108,8 @@ export interface ShardItem {
 /** Builds the `space` string. Changing any part of it means vectors are incomparable. */
 export function spaceKey(model: ModelInfo, dims: number): string {
   const dtype = model.dtype ? `|dtype=${model.dtype}` : '';
-  return `${model.id}@${model.revision}${dtype}|native=${model.nativeDims}|dims=${dims}|prompt=${fnv1a(model.documentPrompt)}`;
+  const file = model.file ? `|file=${model.file}` : '';
+  return `${model.id}@${model.revision}${dtype}${file}|native=${model.nativeDims}|dims=${dims}|prompt=${fnv1a(model.documentPrompt)}`;
 }
 
 /** Throws unless `value` looks like a manifest this version of Inkling can read. */

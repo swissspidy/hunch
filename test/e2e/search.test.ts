@@ -46,6 +46,8 @@ test('a text search is embedded and ranked in the browser, and the query is not 
     id: 'onnx-community/embeddinggemma-300m-ONNX',
     revision: '5090578d9565bb06545b4552f76e6bc2c93e4a66',
     dtype: 'q4',
+    // Browsers can't run model_q4 (GatherBlockQuantized): the q4 file they can run.
+    model_file_name: 'model_no_gather',
   });
   assert.deepEqual(
     await page.evaluate(() => (globalThis as unknown as { __inputs: unknown }).__inputs),

@@ -25,7 +25,7 @@
     let embedded = 0;
     let failed = 0;
     try {
-      status.value = 'Loading the model in this browser (the first time, about 300 MB)…';
+      status.value = 'Loading the model in this browser (the first time, 200 to 300 MB)…';
       await window.inklingEmbed.load();
       for (;;) {
         if (stopping) break;

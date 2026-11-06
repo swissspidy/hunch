@@ -142,7 +142,13 @@ bootstrap 95% interval (2,000 resamples of impressions).
   as "q4 costs nothing here" rather than as a reason to expect gains elsewhere. It needs its
   own embedding pass (24,647 inputs took 52 minutes on 4 busy CPUs), and the dtype is part of
   the embedding space, so switching is a model switch: signals carry over, vectors are
-  re-embedded. A browser query embedder must use the same weights.
+  re-embedded. Every document vector in a catalog must come from the same weights; a query
+  embedder may use a smaller variant ([ADR 0005](adr/0005-query-embedding.md): q4 and q8 query
+  vectors have cosine 0.98). The CLI (`--dtype q4`) and the WordPress plugin (Model weights) offer
+  q4 as an option; q8 stays the default until more than one dataset says otherwise.
+- **The q4 row measured `model_q4`, which browsers can't run.** q4 now means
+  `model_no_gather_q4` ([ADR 0005](adr/0005-query-embedding.md)), whose vectors are within cosine
+  0.998 of `model_q4`'s on the test posts.
 - **Model switch:** histories recorded on the `hash` catalog and ranked on EmbeddingGemma's
   matched a fresh profile in **10,000 of 10,000** impressions.
 

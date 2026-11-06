@@ -20,6 +20,13 @@ export const EMBEDDING_GEMMA = {
   documentPrompt: 'title: {title} | text: {text}',
   /** How a search query becomes the model's input. */
   queryPrompt: 'task: search result | query: {query}',
+  /**
+   * The ONNX file per weights variant, where it isn't the default one. The q4 file quantizes
+   * the token embeddings with an operator browsers' ONNX Runtime lacks (GatherBlockQuantized);
+   * `model_no_gather_q4` keeps them unquantized, runs everywhere, and gives the same vectors in
+   * Node and in the browser, so the CLI and the WordPress plugin can share a q4 catalog.
+   */
+  files: { q4: 'model_no_gather' } as Record<string, string | undefined>,
 } as const;
 
 /** Options for {@link transformersProvider}. */
@@ -30,6 +37,11 @@ export interface TransformersOptions {
   revision?: string;
   /** Weights variant, e.g. `fp32`, `q8`, `q4` (default `q8`). */
   dtype?: string;
+  /**
+   * The ONNX file (Transformers.js's `model_file_name`), when not the default `model`. For
+   * EmbeddingGemma's q4 weights it defaults to `model_no_gather`, which browsers can run.
+   */
+  file?: string;
   /** Required for models other than EmbeddingGemma. */
   nativeDims?: number;
   /** Template for items, `{title}` and `{text}` replaced (default: EmbeddingGemma's). */
@@ -68,6 +80,7 @@ export function transformersProvider(options: TransformersOptions = {}): Embeddi
   const nativeDims = options.nativeDims ?? (isGemma ? EMBEDDING_GEMMA.nativeDims : undefined);
   if (!nativeDims) throw new Error(`Give the output size of ${id} (--native-dims <n>)`);
   const dtype = options.dtype ?? 'q8';
+  const file = options.file ?? (isGemma ? EMBEDDING_GEMMA.files[dtype] : undefined);
   const batchSize = options.batchSize ?? 8;
   let loaded: Promise<{ tokenizer: Tokenizer; model: Model }> | undefined;
 
@@ -85,7 +98,11 @@ export function transformersProvider(options: TransformersOptions = {}): Embeddi
     }
     const [tokenizer, model] = await Promise.all([
       mod.AutoTokenizer.from_pretrained(id, { revision }),
-      mod.AutoModel.from_pretrained(id, { revision, dtype }),
+      mod.AutoModel.from_pretrained(id, {
+        revision,
+        dtype,
+        ...(file && { model_file_name: file }),
+      }),
     ]);
     return { tokenizer, model };
   };
@@ -95,6 +112,7 @@ export function transformersProvider(options: TransformersOptions = {}): Embeddi
       id,
       revision,
       dtype,
+      ...(file && { file }),
       nativeDims,
       documentPrompt:
         options.documentPrompt ?? (isGemma ? EMBEDDING_GEMMA.documentPrompt : '{title}\n{text}'),

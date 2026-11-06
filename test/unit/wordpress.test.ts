@@ -104,6 +104,13 @@ interface Options {
   quantization: Quantization;
   shardBy?: 'section' | 'none';
   maxShardItems?: number;
+  /** The weights variant (default: the CLI's, q8). */
+  dtype?: string;
+}
+
+/** The model info for the options' weights variant. */
+function modelFor(options: Options): typeof model {
+  return options.dtype ? transformersProvider({ dtype: options.dtype }).model : model;
 }
 
 interface PhpResult {
@@ -120,10 +127,11 @@ function runPhp(
   options: Options,
   extra: { html?: string[]; inputs?: { title: string; text: string }[] } = {},
 ): PhpResult {
+  const { dtype: _, ...rest } = options;
   const job = {
     dir,
-    model,
-    ...options,
+    model: modelFor(options),
+    ...rest,
     now: NOW.toISOString(),
     items: catalog.map(({ text, ...item }) => ({
       ...item,
@@ -141,7 +149,15 @@ function runPhp(
 }
 
 function runNode(dir: string, catalog: readonly CatalogItem[], options: Options) {
-  return build({ items: catalog, outDir: dir, provider, cacheDir: false, now: NOW, ...options });
+  const { dtype: _, ...rest } = options;
+  return build({
+    items: catalog,
+    outDir: dir,
+    provider: { ...provider, model: modelFor(options) },
+    cacheDir: false,
+    now: NOW,
+    ...rest,
+  });
 }
 
 /** Both directories hold the same files with the same bytes; returns the manifest. */
@@ -179,6 +195,8 @@ for (const options of [
   { dims: 128, quantization: 'float32' },
   { dims: 768, quantization: 'int8', shardBy: 'none' },
   { dims: 256, quantization: 'int8', maxShardItems: 2 },
+  // The plugin's experimental "Model weights: q4" setting.
+  { dims: 256, quantization: 'int8', dtype: 'q4' },
 ] satisfies Options[]) {
   test(`PHP writes the Node build's bytes: ${JSON.stringify(options)}`, { skip }, async () => {
     const nodeDir = await tempDir();
@@ -188,6 +206,7 @@ for (const options of [
     const manifest = await assertSameOutput(nodeDir, phpDir);
     assert.equal(manifest.count, items.length);
     assert.equal(manifest.model.id, 'onnx-community/embeddinggemma-300m-ONNX');
+    assert.equal(manifest.model.dtype, options.dtype ?? 'q8');
   });
 }
 
@@ -250,5 +269,14 @@ test(
       result.space,
       (await runNode(await tempDir(), items, { dims: 256, quantization: 'int8' })).manifest.space,
     );
+    // q4 weights: another embedding space, so other hashes (a q8 vector is never reused).
+    const q4: Options = { dims: 256, quantization: 'int8', dtype: 'q4' };
+    const q4Result = runPhp(await tempDir(), items, q4, { inputs: inputs.slice(0, 1) });
+    const q4Cache = await EmbeddingCache.open(modelFor(q4));
+    const first = documentInput(model.documentPrompt, inputs[0]!.title, inputs[0]!.text);
+    assert.equal(q4Result.inputs[0]!.hash, q4Cache.key(first));
+    assert.notEqual(q4Result.inputs[0]!.hash, result.inputs[0]!.hash);
+    assert.equal(q4Result.space, (await runNode(await tempDir(), items, q4)).manifest.space);
+    assert.notEqual(q4Result.space, result.space);
   },
 );

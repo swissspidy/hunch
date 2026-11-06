@@ -131,6 +131,44 @@ test('Transformers.js gets the pinned model, revision and weights; the query pro
   assert.equal(calls.at(-1), 'embed ["query: price $& $$"]');
 });
 
+test('EmbeddingGemma q4 loads the file browsers can run, for a q8 or a q4 catalog', async () => {
+  const ink = await load();
+  const options: string[] = [];
+  const fake: TransformersModule = {
+    AutoTokenizer: { from_pretrained: () => Promise.resolve(() => ({})) },
+    AutoModel: {
+      from_pretrained: (_id, o) => {
+        options.push(JSON.stringify(o));
+        return Promise.resolve(() =>
+          Promise.resolve({
+            sentence_embedding: { dims: [1, 768], data: new Float32Array(768).fill(1) },
+          }),
+        );
+      },
+    },
+  };
+  const gemma = {
+    id: 'onnx-community/embeddinggemma-300m-ONNX',
+    revision: 'r',
+    dtype: 'q8',
+    nativeDims: 768,
+    documentPrompt: '{text}',
+  };
+  const transformers = () => Promise.resolve(fake);
+  // A q8 catalog, queried with smaller weights.
+  await createQueryEmbedder({ ...ink.manifest, model: gemma }, { transformers, dtype: 'q4' });
+  // A q4 catalog: its own file.
+  const q4 = { ...gemma, dtype: 'q4', file: 'model_no_gather' };
+  await createQueryEmbedder({ ...ink.manifest, model: q4 }, { transformers });
+  // A q8 catalog with its own weights: the default file.
+  await createQueryEmbedder({ ...ink.manifest, model: gemma }, { transformers });
+  assert.deepEqual(options, [
+    '{"revision":"r","dtype":"q4","model_file_name":"model_no_gather"}',
+    '{"revision":"r","dtype":"q4","model_file_name":"model_no_gather"}',
+    '{"revision":"r","dtype":"q8"}',
+  ]);
+});
+
 test('a model that loads when the tokenizer fails is released', async () => {
   const ink = await load();
   let disposed = false;

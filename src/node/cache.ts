@@ -39,7 +39,9 @@ export class EmbeddingCache {
   /** The cache key of an input (already prompted): a SHA-256 of the model and the input. */
   key(input: string): string {
     return createHash('sha256')
-      .update(`${this.model.id}\0${this.model.revision}\0${this.model.dtype ?? ''}\0${input}`)
+      .update(
+        `${this.model.id}\0${this.model.revision}\0${this.model.dtype ?? ''}${this.model.file ? `/${this.model.file}` : ''}\0${input}`,
+      )
       .digest('hex');
   }
 

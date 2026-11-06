@@ -22,6 +22,7 @@ final class Inkling_Settings {
 		'priors'       => array( 'recency', 'comments' ),
 		'dims'         => array( 128, 256, 512, 768 ),
 		'quantization' => array( 'int8', 'float32' ),
+		'weights'      => array( 'q8', 'q4' ),
 		'consent'      => array( 'optin', 'always', 'cookie', 'function', 'wp-consent-api', 'off' ),
 	);
 
@@ -37,6 +38,7 @@ final class Inkling_Settings {
 			'priors'           => 'recency',
 			'dims'             => 256,
 			'quantization'     => 'int8',
+			'weights'          => 'q8',
 			'consent'          => 'optin',
 			'consent_cookie'   => 'inkling_consent=yes',
 			'consent_function' => 'inklingConsent',
