@@ -24,7 +24,7 @@ don't overwrite each other.
 ```sh
 node eval/run.ts --dataset mind --mind-dir eval/.data/mind --impressions 10000 \
   --models hash@256,gemma,gemma-q4@256/int8 --dims 128,256,512,768 \
-  --quantization int8,float32 --variants profile,default --name mind-ablation-10k
+  --quantization int8,float32 --variants profile,default --batch-size 2 --name mind-ablation-10k
 ```
 
 - `--dims` and `--quantization` take comma-separated lists. Each model gets one catalog per
