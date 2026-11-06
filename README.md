@@ -23,8 +23,11 @@ the signals and the ranking function are specified in
    [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) through Transformers.js. It
    writes `manifest.json` and one small binary shard per section: 256-dimensional int8 vectors,
    about 260 KB gzipped per 1,000 items.
-2. **In the browser**, the client (7.2 KB gzipped, no dependencies) fetches the manifest and
-   the shards it needs. It ranks by cosine similarity, a small recency boost and diversity (MMR).
+2. **In the browser**, the client (9.7 KB gzipped, no dependencies) fetches the manifest and
+   the shards it needs. It ranks by cosine similarity, a small recency boost and diversity (MMR),
+   with a small WebAssembly SIMD kernel (a JavaScript one where WebAssembly can't run, such as
+   under a Content Security Policy without `'wasm-unsafe-eval'`). 100,000 items rank in about
+   12 ms in Node ([ADR 0010](docs/adr/0010-columnar-catalog-simd.md)).
    For "for you", similarity is to a profile derived from the visitor's signals (what they read,
    followed or hid), which stay in the site's own IndexedDB.
 3. **On the page**, the server renders a normal, non-personalized list. `<inkling-related>` and

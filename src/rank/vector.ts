@@ -19,15 +19,3 @@ export function truncate(v: ArrayLike<number>, dims: number): Float32Array {
   if (dims > v.length) throw new RangeError(`Cannot truncate ${v.length} dims to ${dims}`);
   return normalize(Array.prototype.slice.call(v, 0, dims) as number[]);
 }
-
-/** Dot product of `a` with the row of `rows` that starts at `offset`. */
-export function dotRow(
-  a: Float32Array,
-  rows: Int8Array | Float32Array,
-  offset: number,
-  dims: number,
-): number {
-  let sum = 0;
-  for (let d = 0; d < dims; d++) sum += a[d]! * rows[offset + d]!;
-  return sum;
-}

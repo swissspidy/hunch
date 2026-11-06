@@ -13,6 +13,7 @@ import { DEFAULT_WEIGHTS, rank, ranking, type RankInput } from '../../src/rank/r
 import {
   DIMS,
   ITEMS,
+  assertSameResults,
   NOW,
   SECTIONS,
   rankingCalls,
@@ -70,7 +71,7 @@ test('rank() picks exactly what a full sort of every candidate picked', () => {
   assert.equal(cases, 60);
 });
 
-test('ranking() pauses every 512 candidates and after every MMR pick, whatever the result', () => {
+test('ranking() pauses after every MMR pick, whatever the result', () => {
   const candidates = Array.from({ length: 2000 }, (_, i) => i);
   const options = {
     n: 10,
@@ -79,18 +80,26 @@ test('ranking() pauses every 512 candidates and after every MMR pick, whatever t
     diversity: 0.2,
     poolSize: 50,
   };
-  const steps = ranking(candidates, input(2000, 3, 1000), options);
+  const ranked = input(2000, 3, 1000);
+  const columns = {
+    similarity: candidates.map((c) => ranked.similarity(c)),
+    prior: candidates.map((c) => ranked.prior(c)),
+    recency: candidates.map((c) => ranked.recency(c)),
+    pairwise: (i: number, j: number) => ranked.pairwise(i, j),
+  };
+  const steps = ranking(columns, options);
   let pauses = 0;
   let step = steps.next();
   while (!step.done) {
     pauses++;
     step = steps.next();
   }
-  // Four slices to score, four to pick the pool, one after each of the 10 MMR picks.
-  assert.equal(pauses, 18);
-  assert.deepEqual(step.value, rank(candidates, input(2000, 3, 1000), options));
+  // Scoring and choosing the pool run over typed arrays in one go; one pause per MMR pick.
+  assert.equal(pauses, 10);
+  assert.deepEqual(step.value, rank(candidates, ranked, options));
   // Nothing to rank: no pause at all.
-  assert.equal(ranking([], input(0, 1, 10), options).next().done, true);
+  const none = { similarity: [], prior: [], recency: [], pairwise: () => 0 };
+  assert.equal(ranking(none, options).next().done, true);
 });
 
 test('a whole list (n = every candidate, as rank(ids) asks) ranks as a full sort did', () => {
@@ -162,19 +171,23 @@ test('20,000 items: same ids and scores as before slicing, with scheduler.yield(
   const realNow = performance.now.bind(performance);
   performance.now = () => (clock += 20);
   try {
-    assert.deepEqual(await rankingCalls(Inkling, new MemoryStore(), catalog), expected);
+    assertSameResults(await rankingCalls(Inkling, new MemoryStore(), catalog), expected);
   } finally {
     performance.now = realNow;
     delete g.scheduler;
   }
-  // Candidates (40 slices) and ranking (80 slices) for each of the full-catalog calls, and
-  // three yields for each of the 10 shards.
-  assert.ok(yields > 500, `${yields} yields`);
+  // Three yields for each of the 10 shards, one per 8,192 rows of similarities, and one per
+  // diversity pick.
+  assert.ok(yields > 100, `${yields} yields`);
 });
 
 test('20,000 items: same ids and scores without scheduler.yield() (new tasks instead)', async () => {
   assert.equal(g.scheduler, undefined);
-  assert.deepEqual(await rankingCalls(Inkling, new MemoryStore(), catalog), expected);
+  assertSameResults(await rankingCalls(Inkling, new MemoryStore(), catalog), expected);
+});
+
+test('20,000 items: the JavaScript kernel gives the same results as the WebAssembly one', async () => {
+  assertSameResults(await rankingCalls(Inkling, new MemoryStore(), catalog, 'js'), expected);
 });
 
 test('ties come in manifest order, whatever order the shards arrive in', async () => {

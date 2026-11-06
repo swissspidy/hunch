@@ -18,7 +18,7 @@ How it works:
 
 1. **Embedding happens in your browser, in wp-admin.** When you publish or update a post in the block editor, your browser turns it into a vector with EmbeddingGemma, an open embedding model. Your server runs no model and needs no Node.js. The post's text goes from your site to your browser and nowhere else. The vector (about 3 KB) is stored with the post.
 2. **Your site publishes the vectors as static files** in `wp-content/uploads/inkling/`: a small `manifest.json` and one shard per category. They are rewritten shortly after a post is published, updated or trashed.
-3. **On your pages**, the plugin renders normal lists of your own posts: the newest posts in the same category after each post, and the newest posts in the "For you" block. In the visitor's browser, Inkling's script (7 KB) re-ranks them in idle time, slot for slot. Nothing moves on the page.
+3. **On your pages**, the plugin renders normal lists of your own posts: the newest posts in the same category after each post, and the newest posts in the "For you" block. In the visitor's browser, Inkling's script (12 KB, gzipped) re-ranks them in idle time, slot for slot. Nothing moves on the page.
 
 The vectors are the same as those the Inkling command-line tool (`npx @swissspidy/inkling build`) makes from your RSS feed with the same model, so you can switch between the two.
 

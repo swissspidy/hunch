@@ -46,6 +46,13 @@ TypeDoc needs the TypeScript compiler API, which TypeScript 7 doesn't have, so i
 `docs/api/` with its own lockfile and TypeScript 6: install it once with
 `npm ci --prefix docs/api`. It fails on an undocumented export or a broken `{@link}`.
 
+## The similarity kernel
+
+`src/rank/kernel.wat` is the WebAssembly SIMD kernel the client ranks with
+([ADR 0010](docs/adr/0010-columnar-catalog-simd.md)). After changing it, run `npm run kernel` to
+regenerate `src/rank/kernel-wasm.ts` (the compiled module as base64); `npm test` fails while the
+two disagree, and compares the kernel with the JavaScript fallback.
+
 ## The WordPress plugin
 
 [`wordpress/inkling/`](wordpress/inkling/readme.txt) is plain PHP with its own dev tools

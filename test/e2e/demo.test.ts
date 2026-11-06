@@ -88,6 +88,38 @@ for (const [name, options] of [
   });
 }
 
+test(`the WebAssembly SIMD kernel runs in ${BROWSER}, with the JavaScript one's results`, async () => {
+  const { page, close } = await open('/items/cold-brew.html');
+  await ready(page);
+  const result = await page.evaluate(async () => {
+    const { Inkling } = window as unknown as {
+      Inkling: {
+        load(o: object): Promise<{
+          kernel: string;
+          related(id: string, o: object): Promise<{ id: string; score: number }[]>;
+        }>;
+      };
+    };
+    const manifest = document.body.dataset.manifest!;
+    const [wasm, js] = await Promise.all([
+      Inkling.load({ manifest }),
+      Inkling.load({ manifest, kernel: 'js' }),
+    ]);
+    return {
+      kinds: [wasm.kernel, js.kernel],
+      a: await wasm.related('cold-brew', { n: 8 }),
+      b: await js.related('cold-brew', { n: 8 }),
+    };
+  });
+  assert.deepEqual(result.kinds, ['wasm', 'js']);
+  assert.deepEqual(
+    result.a.map((r) => r.id),
+    result.b.map((r) => r.id),
+  );
+  result.a.forEach((r, i) => assert.ok(Math.abs(r.score - result.b[i]!.score) < 1e-8));
+  await close();
+});
+
 test('the explanation lists each item’s similarity', async () => {
   const { page, close } = await open('/items/cold-brew.html');
   await ready(page);
