@@ -91,7 +91,7 @@ Browser runs vary by about ±10 ms between runs on this shared machine.
   IndexedDB on every call.
 - **Loading is about as before** (3.2 s against 3.6 s for every shard at 100,000 items, Chromium):
   it is the shards' JSON headers, the hash and the network, not ranking. A binary format for
-  the per-item columns is the next step there.
+  the per-item columns is the next step there ([ADR 0011](0011-format-v2-columns.md)).
 - **Float32 catalogs** use the JavaScript kernel: 138 ms → 95 ms at 100,000 items in Node. They
   are four times the bytes and rank no better ([evaluation](../evaluation.md)).
 - **Size:** the client is 9.72 KB gzipped (budget 10 KB), up from 7.61 KB: the kernel, its

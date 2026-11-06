@@ -104,7 +104,7 @@ npm run demo
   ranking function amends [ADR 0001](docs/adr/0001-format-signals-ranking.md) or adds an ADR,
   with its row in [`docs/adr/README.md`](docs/adr/README.md).
 - **Keep the promises of [ADR 0009](docs/adr/0009-stability.md).** A format change needs a new
-  format version and a new frozen fixture (never rebuild `test/fixtures/format-v1/`); a change to
+  format version and a new frozen fixture (never rebuild `test/fixtures/format-v*/`); a change to
   the signal schema needs a database version and a migration that keeps every signal.
 
 ## Releases

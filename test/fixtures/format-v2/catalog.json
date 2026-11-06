@@ -1,0 +1,34 @@
+[
+  {
+    "id": "sourdough",
+    "url": "/food/sourdough/",
+    "title": "Keeping a sourdough starter",
+    "text": "Flour, water and patience: feeding a starter so the bread rises.",
+    "section": "Food",
+    "tags": ["bread"],
+    "date": "2026-10-01T08:00:00.000Z",
+    "image": "/img/sourdough.jpg"
+  },
+  {
+    "id": "rye",
+    "url": "/food/rye/",
+    "title": "Dense, dark rye bread",
+    "text": "Rye flour, a long proof and a starter make a dense, sour bread.",
+    "section": "Food",
+    "date": "2026-09-15T08:00:00.000Z"
+  },
+  {
+    "id": "night-train",
+    "url": "/travel/night-train/",
+    "title": "A night train through the Alps",
+    "text": "Sleeping cars, mountain passes and breakfast in another country.",
+    "section": "Travel",
+    "popularity": 10
+  },
+  {
+    "id": "about",
+    "url": "/about/",
+    "title": "About this site",
+    "text": "Who writes here, and why."
+  }
+]

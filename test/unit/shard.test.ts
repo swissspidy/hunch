@@ -40,16 +40,67 @@ test('int8 shards keep cosine similarity within 1%', () => {
   }
 });
 
-test('the vector data is 4-byte aligned whatever the header length', () => {
-  for (const title of ['', 'x', 'xy', 'xyz', 'é']) {
-    const bytes = encodeShard(
-      { space: 's', items: [{ id: 'a', url: '/', title, prior: 1 }] },
-      [vectors[0]!],
-      5,
-      'float32',
-    );
-    assert.equal(decodeShard(copy(bytes)).vectors.byteOffset % 4, 0);
+test('the columns are read as written, the metadata only on demand', () => {
+  const shard = decodeShard(copy(encodeShard({ space: 's', items }, vectors, 5, 'int8')));
+  assert.equal(shard.version, 2);
+  assert.equal(shard.count, 2);
+  assert.deepEqual(shard.ids, ['a', 'b']);
+  assert.deepEqual([...shard.prior], [1, 0.5]);
+  assert.deepEqual([...shard.time], [NaN, Date.parse('2026-01-01T00:00:00.000Z')]);
+  assert.deepEqual(shard.sections, ['x']);
+  assert.deepEqual([...shard.section], [-1, 0]);
+  assert.deepEqual(shard.item(1), items[1]);
+  // Norms are computed from the rows as stored.
+  for (let i = 0; i < 2; i++) {
+    let sum = 0;
+    for (let d = 0; d < 5; d++) sum += shard.vectors[i * 5 + d]! ** 2;
+    assert.equal(shard.invNorms[i], Math.fround(1 / Math.sqrt(sum)));
   }
+});
+
+test('the columns and vectors are aligned whatever the header length', () => {
+  for (const id of ['', 'x', 'xy', 'xyz', 'é', 'abcdefg']) {
+    for (const quantization of ['int8', 'float32'] as const) {
+      const bytes = encodeShard(
+        { space: 's', items: [{ id, url: '/', title: 'T', prior: 1 }] },
+        [vectors[0]!],
+        5,
+        quantization,
+      );
+      const buffer = copy(bytes);
+      const view = new DataView(buffer);
+      const columns = Math.ceil((24 + view.getUint32(16, true)) / 8) * 8;
+      assert.equal(view.getFloat64(columns, true), 1, `${id}: the prior opens the columns`);
+      const shard = decodeShard(buffer);
+      assert.equal(shard.vectors.byteOffset % 4, 0);
+      assert.deepEqual(shard.item(0), { id, url: '/', title: 'T', prior: 1 });
+    }
+  }
+});
+
+test('version 1 shards are still read', () => {
+  const header = JSON.stringify({ space: 's', items });
+  const text = new TextEncoder().encode(header);
+  const start = Math.ceil((20 + text.length) / 4) * 4;
+  const out = new Uint8Array(start + 2 * 4);
+  const view = new DataView(out.buffer);
+  view.setUint32(0, 0x564b4e49, true);
+  view.setUint8(4, 1);
+  view.setUint8(5, 1);
+  view.setUint32(8, 4, true);
+  view.setUint32(12, 2, true);
+  view.setUint32(16, text.length, true);
+  out.set(text, 20);
+  out.set([3, 4, 0, 0, 0, 0, 0, 2], start);
+  const shard = decodeShard(out.buffer);
+  assert.equal(shard.version, 1);
+  assert.deepEqual(shard.items, items);
+  assert.deepEqual(shard.ids, ['a', 'b']);
+  assert.deepEqual([...shard.prior], [1, 0.5]);
+  assert.deepEqual([...shard.time], [NaN, Date.parse('2026-01-01T00:00:00.000Z')]);
+  assert.deepEqual(shard.sections, ['x']);
+  assert.deepEqual([...shard.section], [-1, 0]);
+  assert.deepEqual([...shard.invNorms], [Math.fround(0.2), 0.5]);
 });
 
 test('bad input is rejected', () => {
@@ -68,20 +119,43 @@ test('bad input is rejected', () => {
       header,
     );
   }
+  for (const header of ['null', '{}', '{"space":"s","ids":[]}', '{"space":"s","sections":[]}']) {
+    assert.throws(
+      () => decodeShard(withHeader(header, 2)),
+      /needs a space, sections and ids/,
+      header,
+    );
+  }
+  assert.throws(
+    () => decodeShard(withHeader('{"space":"s","sections":[],"ids":["a"]}', 2)),
+    /lists 1 items, not 0/,
+  );
+  // Metadata lengths that don't add up, or a section the header doesn't list.
+  const good = encodeShard({ space: 's', items }, vectors, 5, 'int8');
+  const view = new DataView(good.buffer);
+  const lengths = Math.ceil((24 + view.getUint32(16, true)) / 8) * 8 + 16 * 2;
+  const broken = good.slice();
+  new DataView(broken.buffer).setUint32(lengths + 4, 10_000, true);
+  assert.throws(() => decodeShard(copy(broken)), /bad metadata lengths/);
+  const unlisted = good.slice();
+  new DataView(unlisted.buffer).setUint16(lengths + 8 + 2, 1, true);
+  assert.throws(() => decodeShard(copy(unlisted)), /section index is out of range/);
 });
 
-/** A shard with no vectors and the given raw JSON header. */
-function withHeader(json: string): ArrayBuffer {
+/** A shard with no items and the given raw JSON header. */
+function withHeader(json: string, version = 1): ArrayBuffer {
   const text = new TextEncoder().encode(json);
-  const out = new Uint8Array(20 + text.length + 3);
+  const start = version === 1 ? 20 : 24;
+  // Room for an empty shard's columns (version 2: one metadata offset, 0).
+  const out = new Uint8Array(start + text.length + 16);
   const view = new DataView(out.buffer);
   view.setUint32(0, 0x564b4e49, true);
-  view.setUint8(4, 1);
+  view.setUint8(4, version);
   view.setUint8(5, 1);
   view.setUint32(8, 4, true);
   view.setUint32(12, 0, true);
   view.setUint32(16, text.length, true);
-  out.set(text, 20);
+  out.set(text, start);
   return out.buffer;
 }
 
@@ -100,4 +174,27 @@ test('the JavaScript SHA-256 matches node:crypto', async () => {
       `length ${length}`,
     );
   }
+});
+
+test('a shard holds up to 65,535 sections (0xffff means none)', () => {
+  const shard = (sections: number) =>
+    encodeShard(
+      {
+        space: 's',
+        items: Array.from({ length: sections + 1 }, (_, i) => ({
+          id: `${i}`,
+          url: '/',
+          title: '',
+          ...(i < sections ? { section: `s${i}` } : {}),
+          prior: 1,
+        })),
+      },
+      Array.from({ length: sections + 1 }, () => Float32Array.of(1)),
+      1,
+      'int8',
+    );
+  const decoded = decodeShard(copy(shard(0xffff)));
+  assert.equal(decoded.sections.length, 0xffff);
+  assert.deepEqual([...decoded.section.subarray(-2)], [0xfffe, -1]);
+  assert.throws(() => shard(0x10000), /too many sections/);
 });

@@ -95,17 +95,20 @@ final class WriterTest extends TestCase {
 	public function test_empty_fields_are_left_out_and_priors_follow_catalog_order() {
 		$manifest = $this->write( $this->items() )['manifest'];
 		$bytes    = file_get_contents( $this->dir . '/' . $manifest['shards'][1]['url'] );
-		$length   = unpack( 'V', substr( $bytes, 16, 4 ) )[1];
-		$header   = json_decode( substr( $bytes, 20, $length ), true );
+		$head     = unpack( 'Vcount/Vheader/Vmetadata', substr( $bytes, 12, 12 ) );
+		$header   = json_decode( substr( $bytes, 24, $head['header'] ), true );
+		$this->assertSame( array( 'Travel' ), $header['sections'] );
+		$this->assertSame( '2', $header['ids'][0] );
+		$columns = ( 24 + $head['header'] + 7 ) & ~7;
+		$this->assertSame( 0.75, unpack( 'e', substr( $bytes, $columns, 8 ) )[1] );
+		// The first item's metadata: only the fields it has.
+		$length = unpack( 'V', substr( $bytes, $columns + 16 * $head['count'], 4 ) )[1];
 		$this->assertSame(
 			array(
-				'id'      => '2',
-				'url'     => '/2/',
-				'title'   => 'Two',
-				'section' => 'Travel',
-				'prior'   => 0.75,
+				'url'   => '/2/',
+				'title' => 'Two',
 			),
-			$header['items'][0]
+			json_decode( substr( $bytes, strlen( $bytes ) - $head['metadata'], $length ), true )
 		);
 	}
 

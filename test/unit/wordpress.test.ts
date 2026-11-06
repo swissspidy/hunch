@@ -289,3 +289,48 @@ test(
     }
   },
 );
+
+test('PHP reads dates as Date.parse reads them', { skip }, () => {
+  const dates = [
+    '2026-01-01T00:00:00.000Z',
+    '2026-01-01',
+    '2026-01',
+    '2026',
+    '+002026-01-01T00:00:00Z',
+    '-000001-06-01T00:00:00Z',
+    '-000000-01-01T00:00:00Z',
+    '0050-03-01T00:00:00Z',
+    '0000-01-01',
+    '1969-12-31T23:59:59.999Z',
+    '2024-02-29T12:00Z',
+    '2026-02-30',
+    '2026-02-31T00:00:00Z',
+    '2026-04-31',
+    '2026-02-32',
+    '2026-13-01',
+    '2026-00-10',
+    '2026-01-01T24:00:00Z',
+    '2026-01-01T24:00Z',
+    '2026-01-01T24:00:01Z',
+    '2026-01-01T23:59:60Z',
+    '2026-01-01T10:00:00.5Z',
+    '2026-01-01T10:00:00.123456Z',
+    '2026-01-01T10:00:00+23:59',
+    '2026-01-01T10:00:00-05:30',
+    '2026-01-01T10:00:00+24:00',
+    '2026-01-01T10:00:00+05:60',
+    '9999-12-31T23:59:59.999Z',
+    'yesterday',
+    '',
+  ];
+  const script = `define('INKLING_STANDALONE', true); require 'wordpress/inkling/includes/class-inkling-shard.php';
+foreach (json_decode(stream_get_contents(STDIN)) as $d) echo bin2hex(Inkling_Shard::time($d)), "\\n";`;
+  const run = spawnSync('php', ['-r', script], { input: JSON.stringify(dates), encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  const got = run.stdout.trim().split('\n');
+  dates.forEach((date, i) => {
+    const want = Buffer.alloc(8);
+    want.writeDoubleLE(date ? Date.parse(date) : NaN);
+    assert.equal(got[i], want.toString('hex'), date);
+  });
+});

@@ -1,10 +1,11 @@
 /**
  * The stability promises of ADR 0009, pinned.
  *
- * test/fixtures/format-v1 is a catalog built with format version 1 (manifest and shards) and
- * frozen: never rebuild it. Every release must keep decoding it, byte for byte, for as long as
- * ADR 0009 says readers keep reading version 1. A change to the format shows up here, and then
- * needs a new format version, a new frozen fixture next to this one, and the ADR's rules.
+ * test/fixtures/format-v1 and format-v2 are one catalog built with format versions 1 and 2
+ * (manifest and shards) and frozen: never rebuild them. Every release must keep decoding each,
+ * byte for byte, for as long as ADR 0009 says readers keep reading its version. A change to the
+ * format shows up here, and then needs a new format version, a new frozen fixture next to these,
+ * and the ADR's rules.
  */
 
 import assert from 'node:assert/strict';
@@ -20,18 +21,19 @@ import {
   MANIFEST_FORMAT_VERSION,
   type Manifest,
 } from '../../src/format/manifest.ts';
-import { decodeShard, encodeShard } from '../../src/format/shard.ts';
+import { decodeShard, encodeShard, SHARD_FORMAT_VERSION } from '../../src/format/shard.ts';
 import { build } from '../../src/node/build.ts';
 import { hashProvider } from '../../src/node/providers/hash.ts';
 import { dirFetch, tempDir } from '../helpers.ts';
 
 const V1 = 'test/fixtures/format-v1';
+const V2 = 'test/fixtures/format-v2';
 
-async function fixture(): Promise<{ manifest: Manifest; shards: Map<string, Buffer> }> {
-  const manifest: unknown = JSON.parse(await readFile(join(V1, 'manifest.json'), 'utf8'));
+async function fixture(dir = V1): Promise<{ manifest: Manifest; shards: Map<string, Buffer> }> {
+  const manifest: unknown = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
   assertManifest(manifest);
   const shards = new Map<string, Buffer>();
-  for (const ref of manifest.shards) shards.set(ref.url, await readFile(join(V1, ref.url)));
+  for (const ref of manifest.shards) shards.set(ref.url, await readFile(join(dir, ref.url)));
   return { manifest, shards };
 }
 
@@ -73,49 +75,103 @@ test('format v1: the frozen shards decode to the same items and vectors', async 
     assert.equal(shard.items.length, ref.count);
   }
   const food = decodeShard(buffer(shards.get('shards/food.fb14f8babf77.ink')!));
-  assert.deepEqual(food.items, [
-    {
-      id: 'sourdough',
-      url: '/food/sourdough/',
-      title: 'Keeping a sourdough starter',
-      section: 'Food',
-      tags: ['bread'],
-      date: '2026-10-01T08:00:00.000Z',
-      image: '/img/sourdough.jpg',
-      prior: 0.75,
-    },
-    {
-      id: 'rye',
-      url: '/food/rye/',
-      title: 'Dense, dark rye bread',
-      section: 'Food',
-      date: '2026-09-15T08:00:00.000Z',
-      prior: 0.5,
-    },
-  ]);
-  assert.deepEqual(
-    [...food.vectors],
-    [0, 0, 107, 30, 67, 0, 0, 127, -77, 14, -14, 14, 14, -14, -50, 127],
-  );
+  assert.deepEqual(food.items, FOOD);
+  assert.deepEqual([...food.vectors], FOOD_VECTORS);
   const travel = decodeShard(buffer(shards.get('shards/travel.6e15341d8ba0.ink')!));
-  assert.deepEqual([...travel.vectors], [0, -108, 19, -127, -63, 64, 0, 64]);
+  assert.deepEqual([...travel.vectors], TRAVEL_VECTORS);
 });
 
-test('format v1: the client ranks the frozen catalog', async () => {
-  const inkling = await Inkling.load({
-    manifest: 'http://site/manifest.json',
-    fetch: dirFetch(V1),
-    consent: false,
+const FOOD = [
+  {
+    id: 'sourdough',
+    url: '/food/sourdough/',
+    title: 'Keeping a sourdough starter',
+    section: 'Food',
+    tags: ['bread'],
+    date: '2026-10-01T08:00:00.000Z',
+    image: '/img/sourdough.jpg',
+    prior: 0.75,
+  },
+  {
+    id: 'rye',
+    url: '/food/rye/',
+    title: 'Dense, dark rye bread',
+    section: 'Food',
+    date: '2026-09-15T08:00:00.000Z',
+    prior: 0.5,
+  },
+];
+const FOOD_VECTORS = [0, 0, 107, 30, 67, 0, 0, 127, -77, 14, -14, 14, 14, -14, -50, 127];
+const TRAVEL_VECTORS = [0, -108, 19, -127, -63, 64, 0, 64];
+
+test('format v2: the frozen manifest is read as it was written', async () => {
+  const { manifest } = await fixture(V2);
+  const v1 = (await fixture()).manifest;
+  assert.equal(manifest.formatVersion, 2);
+  assert.equal(manifest.space, v1.space);
+  assert.deepEqual(manifest.sections, ['Food', 'Travel']);
+  assert.deepEqual(
+    manifest.shards.map((s) => [s.url, s.section, s.count]),
+    [
+      ['shards/food.4a55e7a47ae2.ink', 'Food', 2],
+      ['shards/travel.f0b66251fb85.ink', 'Travel', 1],
+      ['shards/all.58649e7ac5af.ink', null, 1],
+    ],
+  );
+});
+
+test('format v2: the frozen shards decode to the same items and vectors as version 1', async () => {
+  const { manifest, shards } = await fixture(V2);
+  const v1 = await fixture();
+  for (const [i, ref] of manifest.shards.entries()) {
+    const bytes = shards.get(ref.url)!;
+    assert.equal(bytes.length, ref.bytes, ref.url);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), ref.sha256, ref.url);
+    // The fixed header: magic "INKV", version 2, int8, reserved 0, dims 8.
+    assert.deepEqual([...bytes.subarray(0, 12)], [73, 78, 75, 86, 2, 1, 0, 0, 8, 0, 0, 0]);
+    const shard = decodeShard(buffer(bytes));
+    const old = decodeShard(buffer(v1.shards.get(v1.manifest.shards[i]!.url)!));
+    assert.equal(shard.version, 2);
+    assert.equal(shard.space, manifest.space);
+    assert.equal(shard.count, ref.count);
+    assert.deepEqual(shard.items, old.items, ref.url);
+    assert.deepEqual([...shard.vectors], [...old.vectors], ref.url);
+    // The columns hold what version 1 readers derive from the items.
+    for (const column of ['ids', 'prior', 'time', 'sections', 'section', 'invNorms'] as const) {
+      assert.deepEqual(shard[column], old[column], `${ref.url}: ${column}`);
+    }
+  }
+  const food = decodeShard(buffer(shards.get('shards/food.4a55e7a47ae2.ink')!));
+  assert.deepEqual(food.items, FOOD);
+  assert.deepEqual(food.item(1), FOOD[1]);
+  assert.deepEqual([...food.vectors], FOOD_VECTORS);
+  assert.deepEqual(
+    [...food.time],
+    [Date.parse('2026-10-01T08:00:00.000Z'), Date.parse('2026-09-15T08:00:00.000Z')],
+  );
+});
+
+for (const [version, dir] of [
+  [1, V1],
+  [2, V2],
+] as const) {
+  test(`format v${version}: the client ranks the frozen catalog`, async () => {
+    const inkling = await Inkling.load({
+      manifest: 'http://site/manifest.json',
+      fetch: dirFetch(dir),
+      consent: false,
+    });
+    assert.equal(inkling.manifest.formatVersion, version);
+    const related = await inkling.related('sourdough', { n: 3 });
+    assert.deepEqual(related.map((r) => r.id).sort(), ['about', 'night-train', 'rye']);
+    assert.equal((await inkling.item('night-train'))?.title, 'A night train through the Alps');
+    assert.deepEqual(await inkling.item('rye'), FOOD[1]);
   });
-  assert.equal(inkling.manifest.formatVersion, 1);
-  const related = await inkling.related('sourdough', { n: 3 });
-  assert.deepEqual(related.map((r) => r.id).sort(), ['about', 'night-train', 'rye']);
-  assert.equal((await inkling.item('night-train'))?.title, 'A night train through the Alps');
-});
+}
 
-test('format v1: the writer still writes it', async () => {
+test('format v2: the writer writes it', async () => {
   // Re-encoding the decoded shards gives the same bytes...
-  const { manifest, shards } = await fixture();
+  const { manifest, shards } = await fixture(V2);
   for (const [url, bytes] of shards) {
     const shard = decodeShard(buffer(bytes));
     const rows = shard.items.map((_, i) => {
@@ -126,10 +182,10 @@ test('format v1: the writer still writes it', async () => {
     assert.deepEqual(Buffer.from(again), bytes, url);
   }
   // ...and a build of the same catalog today writes the same format: the same version, the
-  // same manifest fields, the same shard header layout.
+  // same manifest fields, the same shards.
   const out = await tempDir();
   const result = await build({
-    items: JSON.parse(await readFile(join(V1, 'catalog.json'), 'utf8')),
+    items: JSON.parse(await readFile(join(V2, 'catalog.json'), 'utf8')),
     outDir: out,
     provider: hashProvider(16),
     dims: 8,
@@ -137,11 +193,12 @@ test('format v1: the writer still writes it', async () => {
     cacheDir: false,
     now: new Date(manifest.generatedAt),
   });
-  assert.equal(MANIFEST_FORMAT_VERSION, 1);
+  assert.equal(MANIFEST_FORMAT_VERSION, 2);
+  assert.equal(SHARD_FORMAT_VERSION, 2);
   assert.deepEqual(shape(result.manifest), shape(manifest));
   for (const file of await readdir(join(out, 'shards'))) {
     const bytes = await readFile(join(out, 'shards', file));
-    assert.deepEqual([...bytes.subarray(0, 12)], [73, 78, 75, 86, 1, 1, 0, 0, 8, 0, 0, 0], file);
+    assert.deepEqual([...bytes.subarray(0, 12)], [73, 78, 75, 86, 2, 1, 0, 0, 8, 0, 0, 0], file);
     assert.equal(decodeShard(buffer(bytes)).dims, result.manifest.dims, file);
   }
 });
@@ -162,18 +219,18 @@ function shape(value: unknown): unknown {
 test('a newer format version is refused, not misread', async () => {
   const { manifest, shards } = await fixture();
   assert.throws(
-    () => assertManifest({ ...manifest, formatVersion: 2 }),
-    /format version 2 is not supported/,
+    () => assertManifest({ ...manifest, formatVersion: 3 }),
+    /format version 3 is not supported/,
   );
   const bytes = new Uint8Array(shards.get('shards/food.fb14f8babf77.ink')!);
-  bytes[4] = 2;
-  assert.throws(() => decodeShard(bytes.buffer), /format version 2 is not supported/);
+  bytes[4] = 3;
+  assert.throws(() => decodeShard(bytes.buffer), /format version 3 is not supported/);
   await assert.rejects(
     Inkling.load({
       manifest: 'http://site/manifest.json',
-      fetch: async () => Response.json({ ...manifest, formatVersion: 2 }),
+      fetch: async () => Response.json({ ...manifest, formatVersion: 3 }),
     }),
-    /format version 2/,
+    /format version 3/,
   );
 });
 

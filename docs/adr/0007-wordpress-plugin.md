@@ -72,8 +72,9 @@ the CLI would write, and a catalog built by either can replace the other.
 
 [`class-inkling-shard.php`](../../wordpress/inkling/includes/class-inkling-shard.php) and
 [`class-inkling-writer.php`](../../wordpress/inkling/includes/class-inkling-writer.php) port
-`encodeShard()` and the file-writing half of `build()`: the INKV layout, float32 rounding of
-the renormalized vector, int8 quantization with JavaScript's `Math.round`, the JSON header as
+`encodeShard()` and the file-writing half of `build()`: the INKV layout (version 2 since
+[ADR 0011](0011-format-v2-columns.md), with dates read as `Date.parse` reads ISO 8601), float32
+rounding of the renormalized vector, int8 quantization with JavaScript's `Math.round`, the JSON as
 `JSON.stringify` writes it (no escaped slashes or Unicode, `1` not `1.0`), one shard per section
 in catalog order split at 2,000 items, content-hashed file names, the manifest's `version`,
 keeping `generatedAt` when nothing changed, and deleting shards neither the new nor the previous

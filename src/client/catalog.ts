@@ -17,7 +17,7 @@ import {
   type ShardRef,
 } from '../format/manifest.ts';
 import { sha256Hex } from '../format/sha256.ts';
-import { decodeShard } from '../format/shard.ts';
+import { decodeShard, type DecodedShard } from '../format/shard.ts';
 import { createVectorStore, MAX_SPAN, type VectorStore } from '../rank/kernel.ts';
 import { recencyAt } from '../rank/rank.ts';
 import { yieldToPage, type Pause } from './slices.ts';
@@ -40,7 +40,12 @@ export class Catalog {
   readonly url: URL;
   private readonly fetch: Fetch;
   private readonly store: VectorStore;
-  /** Published metadata, by row. */
+  /**
+   * Each loaded shard's first row and metadata decoder, in load order (so `first` ascends). Not
+   * the shard itself: its vectors are a view that keeps the whole response alive.
+   */
+  private readonly sources: { first: number; item: DecodedShard['item'] }[] = [];
+  /** Published metadata decoded so far, by row. */
   private readonly items: ShardItem[] = [];
   /** 1 / L2 norm of each stored row: `dot(q, row) · invNorm` is the cosine for a unit `q`. */
   invNorm = new Float32Array(0);
@@ -113,9 +118,23 @@ export class Catalog {
     return this.ids.get(id);
   }
 
-  /** A row's published metadata. */
+  /** A row's published metadata, decoded on first use (ADR 0011). */
   item(row: number): ShardItem {
-    return this.items[row]!;
+    let item = this.items[row];
+    if (!item) {
+      const { sources } = this;
+      // The last source whose first row is at most `row`.
+      let lo = 0;
+      let hi = sources.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (sources[mid]!.first <= row) lo = mid;
+        else hi = mid - 1;
+      }
+      const source = sources[lo]!;
+      item = this.items[row] = source.item(row - source.first);
+    }
+    return item;
   }
 
   /** The row index of a section name (-1 when the manifest doesn't list it). */
@@ -287,23 +306,27 @@ export class Catalog {
       );
     }
     await yieldToPage();
-    const count = shard.items.length;
+    const { count } = shard;
     const first = this.store.append(shard.vectors, count);
     this.grow(first + count);
-    this.invNorm.set(shard.invNorms.subarray(0, count), first);
-    const rows: number[] = [];
-    shard.items.forEach((item, i) => {
+    this.sources.push({ first, item: shard.item });
+    this.invNorm.set(shard.invNorms, first);
+    this.prior.set(shard.prior, first);
+    this.time.set(shard.time, first);
+    const sections = shard.sections.map((name) => this.sectionId(name));
+    const rows = new Int32Array(count);
+    let kept = 0;
+    for (let i = 0; i < count; i++) {
       const row = first + i;
-      this.items[row] = item;
-      this.prior[row] = item.prior;
-      this.time[row] = item.date ? Date.parse(item.date) : NaN;
-      this.section[row] = item.section === undefined ? -1 : this.sectionId(item.section);
+      const s = shard.section[i]!;
+      this.section[row] = s < 0 ? -1 : sections[s]!;
+      const id = shard.ids[i]!;
       // The row stays stored either way; a duplicate id is just never a candidate.
-      if (this.ids.has(item.id)) return;
-      this.ids.set(item.id, row);
-      rows.push(row);
-    });
-    this.byShard.set(ref, Int32Array.from(rows));
+      if (this.ids.has(id)) continue;
+      this.ids.set(id, row);
+      rows[kept++] = row;
+    }
+    this.byShard.set(ref, rows.slice(0, kept));
     this.all = undefined;
   }
 

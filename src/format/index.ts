@@ -7,6 +7,7 @@
 export {
   MANIFEST_FORMAT,
   MANIFEST_FORMAT_VERSION,
+  MANIFEST_FORMAT_VERSIONS,
   assertManifest,
   fnv1a,
   spaceKey,
@@ -16,4 +17,10 @@ export {
   type ShardItem,
   type ShardRef,
 } from './manifest.ts';
-export { decodeShard, encodeShard, type DecodedShard, type ShardHeader } from './shard.ts';
+export {
+  decodeShard,
+  encodeShard,
+  SHARD_FORMAT_VERSION,
+  type DecodedShard,
+  type ShardHeader,
+} from './shard.ts';
