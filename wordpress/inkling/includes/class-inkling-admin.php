@@ -291,10 +291,11 @@ final class Inkling_Admin {
 	/**
 	 * A select row.
 	 *
-	 * @param string $key      Setting.
-	 * @param string $label    Label.
-	 * @param array  $options  Value => label.
-	 * @param array  $settings Current settings.
+	 * @param string $key         Setting.
+	 * @param string $label       Label.
+	 * @param array  $options     Value => label.
+	 * @param array  $settings    Current settings.
+	 * @param string $description Help text under the field (none when empty).
 	 */
 	private static function select( $key, $label, array $options, array $settings, $description = '' ) {
 		$id = 'inkling-' . $key;

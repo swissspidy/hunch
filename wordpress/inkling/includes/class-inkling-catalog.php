@@ -73,7 +73,7 @@ final class Inkling_Catalog {
 	 */
 	public static function model_key() {
 		$model = self::model();
-		$file = empty( $model['file'] ) ? '' : '/' . $model['file'];
+		$file  = empty( $model['file'] ) ? '' : '/' . $model['file'];
 		return $model['id'] . '@' . $model['revision'] . '|' . $model['dtype'] . $file . '|' . $model['nativeDims'];
 	}
 
