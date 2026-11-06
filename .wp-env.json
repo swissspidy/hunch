@@ -1,0 +1,4 @@
+{
+  "plugins": ["./wordpress/inkling"],
+  "testsEnvironment": false
+}
