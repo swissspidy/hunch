@@ -62,6 +62,21 @@ vendor/bin/phpcs                # WordPress coding standards
 installed. `npm run wordpress:build` bundles the client into the plugin and writes
 `wordpress/inkling.zip`.
 
+To try the plugin in WordPress without Docker, start a local site with
+[WordPress Playground](https://wordpress.github.io/wordpress-playground/) through `wp-env`:
+
+```sh
+npm run wordpress:build
+npx @wordpress/env start --runtime=playground   # http://localhost:8888, logged in as admin
+npx @wordpress/env destroy                      # when done
+```
+
+Then go to Settings → Inkling → **Build index**. The browser downloads EmbeddingGemma once
+(about 300 MB; a private window can't cache it). WP-Cron doesn't run by itself in Playground,
+so after you publish or update a post in the editor, the files under
+`wp-content/uploads/inkling/` are rewritten once you open `/wp-cron.php` (or click
+**Build index** again).
+
 ## The demo's embeddings
 
 `demo/inkling-cache/` holds the demo's EmbeddingGemma vectors, so CI builds the demo without the
