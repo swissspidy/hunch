@@ -26,7 +26,7 @@ inkling build --source <file|url> [--source …] --out <dir> [options]
   --provider <name|file>  transformers (default) | hash | a provider module
   --model <id>            Transformers.js model (default: EmbeddingGemma)
   --revision <commit>     Pinned model revision
-  --dtype <dtype>         Weights variant: fp32 | q8 | q4 (default: q8)
+  --dtype <dtype>         Weights variant: fp32 | q8 (default) | q4 (experimental, smaller)
   --native-dims <n>       Output size of a model other than EmbeddingGemma
   --dims <n>              Published dimensions (Matryoshka truncation; default 256)
   --quantization <q>      int8 (default) | float32

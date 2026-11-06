@@ -43,7 +43,8 @@ final class Inkling_Format {
 	 */
 	public static function space_key( array $model, $dims ) {
 		$dtype = empty( $model['dtype'] ) ? '' : '|dtype=' . $model['dtype'];
-		return $model['id'] . '@' . $model['revision'] . $dtype . '|native=' . $model['nativeDims']
+		$file  = empty( $model['file'] ) ? '' : '|file=' . $model['file'];
+		return $model['id'] . '@' . $model['revision'] . $dtype . $file . '|native=' . $model['nativeDims']
 			. '|dims=' . $dims . '|prompt=' . self::fnv1a( $model['documentPrompt'] );
 	}
 
@@ -88,7 +89,8 @@ final class Inkling_Format {
 	 */
 	public static function input_hash( array $model, $input ) {
 		$dtype = isset( $model['dtype'] ) ? $model['dtype'] : '';
-		return hash( 'sha256', $model['id'] . "\0" . $model['revision'] . "\0" . $dtype . "\0" . $input );
+		$file  = empty( $model['file'] ) ? '' : '/' . $model['file'];
+		return hash( 'sha256', $model['id'] . "\0" . $model['revision'] . "\0" . $dtype . $file . "\0" . $input );
 	}
 
 	/**

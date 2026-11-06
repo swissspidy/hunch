@@ -87,6 +87,7 @@ final class Inkling_Admin {
 						'id'         => $model['id'],
 						'revision'   => $model['revision'],
 						'dtype'      => $model['dtype'],
+						'file'       => isset( $model['file'] ) ? $model['file'] : null,
 						'nativeDims' => $model['nativeDims'],
 					),
 					/**
@@ -131,7 +132,7 @@ final class Inkling_Admin {
 			<h1><?php esc_html_e( 'Inkling', 'inkling' ); ?></h1>
 
 			<h2><?php esc_html_e( 'Index', 'inkling' ); ?></h2>
-			<p><?php esc_html_e( 'Each post is embedded with EmbeddingGemma in your browser, on this screen or when you publish in the block editor. Only the resulting vector is stored on the site; the post\'s text is not sent anywhere else. The first time, the browser downloads the model (about 300 MB) and keeps it in its cache.', 'inkling' ); ?></p>
+			<p><?php esc_html_e( 'Each post is embedded with EmbeddingGemma in your browser, on this screen or when you publish in the block editor. Only the resulting vector is stored on the site; the post\'s text is not sent anywhere else. The first time, the browser downloads the model (about 300 MB with q8 weights, 200 MB with q4) and keeps it in its cache.', 'inkling' ); ?></p>
 			<div id="inkling-index" data-total="<?php echo esc_attr( (string) $status['total'] ); ?>">
 				<p>
 					<?php
@@ -219,6 +220,16 @@ final class Inkling_Admin {
 						),
 						$s
 					);
+					self::select(
+						'weights',
+						__( 'Model weights', 'inkling' ),
+						array(
+							'q8' => __( 'q8 (default, about 300 MB)', 'inkling' ),
+							'q4' => __( 'q4 (experimental, about 200 MB)', 'inkling' ),
+						),
+						$s,
+						__( 'The model the browser downloads to embed posts. Changing it makes every vector stale: click Build index right after saving. Until it finishes, the lists show your newest posts.', 'inkling' )
+					);
 					?>
 					<tr>
 						<th scope="row"><label for="inkling-transformers"><?php esc_html_e( 'Transformers.js URL', 'inkling' ); ?></label></th>
@@ -280,12 +291,13 @@ final class Inkling_Admin {
 	/**
 	 * A select row.
 	 *
-	 * @param string $key      Setting.
-	 * @param string $label    Label.
-	 * @param array  $options  Value => label.
-	 * @param array  $settings Current settings.
+	 * @param string $key         Setting.
+	 * @param string $label       Label.
+	 * @param array  $options     Value => label.
+	 * @param array  $settings    Current settings.
+	 * @param string $description Help text under the field (none when empty).
 	 */
-	private static function select( $key, $label, array $options, array $settings ) {
+	private static function select( $key, $label, array $options, array $settings, $description = '' ) {
 		$id = 'inkling-' . $key;
 		?>
 		<tr>
@@ -294,7 +306,10 @@ final class Inkling_Admin {
 				<?php foreach ( $options as $value => $text ) : ?>
 					<option value="<?php echo esc_attr( (string) $value ); ?>" <?php selected( (string) $settings[ $key ], (string) $value ); ?>><?php echo esc_html( $text ); ?></option>
 				<?php endforeach; ?>
-			</select></td>
+			</select>
+			<?php if ( '' !== $description ) : ?>
+				<p class="description"><?php echo esc_html( $description ); ?></p>
+			<?php endif; ?></td>
 		</tr>
 		<?php
 	}

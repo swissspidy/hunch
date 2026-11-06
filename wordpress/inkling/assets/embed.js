@@ -16,10 +16,14 @@
   function load() {
     loaded ??= (async () => {
       const mod = await import(config.transformersUrl);
-      const { id, revision, dtype } = config.model;
+      const { id, revision, dtype, file } = config.model;
       const [tokenizer, model] = await Promise.all([
         mod.AutoTokenizer.from_pretrained(id, { revision }),
-        mod.AutoModel.from_pretrained(id, { revision, dtype }),
+        mod.AutoModel.from_pretrained(id, {
+          revision,
+          dtype,
+          ...(file && { model_file_name: file }),
+        }),
       ]);
       return { tokenizer, model };
     })();

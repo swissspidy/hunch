@@ -43,6 +43,14 @@ weaken the guarantee that nothing about the visitor leaves the device.
   EmbeddingGemma's q4 and q8 query vectors have cosine similarity 0.98 to 0.984. Six test
   queries gave the same top 5 with either, with one swap of neighbours in one query. q4 is
   197 MB instead of 309 MB, and the demo uses it.
+  - _Update:_ those measurements ran in Node. Browsers can't run EmbeddingGemma's `model_q4`
+    file: it quantizes the token embeddings with `GatherBlockQuantized`, which ONNX Runtime
+    Web's WASM backend doesn't implement ("Can't create a session"). So q4 means
+    `model_no_gather_q4` (195 MB), which keeps the token embeddings unquantized and runs in
+    browsers and Node alike. Its vectors are within cosine 0.998 of `model_q4`'s and 0.97 of
+    q8's. The manifest names the file (`model.file`, an optional field), it is part of the
+    space and the embedding-cache key, and the query embedder loads it for a q4 catalog or a
+    `dtype: 'q4'` override.
 - **Privacy:** the query text is embedded on the device and never sent. The only requests are
   for the model's weights and Transformers.js's runtime. They are the same for every visitor
   and carry no query or profile data. They do reach the hosts the site chooses (by default

@@ -49,12 +49,21 @@ final class Inkling_Catalog {
 	}
 
 	/**
-	 * The model the vectors come from: EmbeddingGemma, pinned as the CLI pins it.
+	 * The model the vectors come from: EmbeddingGemma, pinned as the CLI pins it, with the
+	 * weights variant of the settings (q8, or the experimental q4: the CLI's `--dtype q4`).
+	 * The variant is part of the embedding space: changing it makes every vector stale.
 	 *
 	 * @return array
 	 */
 	public static function model() {
-		return Inkling_Format::embedding_gemma();
+		$model          = Inkling_Format::embedding_gemma();
+		$model['dtype'] = Inkling_Settings::get( 'weights' );
+		if ( 'q4' === $model['dtype'] ) {
+			// The q4 file browsers can run, as the CLI picks it (`EMBEDDING_GEMMA.files`). Right
+			// after `dtype`, where the CLI writes it: the manifests are compared byte for byte.
+			$model = array_slice( $model, 0, 3, true ) + array( 'file' => 'model_no_gather' ) + array_slice( $model, 3, null, true );
+		}
+		return $model;
 	}
 
 	/**
@@ -64,7 +73,8 @@ final class Inkling_Catalog {
 	 */
 	public static function model_key() {
 		$model = self::model();
-		return $model['id'] . '@' . $model['revision'] . '|' . $model['dtype'] . '|' . $model['nativeDims'];
+		$file  = empty( $model['file'] ) ? '' : '/' . $model['file'];
+		return $model['id'] . '@' . $model['revision'] . '|' . $model['dtype'] . $file . '|' . $model['nativeDims'];
 	}
 
 	/**

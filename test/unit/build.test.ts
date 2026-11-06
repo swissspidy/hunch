@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { decodeShard } from '../../src/format/shard.ts';
 import { build, computePriors } from '../../src/node/build.ts';
+import { spaceKey } from '../../src/format/manifest.ts';
+import { EmbeddingCache } from '../../src/node/cache.ts';
+import { transformersProvider } from '../../src/node/providers/transformers.ts';
 import type { CatalogItem } from '../../src/node/types.ts';
 import { countingProvider, tempDir } from '../helpers.ts';
 
@@ -214,4 +217,20 @@ test('a corrupt cache is reported, not silently used', async () => {
     build({ items, outDir: out, provider, cacheDir: out }),
     /not an Inkling embedding cache/,
   );
+});
+
+test('EmbeddingGemma q4 uses the file browsers can run, and that file is part of the space', async () => {
+  const q8 = transformersProvider().model;
+  const q4 = transformersProvider({ dtype: 'q4' }).model;
+  assert.equal(q8.file, undefined);
+  assert.equal(q4.file, 'model_no_gather');
+  assert.equal(transformersProvider({ dtype: 'q4', file: 'model' }).model.file, 'model');
+  // q8 spaces and cache keys are unchanged by the new field.
+  assert.equal(
+    spaceKey(q8, 256),
+    `onnx-community/embeddinggemma-300m-ONNX@${q8.revision}|dtype=q8|native=768|dims=256|prompt=03e0cd9b`,
+  );
+  assert.match(spaceKey(q4, 256), /\|dtype=q4\|file=model_no_gather\|native=768\|/);
+  const key = (model: typeof q8) => EmbeddingCache.open(model).then((c) => c.key('input'));
+  assert.notEqual(await key(q4), await key({ ...q4, file: undefined }));
 });

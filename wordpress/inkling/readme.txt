@@ -43,7 +43,7 @@ The plugin asks before every read or write. Related posts use no visitor data an
 == Installation ==
 
 1. Upload the plugin and activate it.
-2. Go to Settings → Inkling and click **Build index**. Keep the tab open: your browser downloads the model once (about 300 MB, then cached) and embeds every published post. You can stop and continue later.
+2. Go to Settings → Inkling and click **Build index**. Keep the tab open: your browser downloads the model once (about 300 MB, or 200 MB with the experimental q4 weights; then cached) and embeds every published post. You can stop and continue later.
 3. From then on, publishing in the block editor embeds the post in your browser. Posts published another way (the classic editor, the REST API, an import) are embedded the next time you click **Build index**.
 
 The manifest should be served with a short cache lifetime and the shards with a long one. On Apache, the plugin writes an `.htaccess` file for this. On nginx:
@@ -65,7 +65,7 @@ Inkling's script, `manifest.json` and the shards it needs, all from your site. A
 
 = What happens if I change the model, dimensions or categories? =
 
-Changing the dimensions, quantization or sections rewrites the files from the stored vectors, with no new embedding. A new plugin version with another model would need a new **Build index**. Visitors' histories survive both: they are kept as post ids, and the profile is recomputed from the new vectors.
+Changing the dimensions, quantization or sections rewrites the files from the stored vectors, with no new embedding. A new plugin version with another model, or switching **Model weights** between q8 and q4, needs a new **Build index**: until it finishes, the lists show your newest posts. Visitors' histories survive both: they are kept as post ids, and the profile is recomputed from the new vectors.
 
 = What is stored on the visitor's device? =
 

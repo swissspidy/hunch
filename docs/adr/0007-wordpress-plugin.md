@@ -54,6 +54,15 @@ the CLI would write, and a catalog built by either can replace the other.
   (Matryoshka), renormalizes and quantizes when it writes the shards. Like the CLI's cache, this
   makes the dimensions and quantization site settings that apply without re-embedding. The
   REST route checks the length, that every value is finite and that the vector isn't zero.
+- **The weights variant is a setting, q8 by default.** q4 (about 200 MB instead of 300 MB) is an
+  experimental choice, as `--dtype q4` is in the CLI: both load `model_no_gather_q4`, the q4
+  file browsers can run ([ADR 0005](0005-query-embedding.md)), and give the same manifest. The
+  editor's browser and Node agree to cosine 0.9998 on q4 vectors (q8: 1.0000), from slightly
+  different 4-bit kernels. It scored no worse on MIND
+  ([evaluation](../evaluation.md)), but on one dataset only. The variant is part of the model
+  key and the space, so switching makes every stored vector stale: the files publish only
+  vectors of the current variant, and **Build index** re-embeds. Mixing variants in one catalog
+  is never allowed.
 - **The post's text never leaves the site.** It goes from the site to the editor's own browser
   over the REST API. The model's weights come from the Hugging Face Hub and Transformers.js from
   jsDelivr. Neither request carries post text. Both URLs can be self-hosted (a setting and a

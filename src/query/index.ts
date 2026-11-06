@@ -21,6 +21,11 @@ import type { Manifest } from '../format/manifest.ts';
 import { hashEmbed } from '../rank/hash.ts';
 import { normalize } from '../rank/vector.ts';
 
+/** Files of q4 weights that browsers can run, per model (see `EMBEDDING_GEMMA.files`). */
+const Q4_FILES: Record<string, string | undefined> = {
+  'onnx-community/embeddinggemma-300m-ONNX': 'model_no_gather',
+};
+
 /** Embeds search queries into the catalog's space. */
 export interface QueryEmbedder {
   /** The model the vectors come from (the manifest's). */
@@ -108,10 +113,13 @@ export async function createQueryEmbedder(
     const specifier = '@huggingface/transformers';
     const mod = loaded ?? ((await import(/* @vite-ignore */ specifier)) as TransformersModule);
     if (mod.env && options.configure) options.configure(mod.env);
-    const settings: Record<string, string | undefined> = {
-      revision: model.revision,
-      dtype: options.dtype ?? model.dtype,
-    };
+    const dtype = options.dtype ?? model.dtype;
+    const settings: Record<string, string | undefined> = { revision: model.revision, dtype };
+    // The catalog's own file, or for another variant the one browsers can run (EmbeddingGemma's
+    // q4 file needs an operator browsers' ONNX Runtime lacks).
+    const file =
+      dtype === model.dtype ? model.file : options.dtype === 'q4' ? Q4_FILES[model.id] : undefined;
+    if (file) settings.model_file_name = file;
     if (options.device) settings.device = options.device;
     const [tokenizerResult, netResult] = await Promise.allSettled([
       mod.AutoTokenizer.from_pretrained(model.id, { revision: model.revision }),
