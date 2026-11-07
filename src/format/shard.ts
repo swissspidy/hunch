@@ -1,11 +1,11 @@
 /**
- * Binary vector shards (ADR 0001; version 2: ADR 0011).
+ * Binary vector shards (ADR 0001, ADR 0011).
  *
- * Version 2, little-endian:
+ * Layout, little-endian:
  *
  *   offset  size          field
  *   0       4             magic "HNCH"
- *   4       1             format version (2)
+ *   4       1             format version (1)
  *   5       1             quantization: 1 = int8, 2 = float32
  *   6       2             reserved (0)
  *   8       4             dims
@@ -25,8 +25,7 @@
  *
  * The columns are what a client reads for every item; the metadata only for items it returns,
  * so it is decoded one item at a time, on demand. Norms aren't stored: a reader computes them
- * from the rows as cheaply as it would download them. Version 1 (ADR 0001) put every item's
- * metadata in one JSON header; readers still read it (ADR 0009).
+ * from the rows as cheaply as it would download them.
  *
  * Vectors are L2-normalized before quantization. int8 rows are `round(v / max|v| * 127)`; the
  * scale is not stored because every comparison renormalizes (cosine is scale-free).
@@ -36,7 +35,7 @@ import type { Quantization, ShardItem } from './manifest.ts';
 
 const MAGIC = 0x48434e48; // "HNCH" read as little-endian u32
 /** The shard format version this release writes. */
-export const SHARD_FORMAT_VERSION = 2;
+export const SHARD_FORMAT_VERSION = 1;
 const NO_SECTION = 0xffff;
 
 const QUANT_CODES: Record<Quantization, number> = { int8: 1, float32: 2 };
@@ -51,7 +50,7 @@ export interface ShardHeader {
 
 /** A decoded shard file. */
 export interface DecodedShard {
-  /** The shard format version (1 or 2). */
+  /** The shard format version. */
   version: number;
   /** The embedding space of the vectors (the manifest's `space`). */
   space: string;
@@ -81,7 +80,7 @@ export interface DecodedShard {
   readonly items: ShardItem[];
 }
 
-/** Encodes unit vectors (one per item, `dims` long) into a shard file (version 2). */
+/** Encodes unit vectors (one per item, `dims` long) into a shard file. */
 export function encodeShard(
   header: ShardHeader,
   vectors: readonly Float32Array[],
@@ -149,7 +148,7 @@ export function encodeShard(
 }
 
 /**
- * Decodes a shard file, version 1 or 2. The vectors are views on `buffer` (no copy); the
+ * Decodes a shard file. The vectors are views on `buffer` (no copy); the
  * columns and metadata are copied, so `buffer` needn't outlive the vectors' use.
  */
 export function decodeShard(buffer: ArrayBuffer): DecodedShard {
@@ -164,7 +163,7 @@ export function decodeShard(buffer: ArrayBuffer): DecodedShard {
   const u32 = (at: number) => view.getUint32(at, true);
   if (u32(0) !== MAGIC) fail('bad magic');
   const version = view.getUint8(4);
-  if (version !== 1 && version !== SHARD_FORMAT_VERSION) {
+  if (version !== SHARD_FORMAT_VERSION) {
     fail(`format version ${version} is not supported`);
   }
   const code = view.getUint8(5);
@@ -173,62 +172,22 @@ export function decodeShard(buffer: ArrayBuffer): DecodedShard {
   const dims = u32(8);
   const count = u32(12);
   const headerLength = u32(16);
-  const v1 = version === 1;
-  const start = v1 ? 20 : 24;
-  truncated(start + headerLength);
-  const decoder = new TextDecoder();
+  truncated(24 + headerLength);
   // A header that isn't an object reads as an empty one, and fails the checks below.
-  const header = (JSON.parse(decoder.decode(new Uint8Array(buffer, start, headerLength))) ??
-    {}) as { space?: unknown; items?: ShardItem[]; sections?: string[]; ids?: string[] };
-  const list = v1 ? header.items : header.ids;
-  if (
-    typeof header.space !== 'string' ||
-    !Array.isArray(list) ||
-    !(v1 || Array.isArray(header.sections))
-  ) {
-    fail(
-      `the header needs ${v1 ? 'a string space and an items array' : 'a space, sections and ids'}`,
-    );
+  const header = (JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 24, headerLength))) ??
+    {}) as { space?: unknown; sections?: string[]; ids?: string[] };
+  const { space, sections, ids } = header;
+  if (typeof space !== 'string' || !Array.isArray(ids) || !Array.isArray(sections)) {
+    fail('the header needs a space, sections and ids');
   }
-  if (list!.length !== count) fail(`header lists ${list!.length} items, not ${count}`);
+  if (ids!.length !== count) fail(`header lists ${ids!.length} items, not ${count}`);
   const layout = layoutOf(headerLength, count, dims, quantization);
-  const vectorsAt = v1 ? align(20 + headerLength, 4) : layout.vectors;
-  truncated(vectorsAt + count * dims * (code === 1 ? 1 : 4));
-  const vectors =
-    code === 1
-      ? new Int8Array(buffer, vectorsAt, count * dims)
-      : new Float32Array(buffer, vectorsAt, count * dims);
-  const base = {
-    version,
-    space: header.space as string,
-    dims,
-    quantization,
-    count,
-    vectors,
-    invNorms: norms(vectors, count, dims),
-  };
-
-  if (v1) {
-    const items = header.items!;
-    const sections: string[] = [];
-    return {
-      ...base,
-      ids: items.map((item) => item.id),
-      prior: Float64Array.from(items, (item) => item.prior),
-      time: Float64Array.from(items, (item) => (item.date ? Date.parse(item.date) : NaN)),
-      sections,
-      section: Int32Array.from(items, ({ section }) =>
-        section === undefined ? -1 : (sections.indexOf(section) + 1 || sections.push(section)) - 1,
-      ),
-      item: itemsReader(items),
-      items,
-    };
-  }
-
   const metaLength = u32(20);
   truncated(layout.metadata + metaLength);
-  const ids = header.ids!;
-  const sections = header.sections!;
+  const vectors =
+    code === 1
+      ? new Int8Array(buffer, layout.vectors, count * dims)
+      : new Float32Array(buffer, layout.vectors, count * dims);
   // Copies, so the closures below don't keep the buffer (and its vectors) alive.
   const column = <T>(make: new (b: ArrayBuffer) => T, at: number, bytes: number) =>
     new make(buffer.slice(at, at + bytes));
@@ -239,27 +198,28 @@ export function decodeShard(buffer: ArrayBuffer): DecodedShard {
   lengths.forEach((length, i) => (offsets[i + 1] = end += length));
   const metadata = column(Uint8Array, layout.metadata, metaLength);
   const section = Int32Array.from(column(Uint16Array, layout.section, 2 * count), (s) =>
-    s === NO_SECTION ? -1 : s < sections.length ? s : fail('a section index is out of range'),
+    s === NO_SECTION ? -1 : s < sections!.length ? s : fail('a section index is out of range'),
   );
   if (end !== metaLength) fail('bad metadata lengths');
-  const item = metadataReader(ids, sections, section, prior, offsets, metadata);
+  const item = metadataReader(ids!, sections!, section, prior, offsets, metadata);
   return {
-    ...base,
-    ids,
+    version,
+    space: space as string,
+    dims,
+    quantization,
+    count,
+    vectors,
+    invNorms: norms(vectors, count, dims),
+    ids: ids!,
     prior,
     time: column(Float64Array, layout.time, 8 * count),
-    sections,
+    sections: sections!,
     section,
     item,
     get items() {
-      return ids.map((_, i) => item(i));
+      return ids!.map((_, i) => item(i));
     },
   };
-}
-
-/** Item `i` of a version 1 header (outside `decodeShard`, as `metadataReader`). */
-function itemsReader(items: ShardItem[]): (i: number) => ShardItem {
-  return (i) => items[i]!;
 }
 
 /**
@@ -286,7 +246,7 @@ function metadataReader(
   };
 }
 
-/** Byte offsets of a version 2 shard's parts. */
+/** Byte offsets of a shard's parts. */
 function layoutOf(headerLength: number, n: number, dims: number, quantization: Quantization) {
   const prior = align(24 + headerLength, 8);
   const time = prior + 8 * n;

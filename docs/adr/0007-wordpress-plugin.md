@@ -72,8 +72,8 @@ the CLI would write, and a catalog built by either can replace the other.
 
 [`class-hunch-shard.php`](../../wordpress/hunch/includes/class-hunch-shard.php) and
 [`class-hunch-writer.php`](../../wordpress/hunch/includes/class-hunch-writer.php) port
-`encodeShard()` and the file-writing half of `build()`: the HNCH layout (version 2 since
-[ADR 0011](0011-format-v2-columns.md), with dates read as `Date.parse` reads ISO 8601), float32
+`encodeShard()` and the file-writing half of `build()`: the HNCH layout (the columns of
+[ADR 0011](0011-shard-columns.md), with dates read as `Date.parse` reads ISO 8601), float32
 rounding of the renormalized vector, int8 quantization with JavaScript's `Math.round`, the JSON as
 `JSON.stringify` writes it (no escaped slashes or Unicode, `1` not `1.0`), one shard per section
 in catalog order split at 2,000 items, content-hashed file names, the manifest's `version`,

@@ -52,7 +52,11 @@ export interface HunchOptions {
   maxSignalAgeDays?: number;
   /** Minutes without activity that end a visit (default 30), for "since your last visit". */
   visitGapMinutes?: number;
-  /** Replaces `fetch` (tests, service workers, custom caching). */
+  /**
+   * Replaces `fetch` (tests, service workers, custom caching). On pages without `crypto.subtle`
+   * (plain HTTP), shards are requested with `init.integrity` and only that check guards them, so
+   * a replacement must honour it.
+   */
   fetch?: Fetch;
   /** Clock, in epoch milliseconds (tests). */
   now?: () => number;

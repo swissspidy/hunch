@@ -1,14 +1,14 @@
-# ADR 0011: Format version 2: per-item columns, and metadata read on demand
+# ADR 0011: The shard as columns, and metadata read on demand
 
 - Status: Accepted
 - Date: 2026-11-06
-- Amends [ADR 0001](0001-format-signals-ranking.md) (the shard layout); follows the rules of
-  [ADR 0009](0009-stability.md)
+- Replaces the shard layout of [ADR 0001](0001-format-signals-ranking.md), before the first
+  release
 
 ## Context
 
 [ADR 0010](0010-columnar-catalog-simd.md) made ranking about ten times faster. Loading did not
-change, and ADR 0010 named the reason: a version 1 shard keeps every item's metadata in one JSON
+change, and ADR 0010 named the reason: ADR 0001's shard keeps every item's metadata in one JSON
 header. Before the client can rank anything from a shard, it:
 
 - parses the whole header, which builds an object per item with its title, URL, tags and image;
@@ -21,17 +21,16 @@ main-thread time, as 50 tasks of about 20 ms each.
 
 ## Decision
 
-### 1. Version 2 of the shard
+### 1. The shard layout
 
-The manifest's `formatVersion` and the shard's version byte become 2. The manifest's fields don't
-change. The shard keeps its magic, quantization, `dims` and `count`, and its vectors. What
-changes is everything else. The values the ranking reads for every item move to binary
+The manifest doesn't change. The shard keeps ADR 0001's magic, quantization, `dims`, `count` and
+vectors. What changes is everything else. The values the ranking reads for every item move to binary
 columns, and the rest of each item moves to a block that is read only on demand:
 
 | Offset | Size         | Field                                                                 |
 | ------ | ------------ | --------------------------------------------------------------------- |
 | 0      | 4            | Magic `HNCH`                                                          |
-| 4      | 1            | Format version (2)                                                    |
+| 4      | 1            | Format version (1)                                                    |
 | 5      | 1            | Quantization: 1 = int8, 2 = float32                                   |
 | 6      | 2            | Reserved (0)                                                          |
 | 8      | 4            | `dims`                                                                |
@@ -45,7 +44,7 @@ columns, and the rest of each item moves to a block that is read only on demand:
 | …      | 4n           | Length of each item's metadata in bytes, uint32                       |
 | …      | 2n           | Section: index into the header's `sections`, uint16 (`0xffff`: none)  |
 | …      | 0–3          | Zero padding to a multiple of 4                                       |
-| …      | n × dims × w | Vectors, row-major, as in version 1                                   |
+| …      | n × dims × w | Vectors, row-major, as in ADR 0001                                    |
 | …      | `M`          | Metadata: each item's other fields as UTF-8 JSON, one after the other |
 
 - **The header keeps what must be known for every item and is a string:** the ids, which the
@@ -53,8 +52,8 @@ columns, and the rest of each item moves to a block that is read only on demand:
   once.
 - **Each item's metadata is its own JSON object**: `{ url, title, tags?, date?, image? }`, the
   published item without `id`, `section` and `prior`, which the columns hold. The client decodes
-  one only when a call returns that item. Unknown fields pass through, as optional item fields
-  did in version 1 (ADR 0009).
+  one only when a call returns that item. Unknown fields pass through, so an optional item field
+  can be added without a new format version (ADR 0009).
 - **The time is parsed when the catalog is built.** `Date.parse` reads ISO 8601 the same way in
   every browser, but other date formats differently. With the time in the file, recency no
   longer depends on the visitor's browser. The date string stays in the metadata, for display.
@@ -69,25 +68,45 @@ The WordPress plugin writes the same bytes as the Node build
 ([ADR 0007](0007-wordpress-plugin.md)). PHP reads ISO 8601 dates as `Date.parse` does. It
 writes NaN for any other format, which the plugin never writes.
 
-### 2. Readers read both versions; the build writes version 2
+### 2. One format version at the first release
 
-As ADR 0009 requires, `decodeShard()` and `assertManifest()` read versions 1 and 2. For a
-version 1 shard, the client derives the same columns from its header. A frozen fixture,
-`test/fixtures/format-v2/`, holds the same catalog as `format-v1/`. The stability test checks
-that both decode to the same items, columns and vectors, and that both rank.
+No release has written ADR 0001's layout, so it is dropped rather than kept as a second
+version: the first release reads and writes this layout, as format version 1 (the manifest's
+`formatVersion` and the shard's version byte). ADR 0009's rules start from it, and the frozen
+fixture `test/fixtures/format-v1/` pins it. Dropping the old reader saves about 0.5 KB gzipped.
 
-A page with a client from before this change refuses a version 2 manifest, so its elements
-keep their server-rendered fallback until the script is refreshed. That is the case
-ADR 0009 plans for. Upgrading the client before rebuilding avoids it.
+`DecodedShard` has the columns (`ids`, `prior`, `time`, `sections`, `section`), `count`,
+`version` and `item(i)`. `items` decodes every item.
 
-`DecodedShard` gains the columns (`ids`, `prior`, `time`, `sections`, `section`), `count`,
-`version` and `item(i)`. `items` remains and decodes every item.
+### 3. Who checks the hash
+
+Every shard is checked against the manifest's SHA-256 before its vectors are used (ADR 0001).
+Where `crypto.subtle` exists, that is, on every secure page, the client hashes with
+`subtle.digest()` as before. On plain-HTTP pages it doesn't exist, and the client passes the
+hash to `fetch()` as Subresource Integrity (`integrity: "sha256-…"`) instead: the browser
+refuses a response that doesn't match. This replaces the JavaScript SHA-256 that ADR 0003 added
+for those pages, about 0.7 KB gzipped. A custom `fetch` (the client's `fetch` option) must honour
+`integrity` for the check to happen there.
+
+Integrity is not used everywhere because it is slower. Fetching 50 shards of 1 MB, against
+fetching them and hashing with `subtle.digest()`:
+
+| Browser                 | `fetch` + `digest()` | `fetch` with `integrity` |
+| ----------------------- | -------------------- | ------------------------ |
+| Chromium, CPU 4× slower | 1.28–1.39 s          | 1.49–1.51 s              |
+| WebKit                  | 353–361 ms           | 418–519 ms               |
+| Firefox                 | 218–358 ms           | 264–296 ms               |
+
+In Chromium and WebKit both block the main thread for the whole time, so integrity doesn't move
+the cost elsewhere either. All three refuse a mismatched shard, on secure and plain-HTTP pages
+alike; a browser test checks this on a page that isn't a secure context, with a shard whose
+vectors were changed.
 
 ## Results
 
-The benchmark's synthetic catalog, main and this change back to back on the same machine:
+The benchmark's synthetic catalog, ADR 0001's layout and this one back to back on the same machine:
 
-| Catalog       | Measure                                            | Version 1      | Version 2      |
+| Catalog       | Measure                                            | JSON header    | Columns        |
 | ------------- | -------------------------------------------------- | -------------- | -------------- |
 | 100,000 items | Decoding and indexing the shards, Chromium, CPU 4× | about 1.05 s   | about 0.75 s   |
 | 100,000 items | JS heap after loading, Chromium                    | 33 MB          | 5 MB           |
@@ -108,11 +127,8 @@ The benchmark's synthetic catalog, main and this change back to back on the same
 - **Bytes over the wire are about the same.** The float columns compress less well than the
   JSON numbers they replace: +1.2% gzipped at 10,000 items, +1.8% at 100,000. Uncompressed, the
   shards are 4% smaller.
-- **Size:** the client is 9.96 KB gzipped (budget 10 KB). Reading two versions costs about
-  0.5 KB. To fit, the JavaScript SHA-256 (for plain-HTTP pages, where `crypto.subtle` is
-  missing) computes its constants from the first 64 primes instead of listing them. Each lies at
-  least 0.005 units from a rounding boundary, so no engine's `Math.cbrt` can get one wrong. The
-  test checks them against `node:crypto`.
+- **Size:** the client is 9.31 KB gzipped (budget 10 KB), down from 9.80 KB with ADR 0001's
+  layout: the columns cost a little, and one format version and no JavaScript SHA-256 save more.
 
 ## Alternatives considered
 
@@ -127,14 +143,16 @@ The benchmark's synthetic catalog, main and this change back to back on the same
   writer for 0.8% of the bytes.
 - **The date only as a time**, with the ISO string rebuilt from it: about 15 KB less per 10,000
   items. But a date the site wrote in another form would come back changed.
-- **Shorter priors (float32):** half the bytes, but scores would move in the eighth decimal, and
-  version 1 and 2 would no longer rank exactly alike.
+- **Shorter priors (float32):** half the bytes, but scores would move in the eighth decimal.
+- **Keeping ADR 0001's layout as a second version:** 0.5 KB of reader for files no release wrote.
+- **Integrity everywhere, or a hash in a Web Worker:** integrity is slower (above); a worker
+  adds a second script and a copy of each shard for a cost of about 7 ms per MB.
 
 ## Consequences
 
-- Format version 2 is a minor release with a changeset (ADR 0009). Sites rebuild to get it.
-  Clients from this release read both versions, and keep reading version 1 for at least two
-  more minor releases.
-- The `./format` entry point's `DecodedShard` has the columns and `item(i)`. Code that read
-  `decodeShard(…).items` still works.
+- The first release writes and reads format version 1 as described here; ADR 0009's promises
+  apply to it from then on.
+- The `./format` entry point's `DecodedShard` has the columns and `item(i)`.
+- Plain-HTTP sites keep their shard check, done by the browser; a custom `fetch` must pass
+  `integrity` on.
 - The next costs of loading are the network and the hash, not the format.

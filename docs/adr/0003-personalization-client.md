@@ -99,7 +99,8 @@ and ranking into short tasks, so larger catalogs do not block input.
 
 SubtleCrypto exists only in secure contexts, so on a plain-HTTP site the client checks a shard's
 SHA-256 with a small JavaScript implementation (`src/format/sha256.ts`, about 1 KB gzipped)
-instead of skipping the check. A stale or mixed-up shard is refused on every site.
+instead of skipping the check. A stale or mixed-up shard is refused on every site. (Since
+[ADR 0011](0011-shard-columns.md), `fetch()` checks it there instead, as Subresource Integrity.)
 
 ## Consequences
 

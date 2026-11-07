@@ -8,10 +8,8 @@
 
 /** The manifest's `format`: identifies the document. */
 export const MANIFEST_FORMAT = 'hunch/manifest';
-/** The manifest format version this release writes (ADR 0009, ADR 0011). */
-export const MANIFEST_FORMAT_VERSION = 2;
-/** The manifest format versions this release reads: its own and the previous one (ADR 0009). */
-export const MANIFEST_FORMAT_VERSIONS: readonly number[] = [1, 2];
+/** The manifest format version this release writes and reads (ADR 0009). */
+export const MANIFEST_FORMAT_VERSION = 1;
 
 /** How the shards store vector components: int8 (the default) or float32. */
 export type Quantization = 'int8' | 'float32';
@@ -58,11 +56,8 @@ export interface ShardRef {
 export interface Manifest {
   /** Always `hunch/manifest`. */
   format: typeof MANIFEST_FORMAT;
-  /**
-   * The format version; a reader refuses versions it doesn't know (ADR 0009). Version 2's
-   * shards keep the per-item values in binary columns (ADR 0011); version 1's in JSON.
-   */
-  formatVersion: 1 | 2;
+  /** The format version; a reader refuses versions it doesn't know (ADR 0009). */
+  formatVersion: typeof MANIFEST_FORMAT_VERSION;
   /** Content hash of the space and all shards; changes whenever any vector or item changes. */
   version: string;
   /** ISO 8601 build time. */
@@ -126,9 +121,9 @@ export function assertManifest(value: unknown): asserts value is Manifest {
   if (m.format !== MANIFEST_FORMAT) {
     throw new TypeError(`Hunch manifest: format is ${JSON.stringify(m.format)}`);
   }
-  if (!MANIFEST_FORMAT_VERSIONS.includes(m.formatVersion as number)) {
+  if (m.formatVersion !== MANIFEST_FORMAT_VERSION) {
     throw new TypeError(
-      `Hunch manifest: format version ${m.formatVersion} is not supported (expected ${MANIFEST_FORMAT_VERSIONS.join(' or ')})`,
+      `Hunch manifest: format version ${m.formatVersion} is not supported (expected ${MANIFEST_FORMAT_VERSION})`,
     );
   }
   if (

@@ -141,7 +141,7 @@ final class Hunch_Writer {
 		}
 		$manifest = array(
 			'format'        => 'hunch/manifest',
-			'formatVersion' => 2,
+			'formatVersion' => 1,
 			'version'       => $version,
 			'generatedAt'   => ( $previous && isset( $previous['version'], $previous['generatedAt'] ) && $previous['version'] === $version ) ? $previous['generatedAt'] : $now,
 			'space'         => $space,

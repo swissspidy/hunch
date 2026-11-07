@@ -16,7 +16,6 @@ import {
   type ShardItem,
   type ShardRef,
 } from '../format/manifest.ts';
-import { sha256Hex } from '../format/sha256.ts';
 import { decodeShard, type DecodedShard } from '../format/shard.ts';
 import { createVectorStore, MAX_SPAN, type VectorStore } from '../rank/kernel.ts';
 import { recencyAt } from '../rank/rank.ts';
@@ -283,13 +282,17 @@ export class Catalog {
 
   private async fetchShard(ref: ShardRef): Promise<void> {
     const url = new URL(ref.url, this.url);
-    const response = await this.fetch(url);
+    // SubtleCrypto is only exposed in secure contexts. Elsewhere (plain-HTTP sites), fetch()
+    // checks the hash itself, as Subresource Integrity: slower than digest() where both exist,
+    // so only there. A custom `fetch` must honour `integrity` for that check to happen.
+    const subtle = globalThis.crypto?.subtle;
+    const response = await this.fetch(url, subtle ? undefined : { integrity: sri(ref.sha256) });
     if (!response.ok) throw new Error(`Hunch: shard ${url} returned ${response.status}`);
     const buffer = await response.arrayBuffer();
     // Shards that arrive together are hashed, decoded and indexed in tasks of their own, so
     // none of them blocks input for long (ADR 0008).
     await yieldToPage();
-    await verify(buffer, ref, url);
+    if (subtle) await verify(subtle, buffer, ref, url);
     await yieldToPage();
     const shard = decodeShard(buffer);
     if (shard.space !== this.manifest.space) {
@@ -359,17 +362,21 @@ export class Catalog {
   }
 }
 
-async function verify(buffer: ArrayBuffer, ref: ShardRef, url: URL): Promise<void> {
-  const subtle = globalThis.crypto?.subtle;
-  let hex: string;
-  if (subtle) {
-    hex = '';
-    for (const byte of new Uint8Array(await subtle.digest('SHA-256', buffer))) {
-      hex += byte.toString(16).padStart(2, '0');
-    }
-  } else {
-    // SubtleCrypto is only exposed in secure contexts: plain-HTTP sites get the JS fallback.
-    hex = sha256Hex(new Uint8Array(buffer));
+async function verify(
+  subtle: SubtleCrypto,
+  buffer: ArrayBuffer,
+  ref: ShardRef,
+  url: URL,
+): Promise<void> {
+  let hex = '';
+  for (const byte of new Uint8Array(await subtle.digest('SHA-256', buffer))) {
+    hex += byte.toString(16).padStart(2, '0');
   }
   if (hex !== ref.sha256) throw new Error(`Hunch: shard ${url} does not match the manifest's hash`);
+}
+
+/** A hex SHA-256 as a Subresource Integrity value (`sha256-` and the digest in base64). */
+function sri(hex: string): string {
+  const bytes = String(hex).match(/../g) ?? [];
+  return `sha256-${btoa(String.fromCharCode(...bytes.map((b) => parseInt(b, 16))))}`;
 }

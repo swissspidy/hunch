@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -104,6 +105,51 @@ test('a shard that does not match its hash is refused', async () => {
   );
 });
 
+test('without SubtleCrypto (plain HTTP), fetch checks the hash as Subresource Integrity', async () => {
+  const manifest = JSON.parse(await readFile(join(dir, 'hunch/manifest.json'), 'utf8'));
+  const inner = dirFetch(dir);
+  const seen: (string | undefined)[] = [];
+  // A fetch that enforces `integrity`, as browsers do.
+  const sriFetch =
+    (body: (url: URL) => Promise<Response>) =>
+    async (input: string | URL, init?: RequestInit): Promise<Response> => {
+      const url = new URL(input);
+      const response = await body(url);
+      if (!init?.integrity) return response;
+      seen.push(init.integrity);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const digest = `sha256-${createHash('sha256').update(bytes).digest('base64')}`;
+      if (digest !== init.integrity) throw new TypeError('Failed to fetch');
+      return new Response(bytes);
+    };
+  const real = Object.getOwnPropertyDescriptor(globalThis, 'crypto')!;
+  Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true });
+  try {
+    const ink = await Hunch.load({ manifest: MANIFEST, fetch: sriFetch((u) => inner(u)), now });
+    assert.ok((await ink.related('cold-brew', { sectionHint: 'Food' })).length > 0);
+    const food = manifest.shards.find((s: { section: string }) => s.section === 'Food');
+    assert.ok(
+      seen.includes(`sha256-${Buffer.from(food.sha256, 'hex').toString('base64')}`),
+      JSON.stringify(seen),
+    );
+    // A shard that doesn't match is refused, by fetch.
+    const wrong = {
+      ...manifest,
+      shards: manifest.shards.map((s: object) => ({ ...s, sha256: '0'.repeat(64) })),
+    };
+    const bad = await Hunch.load({
+      manifest: MANIFEST,
+      fetch: sriFetch((u) =>
+        u.pathname.endsWith('manifest.json') ? Promise.resolve(Response.json(wrong)) : inner(u),
+      ),
+      now,
+    });
+    await assert.rejects(bad.related('cold-brew', { sectionHint: 'Food' }), /Failed to fetch/);
+  } finally {
+    Object.defineProperty(globalThis, 'crypto', real);
+  }
+});
+
 test('manifests of another format are refused', async () => {
   const bad = (body: unknown) => () => Promise.resolve(new Response(JSON.stringify(body)));
   await assert.rejects(
@@ -113,9 +159,9 @@ test('manifests of another format are refused', async () => {
   await assert.rejects(
     Hunch.load({
       manifest: MANIFEST,
-      fetch: bad({ format: 'hunch/manifest', formatVersion: 3 }),
+      fetch: bad({ format: 'hunch/manifest', formatVersion: 2 }),
     }),
-    /format version 3/,
+    /format version 2/,
   );
   const base = {
     format: 'hunch/manifest',
