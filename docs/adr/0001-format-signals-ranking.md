@@ -2,9 +2,9 @@
 
 - Status: Accepted (milestone 1 built the format and `related()`, milestone 2 the signals and
   the profile). Amended by [ADR 0003](0003-personalization-client.md): followed items count as
-  seen, and the cold start keeps the site's order exactly. Amended by
-  [ADR 0011](0011-format-v2-columns.md): format version 2 moves the per-item values into binary
-  columns and decodes the other metadata on demand; the layout below is version 1's.
+  seen, and the cold start keeps the site's order exactly. Its shard
+  layout was replaced before the first release by [ADR 0011](0011-shard-columns.md): the
+  per-item values in binary columns, the other metadata decoded on demand.
 - Date: 2026-11-04
 
 ## Context
@@ -83,8 +83,9 @@ can be cached forever.
 
 ### 2. Vector shards
 
-> Format version 2 ([ADR 0011](0011-format-v2-columns.md)) keeps the vectors and the per-shard
-> grouping below, and replaces the JSON header with columns and per-item metadata.
+> Replaced before the first release by [ADR 0011](0011-shard-columns.md), which keeps the
+> vectors and the per-shard grouping below, and replaces the JSON header with columns and
+> per-item metadata. No release wrote the layout below.
 
 One shard per section (in catalog order), split at 2,000 items, plus one shard (`all`) for
 items without a section. A page that only needs related items from its own section loads one

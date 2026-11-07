@@ -23,7 +23,7 @@ counts as breaking, and what is not promised at all.
 
 ### Manifest and shard format
 
-- **`formatVersion` (manifest) and the version byte (shard) name the format.** Both are 2 since [ADR 0011](0011-format-v2-columns.md). A
+- **`formatVersion` (manifest) and the version byte (shard) name the format.** Both are 1. A
   change that a reader must understand to read the file correctly bumps the version: a field
   that changes meaning, a new required field, a new encoding, a new layout. Adding an optional
   manifest field, or an optional item field in the shard header, does not; readers ignore what
@@ -43,9 +43,8 @@ counts as breaking, and what is not promised at all.
   rebuilds, and a page with a cached older client fails safe (the fallback) on a newer
   manifest until its script is refreshed.
 - **A frozen fixture pins each version.** `test/fixtures/format-v1/` is a tiny catalog built
-  with version 1 and never rebuilt; `test/fixtures/format-v2/` is the same catalog in version 2.
-  [`test/unit/stability.test.ts`](../../test/unit/stability.test.ts) checks that each still
-  decodes byte for byte and ranks, that the writer writes the newest version (2),
+  with version 1 and never rebuilt. [`test/unit/stability.test.ts`](../../test/unit/stability.test.ts)
+  checks that it still decodes byte for byte and ranks, that the writer still writes version 1,
   and that a newer version is refused. A format change fails it; a new version adds its own
   fixture next to the old ones, which stay for as long as readers read them.
 

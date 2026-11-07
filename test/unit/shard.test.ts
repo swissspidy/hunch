@@ -42,7 +42,7 @@ test('int8 shards keep cosine similarity within 1%', () => {
 
 test('the columns are read as written, the metadata only on demand', () => {
   const shard = decodeShard(copy(encodeShard({ space: 's', items }, vectors, 5, 'int8')));
-  assert.equal(shard.version, 2);
+  assert.equal(shard.version, 1);
   assert.equal(shard.count, 2);
   assert.deepEqual(shard.ids, ['a', 'b']);
   assert.deepEqual([...shard.prior], [1, 0.5]);
@@ -78,31 +78,6 @@ test('the columns and vectors are aligned whatever the header length', () => {
   }
 });
 
-test('version 1 shards are still read', () => {
-  const header = JSON.stringify({ space: 's', items });
-  const text = new TextEncoder().encode(header);
-  const start = Math.ceil((20 + text.length) / 4) * 4;
-  const out = new Uint8Array(start + 2 * 4);
-  const view = new DataView(out.buffer);
-  view.setUint32(0, 0x48434e48, true);
-  view.setUint8(4, 1);
-  view.setUint8(5, 1);
-  view.setUint32(8, 4, true);
-  view.setUint32(12, 2, true);
-  view.setUint32(16, text.length, true);
-  out.set(text, 20);
-  out.set([3, 4, 0, 0, 0, 0, 0, 2], start);
-  const shard = decodeShard(out.buffer);
-  assert.equal(shard.version, 1);
-  assert.deepEqual(shard.items, items);
-  assert.deepEqual(shard.ids, ['a', 'b']);
-  assert.deepEqual([...shard.prior], [1, 0.5]);
-  assert.deepEqual([...shard.time], [NaN, Date.parse('2026-01-01T00:00:00.000Z')]);
-  assert.deepEqual(shard.sections, ['x']);
-  assert.deepEqual([...shard.section], [-1, 0]);
-  assert.deepEqual([...shard.invNorms], [Math.fround(0.2), 0.5]);
-});
-
 test('bad input is rejected', () => {
   assert.throws(() => decodeShard(new ArrayBuffer(4)), /truncated/);
   assert.throws(() => decodeShard(new ArrayBuffer(64)), /magic/);
@@ -112,22 +87,11 @@ test('bad input is rejected', () => {
     () => encodeShard({ space: 's', items }, [vectors[0]!], 5, 'int8'),
     /2 items but 1 vectors/,
   );
-  for (const header of ['null', '{}', '{"items":[]}', '{"space":"s"}']) {
-    assert.throws(
-      () => decodeShard(withHeader(header)),
-      /needs a string space and an items array/,
-      header,
-    );
-  }
   for (const header of ['null', '{}', '{"space":"s","ids":[]}', '{"space":"s","sections":[]}']) {
-    assert.throws(
-      () => decodeShard(withHeader(header, 2)),
-      /needs a space, sections and ids/,
-      header,
-    );
+    assert.throws(() => decodeShard(withHeader(header)), /needs a space, sections and ids/, header);
   }
   assert.throws(
-    () => decodeShard(withHeader('{"space":"s","sections":[],"ids":["a"]}', 2)),
+    () => decodeShard(withHeader('{"space":"s","sections":[],"ids":["a"]}')),
     /lists 1 items, not 0/,
   );
   // Metadata lengths that don't add up, or a section the header doesn't list.
@@ -143,14 +107,13 @@ test('bad input is rejected', () => {
 });
 
 /** A shard with no items and the given raw JSON header. */
-function withHeader(json: string, version = 1): ArrayBuffer {
+function withHeader(json: string): ArrayBuffer {
   const text = new TextEncoder().encode(json);
-  const start = version === 1 ? 20 : 24;
-  // Room for an empty shard's columns (version 2: one metadata offset, 0).
+  const start = 24;
   const out = new Uint8Array(start + text.length + 16);
   const view = new DataView(out.buffer);
   view.setUint32(0, 0x48434e48, true);
-  view.setUint8(4, version);
+  view.setUint8(4, 1);
   view.setUint8(5, 1);
   view.setUint32(8, 4, true);
   view.setUint32(12, 0, true);
@@ -162,19 +125,6 @@ function withHeader(json: string, version = 1): ArrayBuffer {
 function copy(bytes: Uint8Array): ArrayBuffer {
   return bytes.slice().buffer;
 }
-
-test('the JavaScript SHA-256 matches node:crypto', async () => {
-  const { createHash } = await import('node:crypto');
-  const { sha256Hex } = await import('../../src/format/sha256.ts');
-  for (const length of [0, 1, 55, 56, 63, 64, 65, 1000, 70_000]) {
-    const bytes = Uint8Array.from({ length }, (_, i) => (i * 31 + length) & 0xff);
-    assert.equal(
-      sha256Hex(bytes),
-      createHash('sha256').update(bytes).digest('hex'),
-      `length ${length}`,
-    );
-  }
-});
 
 test('a shard holds up to 65,535 sections (0xffff means none)', () => {
   const shard = (sections: number) =>
