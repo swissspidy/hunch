@@ -286,7 +286,10 @@ export class Catalog {
     // checks the hash itself, as Subresource Integrity: slower than digest() where both exist,
     // so only there. A custom `fetch` must honour `integrity` for that check to happen.
     const subtle = globalThis.crypto?.subtle;
-    const response = await this.fetch(url, subtle ? undefined : { integrity: sri(ref.sha256) });
+    const response = await this.fetch(
+      url,
+      subtle ? undefined : { integrity: sri(ref.sha256, url) },
+    );
     if (!response.ok) throw new Error(`Hunch: shard ${url} returned ${response.status}`);
     const buffer = await response.arrayBuffer();
     // Shards that arrive together are hashed, decoded and indexed in tasks of their own, so
@@ -376,7 +379,9 @@ async function verify(
 }
 
 /** A hex SHA-256 as a Subresource Integrity value (`sha256-` and the digest in base64). */
-function sri(hex: string): string {
-  const bytes = String(hex).match(/../g) ?? [];
-  return `sha256-${btoa(String.fromCharCode(...bytes.map((b) => parseInt(b, 16))))}`;
+function sri(hex: string, url: URL): string {
+  // Browsers skip the check for metadata they can't parse, so a bad hash must fail here.
+  if (!/^[0-9a-f]{64}$/.test(hex)) throw new Error(`Hunch: shard ${url} has no valid SHA-256`);
+  const bytes = hex.match(/../g)!.map((b) => parseInt(b, 16));
+  return `sha256-${btoa(String.fromCharCode(...bytes))}`;
 }

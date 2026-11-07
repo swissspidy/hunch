@@ -145,6 +145,18 @@ test('without SubtleCrypto (plain HTTP), fetch checks the hash as Subresource In
       now,
     });
     await assert.rejects(bad.related('cold-brew', { sectionHint: 'Food' }), /Failed to fetch/);
+    // A hash browsers couldn't parse would mean no check at all: refused before fetching.
+    for (const sha256 of ['', 'xyz', '0'.repeat(63), 'A'.repeat(64)]) {
+      const odd = { ...manifest, shards: manifest.shards.map((s: object) => ({ ...s, sha256 })) };
+      const ink = await Hunch.load({
+        manifest: MANIFEST,
+        fetch: sriFetch((u) =>
+          u.pathname.endsWith('manifest.json') ? Promise.resolve(Response.json(odd)) : inner(u),
+        ),
+        now,
+      });
+      await assert.rejects(ink.related('cold-brew', { sectionHint: 'Food' }), /no valid SHA-256/);
+    }
   } finally {
     Object.defineProperty(globalThis, 'crypto', real);
   }

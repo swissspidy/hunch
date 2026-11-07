@@ -127,7 +127,7 @@ The benchmark's synthetic catalog, ADR 0001's layout and this one back to back o
 - **Bytes over the wire are about the same.** The float columns compress less well than the
   JSON numbers they replace: +1.2% gzipped at 10,000 items, +1.8% at 100,000. Uncompressed, the
   shards are 4% smaller.
-- **Size:** the client is 9.31 KB gzipped (budget 10 KB), down from 9.80 KB with ADR 0001's
+- **Size:** the client is 9.34 KB gzipped (budget 10 KB), down from 9.80 KB with ADR 0001's
   layout: the columns cost a little, and one format version and no JavaScript SHA-256 save more.
 
 ## Alternatives considered
