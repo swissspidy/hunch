@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 import { after, before, type TestContext } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   chromium,
   firefox,
@@ -233,4 +234,53 @@ export async function fakeTransformers(): Promise<string> {
         return model;
       },
     };`;
+}
+
+const AXE = fileURLToPath(import.meta.resolve('axe-core/axe.min.js'));
+
+/** An axe-core rule the page breaks, and where. */
+export interface Violation {
+  id: string;
+  impact: string | null;
+  help: string;
+  nodes: { target: unknown[] }[];
+}
+
+/** axe-core's WCAG 2.2 A/AA and best-practice rules over the whole page. */
+export async function axe(page: Page): Promise<Violation[]> {
+  // The slots' fade-in would read as low contrast: check the page as it settles.
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+  await page.addScriptTag({ path: AXE });
+  return page.evaluate(async () => {
+    const { violations, passes } = await (
+      window as unknown as {
+        axe: {
+          run(
+            context: Document,
+            options: object,
+          ): Promise<{ violations: Violation[]; passes: unknown[] }>;
+        };
+      }
+    ).axe.run(document, {
+      runOnly: {
+        type: 'tag',
+        values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'],
+      },
+    });
+    if (passes.length < 10) throw new Error(`axe checked only ${passes.length} rules`);
+    return violations.map(({ id, impact, help, nodes }) => ({
+      id,
+      impact,
+      help,
+      nodes: nodes.map(({ target }) => ({ target })),
+    }));
+  });
+}
+
+export function assertClean(violations: Violation[], state: string): void {
+  assert.deepEqual(
+    violations,
+    [],
+    `${state}:\n${violations.map((v) => `${v.id} (${v.impact}): ${v.help} ${JSON.stringify(v.nodes.map((n) => n.target))}`).join('\n')}`,
+  );
 }

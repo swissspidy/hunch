@@ -11,7 +11,7 @@
     "../../src/astro/index.ts"
   ],
   "tsconfig": "./tsconfig.json",
-  "out": "../../demo/dist/api",
+  "out": "../../site/dist/api",
   "readme": "none",
   "excludePrivate": true,
   "excludeProtected": true,
@@ -21,8 +21,9 @@
   "githubPages": false,
   "disableSources": true,
   "navigationLinks": {
-    "GitHub": "https://github.com/swissspidy/hunch",
-    "Demo": "https://swissspidy.github.io/hunch/"
+    "Hunch": "https://swissspidy.github.io/hunch/",
+    "Demo": "https://swissspidy.github.io/hunch/demo/",
+    "GitHub": "https://github.com/swissspidy/hunch"
   },
   "validation": {
     "notExported": true,

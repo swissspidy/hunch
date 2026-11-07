@@ -40,8 +40,8 @@ imports under `src/format`, `src/rank`, `src/client`, `src/elements`, `src/diges
 
 ## The API reference
 
-`npm run api` writes the API reference to `demo/dist/api/` with TypeDoc, from the TSDoc
-comments of the public entry points (run it after `npm run demo`, which empties `demo/dist`).
+`npm run api` writes the API reference to `site/dist/api/` with TypeDoc, from the TSDoc
+comments of the public entry points (run it after `npm run site`, which empties `site/dist`).
 TypeDoc needs the TypeScript compiler API, which TypeScript 7 doesn't have, so it lives in
 `docs/api/` with its own lockfile and TypeScript 6: install it once with
 `npm ci --prefix docs/api`. It fails on an undocumented export or a broken `{@link}`.

@@ -78,6 +78,7 @@
     "size": "node scripts/size.ts",
     "demo": "node scripts/demo.ts",
     "api": "npm run --prefix docs/api build",
+    "site": "node scripts/site.ts",
     "changeset": "changeset",
     "version-packages": "changeset version && npm install --package-lock-only --ignore-scripts",
     "bench": "node scripts/bench.ts",
