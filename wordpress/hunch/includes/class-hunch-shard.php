@@ -1,9 +1,9 @@
 <?php
 /**
- * The HNCH vector shard, version 2 (ADR 0011), written byte for byte as `encodeShard()` in
+ * The HNCH vector shard (ADR 0011), written byte for byte as `encodeShard()` in
  * src/format/shard.ts writes it. No WordPress needed.
  *
- * Layout, little-endian: magic "HNCH", u8 format version (2), u8 quantization (1 = int8,
+ * Layout, little-endian: magic "HNCH", u8 format version (1), u8 quantization (1 = int8,
  * 2 = float32), u16 reserved, u32 dims, u32 count n, u32 header length H, u32 metadata length
  * M, H bytes of UTF-8 JSON `{ "space", "sections", "ids" }`, zero padding to a multiple of 8;
  * the columns: n float64 priors, n float64 times (ms, NaN without a date), n u32 metadata
@@ -20,7 +20,7 @@ defined( 'ABSPATH' ) || defined( 'HUNCH_STANDALONE' ) || exit;
  */
 final class Hunch_Shard {
 
-	const FORMAT_VERSION = 2;
+	const FORMAT_VERSION = 1;
 	const FIXED_HEADER   = 24;
 	const NO_SECTION     = 0xffff;
 

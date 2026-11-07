@@ -195,3 +195,34 @@ test('the server-rendered fallback stays when the manifest cannot load', async (
   assert.deepEqual(await slots(page), fallback);
   await context.close();
 });
+
+test('on a plain-HTTP site (no SubtleCrypto), fetch checks the shards’ hashes', async () => {
+  // The demo under an origin that isn't localhost, so the page is not a secure context.
+  const context = await site.browser.newContext(DESKTOP);
+  let tamper = false;
+  await context.route('http://hunch.test/**', async (route) => {
+    const url = new URL(route.request().url());
+    const response = await route.fetch({ url: `${site.origin}${url.pathname}${url.search}` });
+    if (tamper && url.pathname.endsWith('.hunch')) {
+      // One vector component changed: still a valid shard, so only the hash can tell.
+      const body = Buffer.from(await response.body());
+      const at = body.length - body.readUInt32LE(20) - 1;
+      body[at] = body[at]! ^ 1;
+      return route.fulfill({ response, body });
+    }
+    return route.fulfill({ response });
+  });
+  const page = await context.newPage();
+  await page.goto('http://hunch.test/items/cold-brew.html');
+  assert.deepEqual(
+    await page.evaluate(() => [isSecureContext, Boolean(globalThis.crypto?.subtle)]),
+    [false, false],
+  );
+  await ready(page);
+  assert.ok((await slots(page)).every((slot) => slot.title));
+  // A shard that doesn't match the manifest's hash: refused, the fallback stays.
+  tamper = true;
+  await page.reload();
+  await page.waitForSelector('hunch-related[data-hunch-state="error"]');
+  await context.close();
+});

@@ -7,7 +7,6 @@
 export {
   MANIFEST_FORMAT,
   MANIFEST_FORMAT_VERSION,
-  MANIFEST_FORMAT_VERSIONS,
   assertManifest,
   fnv1a,
   spaceKey,
