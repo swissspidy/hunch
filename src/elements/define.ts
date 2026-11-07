@@ -1,11 +1,11 @@
 import { applyPageConfig } from './config.ts';
-import { InklingDigestElement } from './digest.ts';
-import { InklingForYouElement } from './for-you.ts';
-import { InklingPageElement } from './page.ts';
-import { InklingRelatedElement } from './related.ts';
+import { HunchDigestElement } from './digest.ts';
+import { HunchForYouElement } from './for-you.ts';
+import { HunchPageElement } from './page.ts';
+import { HunchRelatedElement } from './related.ts';
 
 /**
- * Applies `window.InklingConfig` and registers the components (a no-op during server rendering,
+ * Applies `window.HunchConfig` and registers the components (a no-op during server rendering,
  * and for names already taken).
  */
 export function defineElements(): void {
@@ -13,10 +13,10 @@ export function defineElements(): void {
   // Before registering: that upgrades the components already in the page.
   applyPageConfig();
   for (const [name, element] of [
-    ['inkling-related', InklingRelatedElement],
-    ['inkling-for-you', InklingForYouElement],
-    ['inkling-page', InklingPageElement],
-    ['inkling-digest', InklingDigestElement],
+    ['hunch-related', HunchRelatedElement],
+    ['hunch-for-you', HunchForYouElement],
+    ['hunch-page', HunchPageElement],
+    ['hunch-digest', HunchDigestElement],
   ] as const) {
     if (!customElements.get(name)) customElements.define(name, element);
   }

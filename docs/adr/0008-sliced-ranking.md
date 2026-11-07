@@ -13,7 +13,7 @@ loads the catalog and ranks "for you", taps and scrolling wait.
 `npm run bench -- --browser` now counts long tasks (over 50 ms) during load and the first
 `recommend()` of a returning visitor with 50 signals in IndexedDB, in Chromium with the CPU
 slowed 4×. `--items` takes a list (`--items 10000,50000,100000`). The synthetic catalog now
-splits sections into shards of at most 2,000 items, as `inkling build` does by default (before,
+splits sections into shards of at most 2,000 items, as `hunch build` does by default (before,
 a 100,000-item catalog was benchmarked as ten 10,000-item shards, which no build produces).
 
 Before this change (median of three runs):
@@ -27,7 +27,7 @@ Before this change (median of three runs):
 "Blocking" is the total blocking time: the sum of each long task's time over 50 ms.
 `recommend()` is the average of ten calls once everything is loaded. The machine was shared
 with other jobs (4 cores), so the benchmark ran at a higher scheduling priority; without that,
-other processes stretch tasks past 50 ms whatever Inkling does.
+other processes stretch tasks past 50 ms whatever Hunch does.
 
 Where the time went, from Chromium profiles of the 100,000-item run:
 
@@ -39,9 +39,9 @@ Where the time went, from Chromium profiles of the 100,000-item run:
 - **Shards** are decoded one by one, but shards that arrive together were hashed and decoded in
   the same task. Decoding a 2,000-item shard (JSON header, row norms) and indexing its items
   takes 10 to 40 ms.
-- The rest of the long tasks during load contain no Inkling code: the browser receiving 50
+- The rest of the long tasks during load contain no Hunch code: the browser receiving 50
   response bodies (about 51 MB), and garbage collection. A page that only fetches the 50 shards
-  and hashes them, with no Inkling code at all, has 0 to 4 long tasks of 50 to 70 ms on the same
+  and hashes them, with no Hunch code at all, has 0 to 4 long tasks of 50 to 70 ms on the same
   machine.
 
 ## Options

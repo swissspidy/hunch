@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { before, test } from 'node:test';
-import { Inkling, MemoryStore } from '../../src/client/index.ts';
+import { Hunch, MemoryStore } from '../../src/client/index.ts';
 import { nextVisit } from '../../src/client/signals.ts';
 import { canSummarize, summarize } from '../../src/digest/summarize.ts';
 import { build } from '../../src/node/build.ts';
@@ -39,7 +39,7 @@ before(async () => {
 });
 
 async function load(now: () => number, store = new MemoryStore(), consent = true) {
-  return Inkling.load({
+  return Hunch.load({
     manifest: 'http://site/manifest.json',
     fetch: dirFetch(dir),
     consent,

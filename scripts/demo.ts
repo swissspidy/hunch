@@ -4,10 +4,10 @@
  *   node scripts/demo.ts [--base /] [--provider transformers|hash] [--serve [port]]
  *
  * The site is static HTML. Each article page server-renders a "Related" list of the latest
- * articles in its section; `<inkling-related>` rewrites those slots in place with the items
+ * articles in its section; `<hunch-related>` rewrites those slots in place with the items
  * whose vectors are closest. The browser loads `manifest.json` and one shard per section, and
  * no model. The vectors come from EmbeddingGemma via the committed embedding cache
- * (demo/inkling-cache), so the demo builds without downloading the model unless the feed changes.
+ * (demo/hunch-cache), so the demo builds without downloading the model unless the feed changes.
  */
 
 import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -43,19 +43,19 @@ const provider =
   values.provider === 'hash' ? hashProvider() : transformersProvider({ dtype: 'q8' });
 const result = await build({
   items,
-  outDir: join(OUT, 'inkling'),
+  outDir: join(OUT, 'hunch'),
   provider,
   dims: 256,
   quantization: 'int8',
-  cacheDir: values.provider === 'hash' ? false : 'demo/inkling-cache',
+  cacheDir: values.provider === 'hash' ? false : 'demo/hunch-cache',
   // The cache keeps the output reproducible; so does a fixed time.
   now: new Date('2026-11-01T00:00:00Z'),
   log: (m) => console.error(m),
 });
 await provider.dispose?.();
-await bundleGlobal(join(OUT, 'inkling.js'));
+await bundleGlobal(join(OUT, 'hunch.js'));
 // The query embedder, loaded only when a visitor searches.
-await writeFile(join(OUT, 'inkling-query.js'), await bundleEsm('src/query/index.ts'));
+await writeFile(join(OUT, 'hunch-query.js'), await bundleEsm('src/query/index.ts'));
 await cp('demo/style.css', join(OUT, 'style.css'));
 await cp('demo/demo.js', join(OUT, 'demo.js'));
 
@@ -78,9 +78,9 @@ console.error(
 if (values.serve) await serve(Number(values.port));
 
 function slot(item: CatalogItem, indent: string): string {
-  return `${indent}<li data-inkling-slot data-inkling-id="${esc(item.id)}">
-${indent}  <a href="${esc(item.url)}"><span class="title" data-inkling-title>${esc(item.title)}</span></a>
-${indent}  <span class="meta"><span data-inkling-section>${esc(item.section ?? '')}</span> · <time data-inkling-date datetime="${esc(item.date ?? '')}">${fmt(item.date)}</time></span>
+  return `${indent}<li data-hunch-slot data-hunch-id="${esc(item.id)}">
+${indent}  <a href="${esc(item.url)}"><span class="title" data-hunch-title>${esc(item.title)}</span></a>
+${indent}  <span class="meta"><span data-hunch-section>${esc(item.section ?? '')}</span> · <time data-hunch-date datetime="${esc(item.date ?? '')}">${fmt(item.date)}</time></span>
 ${indent}</li>`;
 }
 
@@ -106,7 +106,7 @@ ${list.map((item) => `    <li><a href="${esc(item.url)}">${esc(item.title)}</a> 
     .slice(0, SLOTS)
     .map((item) => slot(item, '      '))
     .join('\n');
-  return `<header><h1>Field Notes</h1><p class="lede">A demo publication for <a href="https://github.com/swissspidy/inkling">Inkling</a>. Recommendations are ranked in your browser from precomputed vectors, with no model. Search embeds your query with a model in your browser. There is no server-side profile and no tracking.</p></header>
+  return `<header><h1>Field Notes</h1><p class="lede">A demo publication for <a href="https://github.com/swissspidy/hunch">Hunch</a>. Recommendations are ranked in your browser from precomputed vectors, with no model. Search embeds your query with a model in your browser. There is no server-side profile and no tracking.</p></header>
 <main>
   <section aria-labelledby="search-heading">
     <h2 id="search-heading">Search</h2>
@@ -119,20 +119,20 @@ ${list.map((item) => `    <li><a href="${esc(item.url)}">${esc(item.title)}</a> 
   </section>
   <section aria-labelledby="digest-heading">
     <h2 id="digest-heading">Since your last visit</h2>
-    <inkling-digest manifest="${base}inkling/manifest.json" context="Headlines of a publication about food, science, technology and travel, published since the reader's last visit.">
-      <p class="summary" data-inkling-summary>The latest articles. Come back later, with personalization on, for what is new since this visit.</p>
+    <hunch-digest manifest="${base}hunch/manifest.json" context="Headlines of a publication about food, science, technology and travel, published since the reader's last visit.">
+      <p class="summary" data-hunch-summary>The latest articles. Come back later, with personalization on, for what is new since this visit.</p>
       <ol class="related" role="list">
 ${latest}
       </ol>
-    </inkling-digest>
+    </hunch-digest>
   </section>
   <section aria-labelledby="for-you-heading">
     <h2 id="for-you-heading">For you</h2>
-    <inkling-for-you manifest="${base}inkling/manifest.json">
+    <hunch-for-you manifest="${base}hunch/manifest.json">
       <ol class="related" role="list">
 ${editorial}
       </ol>
-    </inkling-for-you>
+    </hunch-for-you>
     <details class="why">
       <summary>Why these?</summary>
       <ol id="why-list"><li>The editors' picks: turn on personalization below and read a few articles.</li></ol>
@@ -161,7 +161,7 @@ function articleBody(item: CatalogItem): string {
     .slice(0, SLOTS);
   return `<header><p><a href="${base}">← Field Notes</a></p></header>
 <main>
-  <inkling-page manifest="${base}inkling/manifest.json" item="${esc(item.id)}"></inkling-page>
+  <hunch-page manifest="${base}hunch/manifest.json" item="${esc(item.id)}"></hunch-page>
   <article>
     <p class="kicker">${esc(item.section ?? '')} · <time datetime="${esc(item.date ?? '')}">${fmt(item.date)}</time></p>
     <h1>${esc(item.title)}</h1>
@@ -174,11 +174,11 @@ function articleBody(item: CatalogItem): string {
   </article>
   <aside aria-labelledby="related-heading">
     <h2 id="related-heading">Related</h2>
-    <inkling-related manifest="${base}inkling/manifest.json" item="${esc(item.id)}" section="${esc(item.section ?? '')}">
+    <hunch-related manifest="${base}hunch/manifest.json" item="${esc(item.id)}" section="${esc(item.section ?? '')}">
       <ol class="related" role="list">
 ${fallback.map((other) => slot(other, '        ')).join('\n')}
       </ol>
-    </inkling-related>
+    </hunch-related>
     <details class="why">
       <summary>Why these?</summary>
       <p>Ranked on this device by cosine similarity of precomputed EmbeddingGemma vectors, a small recency boost and diversity. Nothing about you was used or sent.</p>
@@ -196,21 +196,21 @@ function page(title: string, body: string): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <link rel="stylesheet" href="${base}style.css">
-<link rel="preload" href="${base}inkling/manifest.json" as="fetch" crossorigin="anonymous">
+<link rel="preload" href="${base}hunch/manifest.json" as="fetch" crossorigin="anonymous">
 <script>
-  // Inkling's consent hook, set before the components start. The demo asks with a checkbox;
+  // Hunch's consent hook, set before the components start. The demo asks with a checkbox;
   // a real site asks its consent manager.
   // ?as-of=2026-09-15 visits the demo as if it were that day, to try "since your last visit".
   const asOf = Date.parse(new URLSearchParams(location.search).get('as-of') ?? '');
-  window.InklingConfig = {
-    consent: () => { try { return localStorage.getItem('inkling-demo-consent') === 'yes'; } catch { return false; } },
+  window.HunchConfig = {
+    consent: () => { try { return localStorage.getItem('hunch-demo-consent') === 'yes'; } catch { return false; } },
     now: Number.isNaN(asOf) ? undefined : () => asOf,
   };
 </script>
-<script src="${base}inkling.js" defer></script>
+<script src="${base}hunch.js" defer></script>
 <script src="${base}demo.js" defer></script>
 </head>
-<body data-manifest="${base}inkling/manifest.json">
+<body data-manifest="${base}hunch/manifest.json">
 ${body}
 </body>
 </html>
@@ -235,7 +235,7 @@ async function serve(port: number): Promise<void> {
     '.css': 'text/css',
     '.js': 'text/javascript',
     '.json': 'application/json',
-    '.ink': 'application/octet-stream',
+    '.hunch': 'application/octet-stream',
   };
   const server = createServer((req, res) => {
     const path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname).slice(

@@ -19,11 +19,11 @@ import { decodeShard } from '../../src/format/shard.ts';
 const ENGINES = { chromium, firefox, webkit };
 type Engine = keyof typeof ENGINES;
 
-/** The browser the tests run in: `INKLING_BROWSER=chromium` (the default), `firefox` or `webkit`. */
+/** The browser the tests run in: `HUNCH_BROWSER=chromium` (the default), `firefox` or `webkit`. */
 export const BROWSER: Engine = (() => {
-  const name = process.env.INKLING_BROWSER || 'chromium';
+  const name = process.env.HUNCH_BROWSER || 'chromium';
   if (!(name in ENGINES)) {
-    throw new Error(`INKLING_BROWSER must be chromium, firefox or webkit, not ${name}`);
+    throw new Error(`HUNCH_BROWSER must be chromium, firefox or webkit, not ${name}`);
   }
   return name as Engine;
 })();
@@ -163,17 +163,17 @@ export interface SlotContent {
 }
 
 export function slots(page: Page, element: string): Promise<SlotContent[]> {
-  return page.$$eval(`${element} [data-inkling-slot]`, (els) =>
+  return page.$$eval(`${element} [data-hunch-slot]`, (els) =>
     els.map((el) => ({
-      id: (el as HTMLElement).dataset.inklingId ?? '',
-      title: el.querySelector('[data-inkling-title]')?.textContent ?? '',
+      id: (el as HTMLElement).dataset.hunchId ?? '',
+      title: el.querySelector('[data-hunch-title]')?.textContent ?? '',
       href: el.querySelector('a')?.getAttribute('href') ?? '',
     })),
   );
 }
 
 export async function ready(page: Page, element: string): Promise<void> {
-  await page.waitForSelector(`${element}[data-inkling-state="ready"]`, { timeout: 10_000 });
+  await page.waitForSelector(`${element}[data-hunch-state="ready"]`, { timeout: 10_000 });
 }
 
 /**
@@ -183,20 +183,20 @@ export async function ready(page: Page, element: string): Promise<void> {
 export async function read(site: Site, page: Page, id: string): Promise<void> {
   const since = Date.now();
   await page.goto(`${site.origin}/items/${id}.html`);
-  await ready(page, 'inkling-related');
+  await ready(page, 'hunch-related');
   await page.waitForFunction(
     async (item) => {
-      const inkling = await (
+      const hunch = await (
         window as unknown as {
-          Inkling: {
+          Hunch: {
             shared(m: string): Promise<{
               export(): Promise<{ signals: { itemId: string; kind: string; at: number }[] }>;
             }>;
           };
         }
-      ).Inkling.shared(document.body.dataset.manifest!);
+      ).Hunch.shared(document.body.dataset.manifest!);
       // This visit's view, not an earlier signal for the item.
-      return (await inkling.export()).signals.some(
+      return (await hunch.export()).signals.some(
         (s) => s.itemId === item.id && s.kind === 'view' && s.at >= item.since,
       );
     },
@@ -212,9 +212,9 @@ export const TARGET = 'cold-brew';
  * the `TARGET` article, so that article must come first in a search.
  */
 export async function fakeTransformers(): Promise<string> {
-  const manifest = JSON.parse(await readFile('demo/dist/inkling/manifest.json', 'utf8'));
+  const manifest = JSON.parse(await readFile('demo/dist/hunch/manifest.json', 'utf8'));
   const ref = manifest.shards.find((s: { section: string }) => s.section === 'Food');
-  const shard = decodeShard(new Uint8Array(await readFile(`demo/dist/inkling/${ref.url}`)).buffer);
+  const shard = decodeShard(new Uint8Array(await readFile(`demo/dist/hunch/${ref.url}`)).buffer);
   const row = shard.items.findIndex((item) => item.id === TARGET);
   // The article's vector, padded to the model's 768 dims: truncation gives it back exactly.
   const vector = new Array(manifest.model.nativeDims).fill(0);

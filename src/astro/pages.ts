@@ -108,10 +108,10 @@ export function resolveImage(image: string, page: string): string {
 
 /** `out` as a relative directory path, or an error: it must stay inside the build output. */
 export function checkOut(out: string | undefined): string {
-  const path = (out ?? 'inkling').replace(/^\/+|\/+$/g, '');
+  const path = (out ?? 'hunch').replace(/^\/+|\/+$/g, '');
   const segments = path.split('/');
   if (!path || segments.some((s) => !/^[\w.-]+$/.test(s) || s === '.' || s === '..')) {
-    throw new Error(`inkling: out must be a directory inside the build output, not ${out}`);
+    throw new Error(`hunch: out must be a directory inside the build output, not ${out}`);
   }
   return path;
 }
@@ -121,7 +121,7 @@ export function outDir(dir: URL, out: string): URL {
   const root = dir.href.endsWith('/') ? dir.href : `${dir.href}/`;
   const url = new URL(`${out}/`, root);
   if (!url.href.startsWith(root) || url.href === root) {
-    throw new Error(`inkling: ${out} is not inside the build output`);
+    throw new Error(`hunch: ${out} is not inside the build output`);
   }
   return url;
 }

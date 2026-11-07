@@ -9,7 +9,7 @@
 
 ## Context
 
-Inkling ranks a site's catalog in the visitor's browser: "for you" modules, related items,
+Hunch ranks a site's catalog in the visitor's browser: "for you" modules, related items,
 "since your last visit". The visitor's interests never leave the device. The site precomputes a
 vector for every item at build time, and the browser only does arithmetic on those vectors. No
 model runs in the browser for the core features.
@@ -39,7 +39,7 @@ can be cached forever.
 
 ```json
 {
-  "format": "inkling/manifest",
+  "format": "hunch/manifest",
   "formatVersion": 1,
   "version": "e74f7eb05ce1b5c4",
   "generatedAt": "2026-11-01T00:00:00.000Z",
@@ -57,7 +57,7 @@ can be cached forever.
   "sections": ["Food", "Science", "Technology", "Travel"],
   "shards": [
     {
-      "url": "shards/food.f1b06d57a5ac.ink",
+      "url": "shards/food.f1b06d57a5ac.hunch",
       "section": "Food",
       "count": 8,
       "bytes": 3748,
@@ -94,7 +94,7 @@ The binary layout (little-endian, [`shard.ts`](../../src/format/shard.ts)):
 
 | Offset | Size                      | Field                                                   |
 | ------ | ------------------------- | ------------------------------------------------------- |
-| 0      | 4                         | Magic `INKV`                                            |
+| 0      | 4                         | Magic `HNCH`                                            |
 | 4      | 1                         | Format version (1)                                      |
 | 5      | 1                         | Quantization: 1 = int8, 2 = float32                     |
 | 6      | 2                         | Reserved (0)                                            |
@@ -125,7 +125,7 @@ last is 1/n.
 
 ### 3. The build and the embedding cache
 
-`inkling build` reads a catalog (JSON, RSS/Atom, a sitemap plus page text, or a loader module),
+`hunch build` reads a catalog (JSON, RSS/Atom, a sitemap plus page text, or a loader module),
 embeds each item's `documentPrompt` filled with its title and text (truncated to 4,000
 characters), and writes the manifest and shards ([`build.ts`](../../src/node/build.ts)).
 
@@ -163,7 +163,7 @@ scoring happen in idle time, after the page has rendered.
 Signals are the only thing stored about the visitor. They live in IndexedDB, in the site's own
 origin:
 
-- Database `inkling` (the name takes a site-chosen suffix when several catalogs share an
+- Database `hunch` (the name takes a site-chosen suffix when several catalogs share an
   origin), version 1.
 - Object store `signals`, `keyPath: "seq"`, auto-increment, indexes on `itemId` and `at`:
 
@@ -254,7 +254,7 @@ pick    = argmax_c  (1 − λ) · base(c) − λ · red(c)       (MMR, λ = 0.2)
 - Publishing item metadata in the shards makes the catalog public, which it already is on the
   site itself. Item text isn't published.
 - The `hash` provider makes CI hermetic, but it says nothing about recommendation quality. The
-  demo uses EmbeddingGemma vectors from the committed embedding cache (`demo/inkling-cache`), so
+  demo uses EmbeddingGemma vectors from the committed embedding cache (`demo/hunch-cache`), so
   CI builds them without the model.
 - Open for later ADRs: how the free-text query embedding is cached and versioned (milestone 5),
   and per-section weights.

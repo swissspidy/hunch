@@ -61,7 +61,7 @@ test('writes a manifest and one shard per section', async () => {
       [null, 1],
     ],
   );
-  assert.match(manifest.shards[1]!.url, /^shards\/science-fiction-fact\.[0-9a-f]{12}\.ink$/);
+  assert.match(manifest.shards[1]!.url, /^shards\/science-fiction-fact\.[0-9a-f]{12}\.hunch$/);
   assert.equal(manifest.generatedAt, '1970-01-01T00:00:00.000Z');
 
   const shard = decodeShard(
@@ -215,7 +215,7 @@ test('a corrupt cache is reported, not silently used', async () => {
   await writeFile(join(out, `${provider.model.id.replace('/', '_')}@1.vec`), 'garbage');
   await assert.rejects(
     build({ items, outDir: out, provider, cacheDir: out }),
-    /not an Inkling embedding cache/,
+    /not an Hunch embedding cache/,
   );
 });
 

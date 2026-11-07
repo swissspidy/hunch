@@ -1,6 +1,6 @@
 /**
  * Search in the demo: the query is embedded in the browser by the query module and ranked by
- * inkling.search(). Transformers.js is replaced by a fake module (no 200 MB download in CI)
+ * hunch.search(). Transformers.js is replaced by a fake module (no 200 MB download in CI)
  * whose "model" returns the vector of a known article, so that article must come first.
  */
 
@@ -30,7 +30,7 @@ test('a text search is embedded and ranked in the browser, and the query is not 
   await page.goto(`${site.origin}/`);
   await page.waitForLoadState('networkidle');
   assert.ok(
-    !requests.some((u) => u.includes('inkling-query.js') || u.includes('jsdelivr')),
+    !requests.some((u) => u.includes('hunch-query.js') || u.includes('jsdelivr')),
     'nothing loads before a search',
   );
 

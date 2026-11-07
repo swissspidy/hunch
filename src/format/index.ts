@@ -1,7 +1,7 @@
 /**
  * The manifest and shard format (ADR 0001), for tools that read or write it.
  *
- * @module @swissspidy/inkling/format
+ * @module @swissspidy/hunch/format
  */
 
 export {

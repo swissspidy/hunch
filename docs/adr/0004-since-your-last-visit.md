@@ -17,7 +17,7 @@ device without making the core larger or calling any service.
   visit before this one). `visit()` updates them in one read-modify-write (`SignalStore.updateState()`, a single IndexedDB transaction), so a concurrent `pause()` is never overwritten, and a `forget()` is never undone. More than `visitGapMinutes` (default 30)
   without activity starts a new visit, and the old visit's last activity becomes
   `previousVisit`. Within a visit nothing changes, so every component on every page may call
-  it. `observe()`, `<inkling-page>` and `sinceLastVisit()` do. Like signals, visits are recorded
+  it. `observe()`, `<hunch-page>` and `sinceLastVisit()` do. Like signals, visits are recorded
   only with consent and not while paused, and `forget()` deletes them with everything else.
   `export()` doesn't include them: they are timestamps of the visitor's own activity, not
   signals about items. `visit()` returns them to any page that asks.
@@ -26,19 +26,19 @@ device without making the core larger or calling any service.
   cold start all stay the same. With a profile, the new items most like the visitor's interests
   come first. Without one, they keep the site's order. On a first visit, or without consent,
   the result is empty.
-- **The Summarizer lives in its own module** (`@swissspidy/inkling/digest`, `src/digest/`), not
+- **The Summarizer lives in its own module** (`@swissspidy/hunch/digest`, `src/digest/`), not
   in the core. `summarize(items)` uses the Summarizer API (`Summarizer.availability()`,
   `Summarizer.create({ type: 'tldr', format: 'plain-text', length: 'short', sharedContext })`)
   on the items' titles and sections. It runs only when the model is already `available`;
   `allowDownload: true` also accepts `downloadable`, since a download usually needs a user
   gesture. Everywhere else it returns `null` and the caller keeps its placeholder. The model
   runs on the device, so this sends nothing either.
-- **`<inkling-digest>`** fills server-rendered slots with `sinceLastVisit()`, like
-  `<inkling-for-you>`, and writes the summary into a `[data-inkling-summary]` element when there
+- **`<hunch-digest>`** fills server-rendered slots with `sinceLastVisit()`, like
+  `<hunch-for-you>`, and writes the summary into a `[data-hunch-summary]` element when there
   is one. With nothing new, the fallback (for example the latest items) and its placeholder text
-  stay as they are. `data-inkling-new` and `data-inkling-summarized` say what happened.
+  stay as they are. `data-hunch-new` and `data-hunch-summarized` say what happened.
 - **The demo can time-travel.** Its catalog is fixed, so a visit "today" never sees anything
-  new. `?as-of=2026-09-15` makes the client's clock that day (through `InklingConfig.now`). A
+  new. `?as-of=2026-09-15` makes the client's clock that day (through `HunchConfig.now`). A
   visit like that followed by one today shows the digest.
 
 ## Consequences

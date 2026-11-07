@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 
-import type { Inkling, SignalStore } from '../../src/client/index.ts';
+import type { Hunch, SignalStore } from '../../src/client/index.ts';
 import type { SyntheticCatalog } from '../../scripts/synthetic.ts';
 
 export const ITEMS = 20_000;
@@ -17,7 +17,7 @@ export const SECTIONS = 10;
 export const NOW = Date.UTC(2026, 3, 1);
 
 interface Client {
-  load: typeof Inkling.load;
+  load: typeof Hunch.load;
 }
 
 export interface Result {

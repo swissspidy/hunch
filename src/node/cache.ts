@@ -3,7 +3,7 @@
  * of the model and the exact input, one file per model. Changing the dimensions or the
  * quantization re-uses it; changing the model, its revision or the prompt does not.
  *
- * File layout (little-endian): magic "INKC", u32 version (1), u32 dims, u32 count, then
+ * File layout (little-endian): magic "HNCC", u32 version (1), u32 dims, u32 count, then
  * `count` records of [32-byte key][dims float32].
  */
 
@@ -12,7 +12,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { ModelInfo } from '../format/manifest.ts';
 
-const MAGIC = 0x434b4e49; // "INKC"
+const MAGIC = 0x43434e48; // "HNCC"
 const HEADER = 16;
 
 /** The embedding cache: full-size vectors keyed by model and input, one file per model. */
@@ -92,7 +92,7 @@ export class EmbeddingCache {
     }
     const dims = this.model.nativeDims;
     if (data.length < HEADER || data.readUInt32LE(0) !== MAGIC || data.readUInt32LE(4) !== 1) {
-      throw new Error(`${file} is not an Inkling embedding cache`);
+      throw new Error(`${file} is not an Hunch embedding cache`);
     }
     if (data.readUInt32LE(8) !== dims) return; // A different model shape: start over.
     const count = data.readUInt32LE(12);

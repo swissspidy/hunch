@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
-import { Inkling, MemoryStore, type InklingOptions } from '../../src/client/index.ts';
+import { Hunch, MemoryStore, type HunchOptions } from '../../src/client/index.ts';
 import { build } from '../../src/node/build.ts';
 import { documentInput, type EmbeddingProvider } from '../../src/node/providers/types.ts';
 import type { CatalogItem } from '../../src/node/types.ts';
@@ -59,8 +59,8 @@ before(async () => {
   });
 });
 
-function load(options: Partial<InklingOptions> = {}, version = 'v1') {
-  return Inkling.load({
+function load(options: Partial<HunchOptions> = {}, version = 'v1') {
+  return Hunch.load({
     manifest: `http://site/${version}/manifest.json`,
     fetch: dirFetch(dir),
     now,
@@ -138,7 +138,7 @@ test('pause, resume, forget and export', async () => {
   assert.equal(await ink.record('dwell', 'bread-2', { seconds: Number.NaN }), false);
   assert.equal(await ink.record('nope' as 'view', 'bread-2'), false);
   const exported = await ink.export();
-  assert.equal(exported.format, 'inkling/signals');
+  assert.equal(exported.format, 'hunch/signals');
   assert.deepEqual(
     exported.signals.map((s) => [s.itemId, s.kind, s.weight]),
     [

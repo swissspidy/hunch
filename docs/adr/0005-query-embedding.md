@@ -9,7 +9,7 @@ The brief's last optional enhancement is free-text features, such as matching a 
 "with the same pinned model in the browser, versioned and cached". The catalog's vectors are
 published, but a query only exists on the visitor's device. To compare a query with the
 catalog, it has to be embedded there, by the same model, into the same space. That is the one
-place where Inkling runs a model in the browser, so it must stay optional and lazy, and must not
+place where Hunch runs a model in the browser, so it must stay optional and lazy, and must not
 weaken the guarantee that nothing about the visitor leaves the device.
 
 ## Decision
@@ -17,15 +17,15 @@ weaken the guarantee that nothing about the visitor leaves the device.
 - **The manifest names the query prompt.** `model.queryPrompt` (EmbeddingGemma's is
   `task: search result | query: {query}`) is written by the build, next to the document prompt.
   It is optional: an older manifest falls back to `{query}`. Adding it keeps the format version.
-- **`inkling.search(vector, options)` is in the core and takes a vector.** It accepts the
+- **`hunch.search(vector, options)` is in the core and takes a vector.** It accepts the
   model's full or truncated output, truncates it to the catalog's dimensions and renormalizes
   it (the build's own Matryoshka step), then ranks by cosine. It uses no recency and no
   diversity by default, because a search is about the query. Hidden items never appear. Seen
   items do, unless `excludeSeen` is set. `personalize` in [0, 1] blends the visitor's profile
   into the similarity (with consent). The core gains about 0.2 KB and no model.
-- **`@swissspidy/inkling/query` embeds text** (`createQueryEmbedder(manifest, options)`), and is
+- **`@swissspidy/hunch/query` embeds text** (`createQueryEmbedder(manifest, options)`), and is
   never imported by the core or the components.
-  - For `inkling/hash` catalogs it runs the hash embedding in plain JavaScript; that code is now
+  - For `hunch/hash` catalogs it runs the hash embedding in plain JavaScript; that code is now
     shared with the build in `src/rank/hash.ts`.
   - Otherwise it loads Transformers.js, which the site passes in (`transformers: () => import(…)`;
     by default `import('@huggingface/transformers')` for bundlers). Then it loads the manifest's

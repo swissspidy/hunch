@@ -1,20 +1,20 @@
 /**
- * Free-text search on the device (`@swissspidy/inkling/query`): embeds a query with the catalog's
+ * Free-text search on the device (`@swissspidy/hunch/query`): embeds a query with the catalog's
  * own pinned model, in the browser, so it lands in the same space as the published vectors.
  * Optional and lazy: nothing here loads until a site asks, and the core never imports it.
  *
  * ```js
- * const embedder = await createQueryEmbedder(inkling.manifest, {
+ * const embedder = await createQueryEmbedder(hunch.manifest, {
  *   transformers: () => import('@huggingface/transformers'),
  * });
- * const results = await inkling.search(await embedder.embed('night trains'), { n: 5 });
+ * const results = await hunch.search(await embedder.embed('night trains'), { n: 5 });
  * ```
  *
  * The query text never leaves the device. The model's weights are fetched once (from the
  * Hugging Face Hub unless the site hosts them, see `configure`) and kept in the browser's cache
  * by Transformers.js; the requests carry no query or profile data.
  *
- * @module @swissspidy/inkling/query
+ * @module @swissspidy/hunch/query
  */
 
 import type { Manifest } from '../format/manifest.ts';
@@ -91,7 +91,7 @@ export interface QueryEmbedderOptions {
   cacheSize?: number;
 }
 
-/** A query embedder for the manifest's model: in plain JavaScript for `inkling/hash`, else Transformers.js. */
+/** A query embedder for the manifest's model: in plain JavaScript for `hunch/hash`, else Transformers.js. */
 export async function createQueryEmbedder(
   manifest: Manifest,
   options: QueryEmbedderOptions = {},
@@ -102,7 +102,7 @@ export async function createQueryEmbedder(
   let embedFull: (text: string) => Promise<Float32Array>;
   let dispose: () => Promise<void> = () => Promise.resolve();
 
-  if (model.id === 'inkling/hash') {
+  if (model.id === 'hunch/hash') {
     embedFull = (text) => Promise.resolve(hashEmbed(text, model.nativeDims));
   } else {
     const loaded =
@@ -136,10 +136,10 @@ export async function createQueryEmbedder(
     embedFull = async (text) => {
       const result = await net(tokenizer([text], { padding: true, truncation: true }));
       const tensor = result.sentence_embedding;
-      if (!tensor) throw new Error(`Inkling: ${model.id} has no sentence_embedding output`);
+      if (!tensor) throw new Error(`Hunch: ${model.id} has no sentence_embedding output`);
       if (tensor.dims[1] !== model.nativeDims) {
         throw new Error(
-          `Inkling: ${model.id} returned ${tensor.dims[1]} dims, not ${model.nativeDims}`,
+          `Hunch: ${model.id} returned ${tensor.dims[1]} dims, not ${model.nativeDims}`,
         );
       }
       return Float32Array.from(tensor.data.subarray(0, model.nativeDims));

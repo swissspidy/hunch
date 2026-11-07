@@ -12,7 +12,7 @@ after(() => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true
 
 /** A fresh temporary directory, removed after the test file. */
 export async function tempDir(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'inkling-'));
+  const dir = await mkdtemp(join(tmpdir(), 'hunch-'));
   dirs.push(dir);
   return dir;
 }

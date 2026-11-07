@@ -30,7 +30,7 @@ columns, and the rest of each item moves to a block that is read only on demand:
 
 | Offset | Size         | Field                                                                 |
 | ------ | ------------ | --------------------------------------------------------------------- |
-| 0      | 4            | Magic `INKV`                                                          |
+| 0      | 4            | Magic `HNCH`                                                          |
 | 4      | 1            | Format version (2)                                                    |
 | 5      | 1            | Quantization: 1 = int8, 2 = float32                                   |
 | 6      | 2            | Reserved (0)                                                          |

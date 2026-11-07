@@ -1,6 +1,6 @@
 {
   "$schema": "https://typedoc.org/schema.json",
-  "name": "Inkling API reference",
+  "name": "Hunch API reference",
   "entryPoints": [
     "../../src/client/index.ts",
     "../../src/elements/index.ts",
@@ -21,8 +21,8 @@
   "githubPages": false,
   "disableSources": true,
   "navigationLinks": {
-    "GitHub": "https://github.com/swissspidy/inkling",
-    "Demo": "https://swissspidy.github.io/inkling/"
+    "GitHub": "https://github.com/swissspidy/hunch",
+    "Demo": "https://swissspidy.github.io/hunch/"
   },
   "validation": {
     "notExported": true,

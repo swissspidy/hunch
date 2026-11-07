@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { gzipSync } from 'node:zlib';
-import { Inkling, MemoryStore } from '../src/client/index.ts';
+import { Hunch, MemoryStore } from '../src/client/index.ts';
 import type { Quantization } from '../src/format/manifest.ts';
 import { bundleGlobal } from './bundle.ts';
 import { syntheticCatalog, type SyntheticCatalog } from './synthetic.ts';
@@ -61,7 +61,7 @@ async function node(quantization: Quantization): Promise<void> {
   };
   const store = new MemoryStore();
   const start = performance.now();
-  const ink = await Inkling.load({
+  const ink = await Hunch.load({
     manifest: 'http://bench/manifest.json',
     fetch: fetchFn,
     consent: true,
@@ -92,8 +92,8 @@ async function node(quantization: Quantization): Promise<void> {
 async function browser(): Promise<void> {
   const { chromium } = await import('playwright-core');
   const catalog: SyntheticCatalog = await syntheticCatalog(count, dims, sections, 'int8');
-  const dir = await mkdtemp(join(tmpdir(), 'inkling-bench-'));
-  const script = join(dir, 'inkling.js');
+  const dir = await mkdtemp(join(tmpdir(), 'hunch-bench-'));
+  const script = join(dir, 'hunch.js');
   await bundleGlobal(script);
   const { readFile } = await import('node:fs/promises');
   const bundle = await readFile(script);
@@ -102,8 +102,8 @@ async function browser(): Promise<void> {
     if (path === '') {
       res
         .writeHead(200, { 'content-type': 'text/html' })
-        .end('<!doctype html><script src="/inkling.js"></script>');
-    } else if (path === 'inkling.js') {
+        .end('<!doctype html><script src="/hunch.js"></script>');
+    } else if (path === 'hunch.js') {
       res.writeHead(200, { 'content-type': 'text/javascript' }).end(bundle);
     } else if (path === 'manifest.json') {
       res
@@ -135,7 +135,7 @@ async function browser(): Promise<void> {
     await page.evaluate(
       async ({ sections, perSection }) => {
         const id = (i: number) => `s${i % sections}-item-${Math.floor(i / sections) % perSection}`;
-        const I = (window as unknown as { Inkling: typeof Inkling }).Inkling;
+        const I = (window as unknown as { Hunch: typeof Hunch }).Hunch;
         const ink = await I.load({ manifest: '/manifest.json', consent: true });
         for (let i = 0; i < 50; i++) await ink.record('view', id(i * 7));
       },
@@ -150,10 +150,10 @@ async function browser(): Promise<void> {
         // As itemId() below: an id that exists whatever the catalog's size.
         const id = (i: number) => `s${i % sections}-item-${Math.floor(i / sections) % perSection}`;
         const w = window as unknown as {
-          Inkling: typeof Inkling;
+          Hunch: typeof Hunch;
           __longTasks: { start: number; duration: number }[];
         };
-        const I = w.Inkling;
+        const I = w.Hunch;
         // Load + first recommend(), as a returning visitor's "for you" would.
         const t0 = performance.now();
         const ink = await I.load({ manifest: '/manifest.json', consent: true, ...options });

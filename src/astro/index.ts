@@ -1,14 +1,14 @@
 /**
- * The Astro integration (`@swissspidy/inkling/astro`): builds the catalog from the pages Astro
+ * The Astro integration (`@swissspidy/hunch/astro`): builds the catalog from the pages Astro
  * emitted, writes `manifest.json` and the shards into the build output, and loads the web
  * components on every page with the manifest preset (ADR 0006).
  *
  * ```js
- * import inkling from '@swissspidy/inkling/astro';
- * export default defineConfig({ integrations: [inkling({ include: ['/blog/*'] })] });
+ * import hunch from '@swissspidy/hunch/astro';
+ * export default defineConfig({ integrations: [hunch({ include: ['/blog/*'] })] });
  * ```
  *
- * @module @swissspidy/inkling/astro
+ * @module @swissspidy/hunch/astro
  */
 
 import { readFileSync, statSync } from 'node:fs';
@@ -53,7 +53,7 @@ export interface ItemsContext {
 }
 
 /** Options of the integration. Without any, every built page goes into the catalog. */
-export interface InklingAstroOptions {
+export interface HunchAstroOptions {
   /** Pages to include (default: all). */
   include?: PathFilter;
   /** Pages to leave out (default: none; 404 and 500 pages are always left out). */
@@ -62,14 +62,14 @@ export interface InklingAstroOptions {
   page?: (item: CatalogItem, page: PageContext) => CatalogItem | null | undefined;
   /** The catalog, in full: replaces the built pages (which it receives). */
   items?: (context: ItemsContext) => readonly CatalogItem[] | Promise<readonly CatalogItem[]>;
-  /** Directory in the build output for `manifest.json` and the shards (default `inkling`). */
+  /** Directory in the build output for `manifest.json` and the shards (default `hunch`). */
   out?: string;
   /** `transformers` (EmbeddingGemma; the default), `hash` (tests, offline), or a provider. */
   provider?: 'transformers' | 'hash' | EmbeddingProvider;
   /** Options of the `transformers` provider. */
   transformers?: TransformersOptions;
   /**
-   * Embedding cache, relative to the project root (default `node_modules/.cache/inkling`);
+   * Embedding cache, relative to the project root (default `node_modules/.cache/hunch`);
    * `false` for none. Keep it between builds (in CI too) and only changed pages are embedded.
    */
   cacheDir?: string | false;
@@ -87,18 +87,18 @@ export interface InklingAstroOptions {
   script?: boolean;
 }
 
-const VIRTUAL = 'virtual:inkling/config';
+const VIRTUAL = 'virtual:hunch/config';
 const ALWAYS_EXCLUDED = [/^\/(404|500)\/?$/];
 
 /**
  * The integration: add it to `integrations` in `astro.config.mjs`. After `astro build` the
  * catalog is in `dist/<out>/`; with `script`, every page loads the web components.
  */
-export default function inkling(options: InklingAstroOptions = {}): AstroIntegration {
+export default function hunch(options: HunchAstroOptions = {}): AstroIntegration {
   const out = checkOut(options.out);
   let config: AstroConfig;
   return {
-    name: '@swissspidy/inkling',
+    name: '@swissspidy/hunch',
     hooks: {
       'astro:config:setup': ({ updateConfig, injectScript }) => {
         if (options.script === false) return;
@@ -106,7 +106,7 @@ export default function inkling(options: InklingAstroOptions = {}): AstroIntegra
         const manifest = () => `${withSlash(config.base)}${out}/manifest.json`;
         updateConfig({ vite: { plugins: [configModule(manifest)] } });
         // The config module runs first: the components read the manifest as they register.
-        injectScript('page', `import '${VIRTUAL}';\nimport '@swissspidy/inkling/elements';`);
+        injectScript('page', `import '${VIRTUAL}';\nimport '@swissspidy/hunch/elements';`);
       },
       'astro:config:done': ({ config: doneConfig }) => {
         config = doneConfig;
@@ -164,7 +164,7 @@ export default function inkling(options: InklingAstroOptions = {}): AstroIntegra
                 ? false
                 : resolve(
                     fileURLToPath(config.root),
-                    options.cacheDir ?? 'node_modules/.cache/inkling',
+                    options.cacheDir ?? 'node_modules/.cache/hunch',
                   ),
             log: (message) => logger.info(message),
           });
@@ -185,7 +185,7 @@ async function builtPages(
   pages: readonly { pathname: string }[],
   dir: URL,
   config: AstroConfig,
-  options: InklingAstroOptions,
+  options: HunchAstroOptions,
   logger: AstroIntegrationLogger,
 ): Promise<CatalogItem[]> {
   const include = options.include === undefined ? () => true : matcher(options.include);
@@ -214,23 +214,23 @@ async function builtPages(
   return items;
 }
 
-function resolveProvider(options: InklingAstroOptions): EmbeddingProvider {
+function resolveProvider(options: HunchAstroOptions): EmbeddingProvider {
   const provider = options.provider ?? 'transformers';
   if (provider === 'transformers') return transformersProvider(options.transformers);
   if (provider === 'hash') return hashProvider();
   if (typeof provider === 'object' && typeof provider.embed === 'function') return provider;
-  throw new Error(`inkling: provider is transformers, hash or a provider, not ${String(provider)}`);
+  throw new Error(`hunch: provider is transformers, hash or a provider, not ${String(provider)}`);
 }
 
-/** The module that sets `window.InklingConfig.manifest`, unless the page set one. */
+/** The module that sets `window.HunchConfig.manifest`, unless the page set one. */
 function configModule(manifest: () => string) {
   const resolved = `\0${VIRTUAL}`;
   return {
-    name: 'inkling:config',
+    name: 'hunch:config',
     resolveId: (id: string) => (id === VIRTUAL ? resolved : undefined),
     load: (id: string) =>
       id === resolved
-        ? `globalThis.InklingConfig = { manifest: ${JSON.stringify(manifest())}, ...globalThis.InklingConfig };\n`
+        ? `globalThis.HunchConfig = { manifest: ${JSON.stringify(manifest())}, ...globalThis.HunchConfig };\n`
         : undefined,
   };
 }

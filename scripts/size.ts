@@ -8,7 +8,7 @@ import { gzipSync } from 'node:zlib';
 import { bundleEsm } from './bundle.ts';
 
 const BUDGETS: [label: string, entry: string, gzipBudget: number][] = [
-  ['core (Inkling client)', 'src/client/index.ts', 10 * 1024],
+  ['core (Hunch client)', 'src/client/index.ts', 10 * 1024],
   ['core + web components', 'src/elements/global.ts', 12 * 1024],
 ];
 

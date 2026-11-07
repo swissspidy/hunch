@@ -84,7 +84,7 @@ export class Catalog {
   ): Promise<Catalog> {
     const resolved = new URL(url, globalThis.location?.href);
     const response = await fetchFn(resolved);
-    if (!response.ok) throw new Error(`Inkling: manifest ${resolved} returned ${response.status}`);
+    if (!response.ok) throw new Error(`Hunch: manifest ${resolved} returned ${response.status}`);
     const manifest: unknown = await response.json();
     assertManifest(manifest);
     return new Catalog(manifest, resolved, fetchFn, kernel);
@@ -284,7 +284,7 @@ export class Catalog {
   private async fetchShard(ref: ShardRef): Promise<void> {
     const url = new URL(ref.url, this.url);
     const response = await this.fetch(url);
-    if (!response.ok) throw new Error(`Inkling: shard ${url} returned ${response.status}`);
+    if (!response.ok) throw new Error(`Hunch: shard ${url} returned ${response.status}`);
     const buffer = await response.arrayBuffer();
     // Shards that arrive together are hashed, decoded and indexed in tasks of their own, so
     // none of them blocks input for long (ADR 0008).
@@ -294,15 +294,15 @@ export class Catalog {
     const shard = decodeShard(buffer);
     if (shard.space !== this.manifest.space) {
       throw new Error(
-        `Inkling: shard ${url} is from space ${shard.space}, not ${this.manifest.space}`,
+        `Hunch: shard ${url} is from space ${shard.space}, not ${this.manifest.space}`,
       );
     }
     if (shard.dims !== this.manifest.dims) {
-      throw new Error(`Inkling: shard ${url} has ${shard.dims} dims, not ${this.manifest.dims}`);
+      throw new Error(`Hunch: shard ${url} has ${shard.dims} dims, not ${this.manifest.dims}`);
     }
     if (shard.quantization !== this.manifest.quantization) {
       throw new Error(
-        `Inkling: shard ${url} is ${shard.quantization}, not ${this.manifest.quantization}`,
+        `Hunch: shard ${url} is ${shard.quantization}, not ${this.manifest.quantization}`,
       );
     }
     await yieldToPage();
@@ -371,6 +371,5 @@ async function verify(buffer: ArrayBuffer, ref: ShardRef, url: URL): Promise<voi
     // SubtleCrypto is only exposed in secure contexts: plain-HTTP sites get the JS fallback.
     hex = sha256Hex(new Uint8Array(buffer));
   }
-  if (hex !== ref.sha256)
-    throw new Error(`Inkling: shard ${url} does not match the manifest's hash`);
+  if (hex !== ref.sha256) throw new Error(`Hunch: shard ${url} does not match the manifest's hash`);
 }

@@ -5,7 +5,7 @@
 
 ## Context
 
-Inkling's build step is a Node CLI that embeds a site's items with a pinned model and writes the
+Hunch's build step is a Node CLI that embeds a site's items with a pinned model and writes the
 manifest and shards ([ADR 0001](0001-format-signals-ranking.md)). Most WordPress sites have no
 Node on the server, no CI and no build step: the site is the PHP application, and its owner
 installs plugins. For them, "adoptable in an afternoon" means installing a plugin and clicking a
@@ -18,7 +18,7 @@ which PHP does well.
 
 ## Decision
 
-The plugin lives in [`wordpress/inkling/`](../../wordpress/inkling/readme.txt): plain PHP, a
+The plugin lives in [`wordpress/hunch/`](../../wordpress/hunch/readme.txt): plain PHP, a
 little plain JavaScript for wp-admin (`wp.*` globals, no build step), and the client's
 script-tag bundle, which `npm run wordpress:build` copies in before zipping the plugin.
 
@@ -32,7 +32,7 @@ the CLI would write, and a catalog built by either can replace the other.
 - **On publish:** in the block editor, after a published post is saved, a small script asks the
   site for the post's model input, embeds it and stores the vector. A snackbar says when it's done
   or failed.
-- **"Build index"** (Settings → Inkling) backfills: it asks for posts without a current vector,
+- **"Build index"** (Settings → Hunch) backfills: it asks for posts without a current vector,
   8 at a time, embeds them one by one with a progress bar, then has the site write the files. It
   is resumable without stored state: posts with a current vector are skipped, so stopping, closing
   the tab or a failure loses only the post in flight. It also catches posts published outside
@@ -70,9 +70,9 @@ the CLI would write, and a catalog built by either can replace the other.
 
 ### 2. PHP writes the files, byte for byte as the CLI does
 
-[`class-inkling-shard.php`](../../wordpress/inkling/includes/class-inkling-shard.php) and
-[`class-inkling-writer.php`](../../wordpress/inkling/includes/class-inkling-writer.php) port
-`encodeShard()` and the file-writing half of `build()`: the INKV layout (version 2 since
+[`class-hunch-shard.php`](../../wordpress/hunch/includes/class-hunch-shard.php) and
+[`class-hunch-writer.php`](../../wordpress/hunch/includes/class-hunch-writer.php) port
+`encodeShard()` and the file-writing half of `build()`: the HNCH layout (version 2 since
 [ADR 0011](0011-format-v2-columns.md), with dates read as `Date.parse` reads ISO 8601), float32
 rounding of the renormalized vector, int8 quantization with JavaScript's `Math.round`, the JSON as
 `JSON.stringify` writes it (no escaped slashes or Unicode, `1` not `1.0`), one shard per section
@@ -87,7 +87,7 @@ manifest names. These classes don't need WordPress.
   the first), or none (one shard). A filter can change it.
 - **Priors** come from the catalog order, newest first, or from the comment count
   ("most comments first", as the CLI's `popularity`). Both are `computePriors()`. Page views
-  would need a stats plugin, so they are left to the `inkling_item` filter.
+  would need a stats plugin, so they are left to the `hunch_item` filter.
 - **Item ids are post GUIDs**, the RSS feed's `guid`. A site that built its catalog with the CLI
   from its feed keeps its visitors' signals when it switches to the plugin, and the other way
   round.
@@ -106,22 +106,22 @@ manifest names. These classes don't need WordPress.
 - **An empty catalog** (every post unpublished) deletes the manifest at once, so pages stop
   pointing at it, and keeps its shards for one more run, as after any rebuild, for clients and
   cached pages holding it. That run is scheduled an hour later (or is the next run, if one
-  comes sooner); if the catalog is still empty, it deletes the remaining shards. Otherwise the next manifest's write prunes them. The files go to `wp-content/uploads/inkling/`. The
+  comes sooner); if the catalog is still empty, it deletes the remaining shards. Otherwise the next manifest's write prunes them. The files go to `wp-content/uploads/hunch/`. The
   manifest's URL carries its version (`manifest.json?v=…`), so caches in front of the site see a
   new URL after each rebuild even when they ignore the `.htaccess` cache headers the plugin
   writes for Apache.
 
 ### 3. The front end
 
-- The script-tag build (`inkling.global.js`) is enqueued with `defer`, only on pages that
-  render a list. `window.InklingConfig.consent` is set inline before it from the consent
+- The script-tag build (`hunch.global.js`) is enqueued with `defer`, only on pages that
+  render a list. `window.HunchConfig.consent` is set inline before it from the consent
   setting: the visitor's own switch in the controls block (`localStorage`, as the demo does;
   the default), a cookie (`name=value`), a global JavaScript function (a dotted path, validated
   so it can't inject script), the WP Consent API's "preferences" category, always, or off.
 - **Related posts** are added after the content of every indexed post (an option) or placed as a
   block. The server renders the newest posts of the same category, filled up with the newest
-  posts, inside `<inkling-related>`. **"For you"** is a block that renders the newest posts
-  inside `<inkling-for-you>`. Indexed posts get an `<inkling-page>` in the footer to record the
+  posts, inside `<hunch-related>`. **"For you"** is a block that renders the newest posts
+  inside `<hunch-for-you>`. Indexed posts get an `<hunch-page>` in the footer to record the
   view. Each slot has a fixed height and the title is clamped to two lines, so re-ranking moves
   nothing. Before the first build, the lists render without the component and stay as they are.
 - **The personalization controls block** mirrors the demo's "Your data": the consent checkbox

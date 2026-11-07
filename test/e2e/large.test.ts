@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, test, type TestContext } from 'node:test';
 import { chromium, type Browser, type Page } from 'playwright-core';
-import type { Inkling } from '../../src/client/index.ts';
+import type { Hunch } from '../../src/client/index.ts';
 import { bundleGlobal } from '../../scripts/bundle.ts';
 import { syntheticCatalog } from '../../scripts/synthetic.ts';
 import { BROWSER } from './site.ts';
@@ -36,16 +36,16 @@ let dir = '';
 before(async () => {
   if (SKIP) return;
   const catalog = await syntheticCatalog(ITEMS, 256, SECTIONS, 'int8');
-  dir = await mkdtemp(join(tmpdir(), 'inkling-large-'));
-  await bundleGlobal(join(dir, 'inkling.js'));
-  const bundle = await readFile(join(dir, 'inkling.js'));
+  dir = await mkdtemp(join(tmpdir(), 'hunch-large-'));
+  await bundleGlobal(join(dir, 'hunch.js'));
+  const bundle = await readFile(join(dir, 'hunch.js'));
   server = createServer((req, res) => {
     const path = (req.url ?? '/').slice(1);
     if (path === '') {
       res
         .writeHead(200, { 'content-type': 'text/html' })
-        .end('<!doctype html><script src="/inkling.js"></script>');
-    } else if (path === 'inkling.js') {
+        .end('<!doctype html><script src="/hunch.js"></script>');
+    } else if (path === 'hunch.js') {
       res.writeHead(200, { 'content-type': 'text/javascript' }).end(bundle);
     } else if (path === 'manifest.json') {
       res
@@ -102,12 +102,12 @@ async function recommendOnce(page: Page): Promise<Run> {
   try {
     const load = await page.evaluate(async (sections) => {
       const w = window as unknown as {
-        Inkling: typeof Inkling;
-        ink: Inkling;
+        Hunch: typeof Hunch;
+        ink: Hunch;
         __longTasks: { start: number; duration: number }[];
       };
       const t0 = performance.now();
-      w.ink = await w.Inkling.load({ manifest: '/manifest.json', consent: true });
+      w.ink = await w.Hunch.load({ manifest: '/manifest.json', consent: true });
       for (let i = 0; i < 50; i++) await w.ink.record('view', `s${i % sections}-item-${i * 7}`);
       // Every shard and the profile, so what follows is ranking alone.
       await w.ink.recommend({ n: 10 });
@@ -123,7 +123,7 @@ async function recommendOnce(page: Page): Promise<Run> {
     return await page
       .evaluate(async () => {
         const w = window as unknown as {
-          ink: Inkling;
+          ink: Hunch;
           __longTasks: { start: number; duration: number }[];
         };
         const t0 = performance.now();

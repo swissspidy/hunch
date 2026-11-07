@@ -5,16 +5,16 @@
 
 ## Context
 
-An Astro site can already use Inkling: run `inkling build` on its sitemap after `astro build`,
+An Astro site can already use Hunch: run `hunch build` on its sitemap after `astro build`,
 copy the elements script, and write the `manifest` attribute on every component. That is a
 second build step, a second source of truth for item ids, and a script to keep in sync. Astro
 has an integration API that runs code at build time, adds scripts to every page and changes
-the Vite config. With it, adding Inkling to an Astro site can be one line in
+the Vite config. With it, adding Hunch to an Astro site can be one line in
 `astro.config.mjs`.
 
 ## Decision
 
-- **A subpath export, `@swissspidy/inkling/astro`, not a separate package.** It is Node code
+- **A subpath export, `@swissspidy/hunch/astro`, not a separate package.** It is Node code
   (`src/astro`) that reuses the build step: `build()` from `src/node/build.ts`, the embedding
   cache, the providers, and `parsePage()` from the sitemap source. `astro` is an optional peer
   dependency (`^7`). The integration only imports Astro's types, so the module loads without
@@ -48,28 +48,28 @@ the Vite config. With it, adding Inkling to an Astro site can be one line in
   format against the path the fixture page prints. So a layout writes `item={Astro.url.pathname}` and matches the catalog. Paths, not absolute URLs,
   so the same manifest works on preview deployments and on `localhost`, and changing `site`
   does not change ids (signals refer to items by id). `site` is not needed.
-- **The vectors go into the build output**, `inkling/` by default (`out`), next to the pages,
-  so they deploy with the site and the manifest URL is `${base}inkling/manifest.json`, with
+- **The vectors go into the build output**, `hunch/` by default (`out`), next to the pages,
+  so they deploy with the site and the manifest URL is `${base}hunch/manifest.json`, with
   the `base` Astro settles on after every integration's setup. `out` is a relative path of
   plain segments (no `.`, `..`, `%` or scheme), and the resolved directory is checked to be
   inside the build output before anything is written.
-- **The embedding cache lives in `node_modules/.cache/inkling`** by default (`cacheDir`), the
+- **The embedding cache lives in `node_modules/.cache/hunch`** by default (`cacheDir`), the
   conventional place for tool caches that survive rebuilds but are not committed. Astro empties
   the build output on every build, so the cache can't live there. In CI, `actions/cache` on
   that directory keeps rebuilds incremental, which replaces a dedicated GitHub Action. A site
-  that would rather commit the cache, as the CLI suggests, sets `cacheDir: '.inkling-cache'`.
+  that would rather commit the cache, as the CLI suggests, sets `cacheDir: '.hunch-cache'`.
 - **The provider is EmbeddingGemma by default**, through Transformers.js as an optional peer
   dependency, as for the CLI. `provider: 'hash'` is for tests and offline builds, and a
   provider object can be passed.
 - **The components load on every page** with `injectScript('page', …)`, which Astro bundles
   with the site's own scripts. It imports a virtual module that sets
-  `window.InklingConfig.manifest` (keeping any `InklingConfig` the page already set), then
-  `@swissspidy/inkling/elements`. Module imports run in order, so the manifest is known before
+  `window.HunchConfig.manifest` (keeping any `HunchConfig` the page already set), then
+  `@swissspidy/hunch/elements`. Module imports run in order, so the manifest is known before
   the components register. `script: false` turns this off for sites that load the components
   themselves.
-- **The components take a default manifest from `window.InklingConfig.manifest`** when they
+- **The components take a default manifest from `window.HunchConfig.manifest`** when they
   have no `manifest` attribute, and the ES module build of the components now applies
-  `window.InklingConfig` when it registers them, as the script-tag build always did. That is
+  `window.HunchConfig` when it registers them, as the script-tag build always did. That is
   how the integration tells the components the manifest URL, and it lets an Astro site set its
   consent hook the same way as any other site: an inline script in `<head>`. Pages still
   server-render the slots, so there is still no layout shift.
@@ -77,19 +77,19 @@ the Vite config. With it, adding Inkling to an Astro site can be one line in
   query), and a component would have to guess both. The README shows the markup for a layout.
 - **`astro dev` serves the last build's vectors.** The dev server builds no catalog (it renders
   pages on request, so there is no set of built pages), but the integration serves the files
-  of `inkling/` from the build output directory, or from its client directory where a site
+  of `hunch/` from the build output directory, or from its client directory where a site
   with on-demand pages has them, if a build left them there. Before the first build the lists
   keep their fallback, and the dev server logs why once.
 
 ## Consequences
 
-- Adding Inkling to an Astro site is the integration, the slot markup in a layout, and caching
+- Adding Hunch to an Astro site is the integration, the slot markup in a layout, and caching
   one directory in CI.
 - The unit tests build a fixture site with the real `astro build` (hash provider): the
   catalog from the built pages, the filters, `items`, `base`, `build.format`, a second build
   that embeds nothing, the injected script, and the dev server. A browser test serves the
   built fixture and checks that a related list fills in place with no layout shift, and that a
-  page's own `InklingConfig` keeps its consent hook. Each build takes about half a second to a
+  page's own `HunchConfig` keeps its consent hook. Each build takes about half a second to a
   few seconds.
 - Reading the built HTML with regular expressions, as the sitemap source does, depends on the
   site's meta tags. A page without `article:section` has no section, and `page` or `items`

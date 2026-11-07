@@ -1,4 +1,4 @@
-/** The `inkling` command line. */
+/** The `hunch` command line. */
 
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -12,17 +12,17 @@ import type { EmbeddingProvider } from './providers/types.ts';
 import { loadSource, type SourceKind } from './sources/index.ts';
 import type { CatalogItem } from './types.ts';
 
-const HELP = `Usage: inkling <command> [options]
+const HELP = `Usage: hunch <command> [options]
 
 Commands:
   build     Embed a catalog and write manifest.json and vector shards
   inspect   Summarize a manifest (a file or URL)
 
-inkling build --source <file|url> [--source …] --out <dir> [options]
+hunch build --source <file|url> [--source …] --out <dir> [options]
   --source <file|url>     JSON, RSS/Atom, sitemap, or a loader module (.js/.mjs/.ts)
   --source-kind <kind>    json | feed | sitemap | module (default: detected)
   --limit <n>             For sitemaps: pages to fetch at most
-  --out <dir>             Output directory (default: inkling)
+  --out <dir>             Output directory (default: hunch)
   --provider <name|file>  transformers (default) | hash | a provider module
   --model <id>            Transformers.js model (default: EmbeddingGemma)
   --revision <commit>     Pinned model revision
@@ -32,7 +32,7 @@ inkling build --source <file|url> [--source …] --out <dir> [options]
   --quantization <q>      int8 (default) | float32
   --shard-by <how>        section (default) | none
   --max-shard-items <n>   Split larger shards (default 2000)
-  --cache-dir <dir>       Embedding cache (default: .inkling-cache)
+  --cache-dir <dir>       Embedding cache (default: .hunch-cache)
   --no-cache              Embed everything, keep nothing
   --quiet                 Print nothing but errors
 `;
@@ -66,7 +66,7 @@ export async function main(argv: string[]): Promise<number> {
         return 1;
     }
   } catch (error) {
-    console.error(`inkling: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`hunch: ${error instanceof Error ? error.message : String(error)}`);
     return 1;
   }
 }
@@ -79,7 +79,7 @@ async function buildCommand(argv: string[]): Promise<void> {
       source: { type: 'string', multiple: true },
       'source-kind': { type: 'string' },
       limit: { type: 'string' },
-      out: { type: 'string', default: 'inkling' },
+      out: { type: 'string', default: 'hunch' },
       provider: { type: 'string', default: 'transformers' },
       model: { type: 'string' },
       revision: { type: 'string' },
@@ -89,7 +89,7 @@ async function buildCommand(argv: string[]): Promise<void> {
       quantization: { type: 'string', default: 'int8' },
       'shard-by': { type: 'string', default: 'section' },
       'max-shard-items': { type: 'string' },
-      'cache-dir': { type: 'string', default: '.inkling-cache' },
+      'cache-dir': { type: 'string', default: '.hunch-cache' },
       'no-cache': { type: 'boolean', default: false },
       quiet: { type: 'boolean', default: false },
     },
@@ -168,7 +168,7 @@ async function resolveProvider(
 
 async function inspectCommand(argv: string[]): Promise<void> {
   const { positionals } = parseArgs({ args: argv, allowPositionals: true, strict: true });
-  const target = positionals[0] ?? 'inkling/manifest.json';
+  const target = positionals[0] ?? 'hunch/manifest.json';
   let text: string;
   if (/^https?:\/\//.test(target)) {
     const response = await fetch(target);

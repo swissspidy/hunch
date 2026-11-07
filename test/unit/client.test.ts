@@ -2,24 +2,24 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
-import { Inkling } from '../../src/client/index.ts';
+import { Hunch } from '../../src/client/index.ts';
 import { build } from '../../src/node/build.ts';
 import { hashProvider } from '../../src/node/providers/hash.ts';
 import { loadSource } from '../../src/node/sources/index.ts';
 import { dirFetch, tempDir } from '../helpers.ts';
 
 let dir = '';
-const MANIFEST = 'http://site/inkling/manifest.json';
+const MANIFEST = 'http://site/hunch/manifest.json';
 const now = () => Date.parse('2026-11-01T00:00:00Z');
 
 before(async () => {
   dir = await tempDir();
   const items = await loadSource('demo/feed.xml');
-  await build({ items, outDir: join(dir, 'inkling'), provider: hashProvider(), cacheDir: false });
+  await build({ items, outDir: join(dir, 'hunch'), provider: hashProvider(), cacheDir: false });
 });
 
 test('related items share the query item’s topic', async () => {
-  const ink = await Inkling.load({ manifest: MANIFEST, fetch: dirFetch(dir), now });
+  const ink = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir), now });
   // The hash provider is lexical, not semantic: "night", "train" and "rail" carry this.
   const related = await ink.related('night-train-alps', { n: 3, diversity: 0 });
   assert.equal(related.length, 3);
@@ -39,7 +39,7 @@ test('related items share the query item’s topic', async () => {
 
 test('only the shards needed are fetched', async () => {
   const log: string[] = [];
-  const ink = await Inkling.load({ manifest: MANIFEST, fetch: dirFetch(dir, log), now });
+  const ink = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir, log), now });
   const related = await ink.related('coffee-chemistry', {
     sections: 'same',
     sectionHint: 'Science',
@@ -47,7 +47,7 @@ test('only the shards needed are fetched', async () => {
   assert.equal(related.length, 5);
   assert.ok(related.every((r) => r.section === 'Science'));
   assert.equal(log.length, 2, log.join(', '));
-  assert.match(log[1]!, /\/inkling\/shards\/science\./);
+  assert.match(log[1]!, /\/hunch\/shards\/science\./);
   // Asking across all sections loads the rest, once.
   await ink.related('coffee-chemistry');
   await ink.related('cold-brew');
@@ -55,7 +55,7 @@ test('only the shards needed are fetched', async () => {
 });
 
 test('exclusions, unknown items and n', async () => {
-  const ink = await Inkling.load({ manifest: MANIFEST, fetch: dirFetch(dir), now });
+  const ink = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir), now });
   const all = await ink.related('cold-brew', { n: 100 });
   assert.equal(all.length, 31);
   assert.equal(new Set(all.map((r) => r.id)).size, 31);
@@ -70,27 +70,27 @@ test('a shard from another embedding space is refused', async () => {
   const items = await loadSource('demo/feed.xml');
   await build({
     items,
-    outDir: join(other, 'inkling'),
+    outDir: join(other, 'hunch'),
     provider: hashProvider(256),
     dims: 256,
     cacheDir: false,
   });
   // The manifest of one build pointing at the shards of another, hashes fixed up.
-  const manifest = JSON.parse(await readFile(join(dir, 'inkling/manifest.json'), 'utf8'));
-  const otherManifest = JSON.parse(await readFile(join(other, 'inkling/manifest.json'), 'utf8'));
+  const manifest = JSON.parse(await readFile(join(dir, 'hunch/manifest.json'), 'utf8'));
+  const otherManifest = JSON.parse(await readFile(join(other, 'hunch/manifest.json'), 'utf8'));
   manifest.shards = otherManifest.shards;
-  await writeFile(join(other, 'inkling/manifest.json'), JSON.stringify(manifest));
-  const ink = await Inkling.load({ manifest: MANIFEST, fetch: dirFetch(other), now });
+  await writeFile(join(other, 'hunch/manifest.json'), JSON.stringify(manifest));
+  const ink = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(other), now });
   await assert.rejects(ink.related('cold-brew'), /is from space .*hash@1\|native=256\|dims=256/);
 });
 
 test('a shard that does not match its hash is refused', async () => {
   const copy = await tempDir();
-  const manifest = JSON.parse(await readFile(join(dir, 'inkling/manifest.json'), 'utf8'));
+  const manifest = JSON.parse(await readFile(join(dir, 'hunch/manifest.json'), 'utf8'));
   manifest.shards[0].sha256 = '0'.repeat(64);
   await writeFile(join(copy, 'manifest.json'), JSON.stringify(manifest));
   const fetchFn = dirFetch(dir);
-  const ink = await Inkling.load({
+  const ink = await Hunch.load({
     manifest: MANIFEST,
     fetch: (url, init) =>
       String(url).endsWith('manifest.json')
@@ -107,36 +107,36 @@ test('a shard that does not match its hash is refused', async () => {
 test('manifests of another format are refused', async () => {
   const bad = (body: unknown) => () => Promise.resolve(new Response(JSON.stringify(body)));
   await assert.rejects(
-    Inkling.load({ manifest: MANIFEST, fetch: bad({ format: 'x' }) }),
+    Hunch.load({ manifest: MANIFEST, fetch: bad({ format: 'x' }) }),
     /format is "x"/,
   );
   await assert.rejects(
-    Inkling.load({
+    Hunch.load({
       manifest: MANIFEST,
-      fetch: bad({ format: 'inkling/manifest', formatVersion: 3 }),
+      fetch: bad({ format: 'hunch/manifest', formatVersion: 3 }),
     }),
     /format version 3/,
   );
   const base = {
-    format: 'inkling/manifest',
+    format: 'hunch/manifest',
     formatVersion: 1,
     space: 's',
     dims: 4,
     quantization: 'int8',
   };
   await assert.rejects(
-    Inkling.load({ manifest: MANIFEST, fetch: bad({ ...base, shards: [] }) }),
+    Hunch.load({ manifest: MANIFEST, fetch: bad({ ...base, shards: [] }) }),
     /missing space, dims, model or shard URLs/,
   );
   await assert.rejects(
-    Inkling.load({
+    Hunch.load({
       manifest: MANIFEST,
       fetch: bad({ ...base, model: {}, shards: [{ section: 'x' }] }),
     }),
     /missing space, dims, model or shard URLs/,
   );
   await assert.rejects(
-    Inkling.load({
+    Hunch.load({
       manifest: MANIFEST,
       fetch: () => Promise.resolve(new Response('', { status: 404 })),
     }),

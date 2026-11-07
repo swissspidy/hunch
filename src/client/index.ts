@@ -1,11 +1,11 @@
 /**
- * Inkling's client: ranks a site's catalog in the visitor's browser, from vectors the site
+ * Hunch's client: ranks a site's catalog in the visitor's browser, from vectors the site
  * precomputed. No model runs here, and nothing about the visitor leaves the device.
  *
  * Related items use no visitor data. Personalization ("for you") records signals in the site's
  * own IndexedDB, and only once the site's consent hook says yes (ADR 0001).
  *
- * @module @swissspidy/inkling
+ * @module @swissspidy/hunch
  */
 
 import type { Manifest, ShardItem } from '../format/manifest.ts';
@@ -31,8 +31,8 @@ import {
 /** `true`, or a function the client asks before every read or write of signals. */
 export type Consent = boolean | (() => boolean | Promise<boolean>);
 
-/** Options for {@link Inkling.load}; all but `manifest` also for {@link Inkling.configure}. */
-export interface InklingOptions {
+/** Options for {@link Hunch.load}; all but `manifest` also for {@link Hunch.configure}. */
+export interface HunchOptions {
   /** URL of the site's `manifest.json` (relative URLs resolve against the page). */
   manifest: string | URL;
   /**
@@ -40,7 +40,7 @@ export interface InklingOptions {
    * storing signals needs the visitor's consent (ePrivacy Art. 5(3)) is the site's call.
    */
   consent?: Consent;
-  /** Where signals live (default: IndexedDB, database `inkling` or `inkling-<namespace>`). */
+  /** Where signals live (default: IndexedDB, database `hunch` or `hunch-<namespace>`). */
   store?: SignalStore;
   /** Keeps several catalogs on one origin apart. */
   namespace?: string;
@@ -78,7 +78,7 @@ export interface RankingOptions {
   weights?: Partial<ScoreWeights>;
 }
 
-/** Options for {@link Inkling.related}. */
+/** Options for {@link Hunch.related}. */
 export interface RelatedOptions extends RankingOptions {
   /**
    * Restrict candidates to these sections; `'same'` means the item's own section. Only the
@@ -89,7 +89,7 @@ export interface RelatedOptions extends RankingOptions {
   sectionHint?: string;
 }
 
-/** Options for {@link Inkling.search}. */
+/** Options for {@link Hunch.search}. */
 export interface SearchOptions extends RankingOptions {
   /** Restrict results to these sections (only their shards are fetched). */
   sections?: readonly string[];
@@ -102,7 +102,7 @@ export interface SearchOptions extends RankingOptions {
   excludeSeen?: boolean;
 }
 
-/** Options for {@link Inkling.recommend} and {@link Inkling.sinceLastVisit}. */
+/** Options for {@link Hunch.recommend} and {@link Hunch.sinceLastVisit}. */
 export interface RecommendOptions extends RankingOptions {
   /** Restrict candidates to these sections (only their shards are fetched for candidates). */
   sections?: readonly string[];
@@ -179,10 +179,10 @@ export interface ItemExplanation {
   missing: number;
 }
 
-/** What {@link Inkling.export} returns: the visitor's signals, as JSON (none without consent). */
+/** What {@link Hunch.export} returns: the visitor's signals, as JSON (none without consent). */
 export interface SignalExport {
   /** Identifies the document. */
-  format: 'inkling/signals';
+  format: 'hunch/signals';
   /** The export format's version. */
   formatVersion: 1;
   /** When it was exported (ISO 8601). */
@@ -210,20 +210,20 @@ const NO_PROFILE: Profile = {
 
 /**
  * The client for one catalog: related items, and with consent "for you", "since your last
- * visit", search and the visitor's controls. Create it with {@link Inkling.load}, or share one
- * per manifest with {@link Inkling.shared}.
+ * visit", search and the visitor's controls. Create it with {@link Hunch.load}, or share one
+ * per manifest with {@link Hunch.shared}.
  */
-export class Inkling {
-  private static defaults: Omit<InklingOptions, 'manifest'> = {};
-  private static instances = new Map<string, Promise<Inkling>>();
+export class Hunch {
+  private static defaults: Omit<HunchOptions, 'manifest'> = {};
+  private static instances = new Map<string, Promise<Hunch>>();
 
   private readonly catalog: Catalog;
-  private readonly options: InklingOptions;
+  private readonly options: HunchOptions;
   private readonly store: SignalStore;
   private readonly now: () => number;
   /** Counts forget() calls, so a visit that started before one does not write after it. */
   private forgotten = 0;
-  private constructor(catalog: Catalog, options: InklingOptions) {
+  private constructor(catalog: Catalog, options: HunchOptions) {
     this.catalog = catalog;
     this.options = options;
     this.now = options.now ?? Date.now;
@@ -231,11 +231,11 @@ export class Inkling {
       options.store ??
       (typeof indexedDB === 'undefined'
         ? new MemoryStore()
-        : new IndexedDbStore(options.namespace ? `inkling-${options.namespace}` : 'inkling'));
+        : new IndexedDbStore(options.namespace ? `hunch-${options.namespace}` : 'hunch'));
   }
 
   /** Fetches the manifest. Shards are fetched on first use. */
-  static async load(options: InklingOptions): Promise<Inkling> {
+  static async load(options: HunchOptions): Promise<Hunch> {
     for (const name of [
       'signalHalfLifeDays',
       'maxSignals',
@@ -244,34 +244,34 @@ export class Inkling {
     ] as const) {
       const value = options[name];
       if (value !== undefined && !(Number.isFinite(value) && value > 0)) {
-        throw new RangeError(`Inkling: ${name} must be a positive number, not ${value}`);
+        throw new RangeError(`Hunch: ${name} must be a positive number, not ${value}`);
       }
     }
     const fetchFn = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
     const catalog = await Catalog.load(options.manifest, fetchFn, options.kernel);
-    return new Inkling(catalog, options);
+    return new Hunch(catalog, options);
   }
 
   /**
-   * Options for the clients that `Inkling.shared()` creates, such as the web components'. The
+   * Options for the clients that `Hunch.shared()` creates, such as the web components'. The
    * consent hook is looked up whenever it is needed, so it can be set at any time.
    */
-  static configure(defaults: Omit<InklingOptions, 'manifest'>): void {
-    Inkling.defaults = { ...Inkling.defaults, ...defaults };
+  static configure(defaults: Omit<HunchOptions, 'manifest'>): void {
+    Hunch.defaults = { ...Hunch.defaults, ...defaults };
   }
 
   /** One client per manifest URL, shared by everything on the page. */
-  static shared(manifest: string | URL): Promise<Inkling> {
+  static shared(manifest: string | URL): Promise<Hunch> {
     const key = new URL(manifest, globalThis.location?.href).href;
-    let instance = Inkling.instances.get(key);
+    let instance = Hunch.instances.get(key);
     if (!instance) {
-      instance = Inkling.load({
-        ...Inkling.defaults,
+      instance = Hunch.load({
+        ...Hunch.defaults,
         manifest: key,
-        consent: () => evaluate(Inkling.defaults.consent),
+        consent: () => evaluate(Hunch.defaults.consent),
       });
-      Inkling.instances.set(key, instance);
-      instance.catch(() => Inkling.instances.delete(key));
+      Hunch.instances.set(key, instance);
+      instance.catch(() => Hunch.instances.delete(key));
     }
     return instance;
   }
@@ -393,7 +393,7 @@ export class Inkling {
 
   /**
    * Ranks the catalog by similarity to a query vector, such as one from
-   * `@swissspidy/inkling/query`, which embeds text with the catalog's own model on the device.
+   * `@swissspidy/hunch/query`, which embeds text with the catalog's own model on the device.
    * The vector is truncated to the catalog's dimensions and normalized. Hidden items never
    * appear. With `personalize`, the visitor's profile is blended in.
    */
@@ -401,12 +401,12 @@ export class Inkling {
     const { dims, model } = this.catalog.manifest;
     if (query.length !== dims && query.length !== model.nativeDims) {
       throw new RangeError(
-        `Inkling: a query vector has ${dims} or ${model.nativeDims} dims (${model.id}), not ${query.length}`,
+        `Hunch: a query vector has ${dims} or ${model.nativeDims} dims (${model.id}), not ${query.length}`,
       );
     }
     const components = Array.prototype.slice.call(query, 0, dims) as number[];
     if (!components.every(Number.isFinite)) {
-      throw new RangeError('Inkling: a query vector has a non-finite component');
+      throw new RangeError('Hunch: a query vector has a non-finite component');
     }
     const vector = normalize(components);
     const requested = options.personalize ?? 0;
@@ -538,7 +538,7 @@ export class Inkling {
     return this.setPaused(true);
   }
 
-  /** Records signals again after {@link Inkling.pause}. */
+  /** Records signals again after {@link Hunch.pause}. */
   resume(): Promise<void> {
     return this.setPaused(false);
   }
@@ -554,7 +554,7 @@ export class Inkling {
   }
 
   /**
-   * Deletes the signals of one item, or, without `itemId`, everything Inkling stored on this
+   * Deletes the signals of one item, or, without `itemId`, everything Hunch stored on this
    * device (its whole database). Works without consent: deleting is always allowed.
    */
   async forget(itemId?: string): Promise<void> {
@@ -573,7 +573,7 @@ export class Inkling {
   async export(): Promise<SignalExport> {
     const signals = (await this.consented()) ? await this.store.all().catch(() => []) : [];
     return {
-      format: 'inkling/signals',
+      format: 'hunch/signals',
       formatVersion: 1,
       exportedAt: new Date(this.now()).toISOString(),
       manifestVersion: this.catalog.manifest.version,

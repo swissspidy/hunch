@@ -54,7 +54,7 @@ within 1e-8 on the 20,000-item fixture.
 The JavaScript fallback sums in float64. It runs where WebAssembly SIMD doesn't (browsers from
 before 2021–2023), where a Content Security Policy forbids compiling WebAssembly (it needs
 `'wasm-unsafe-eval'`), for float32 catalogs, and for dims that aren't a multiple of 16.
-`Inkling.load({ kernel: 'js' })` forces it, and `inkling.kernel` says which one runs. Both give
+`Hunch.load({ kernel: 'js' })` forces it, and `hunch.kernel` says which one runs. Both give
 the same results to within 1e-8; a browser test checks that in Chromium, Firefox and WebKit.
 Single rows (diversity, explanations) are computed in JavaScript, where a kernel call costs
 more than the row.

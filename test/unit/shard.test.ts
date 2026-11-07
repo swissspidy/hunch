@@ -84,7 +84,7 @@ test('version 1 shards are still read', () => {
   const start = Math.ceil((20 + text.length) / 4) * 4;
   const out = new Uint8Array(start + 2 * 4);
   const view = new DataView(out.buffer);
-  view.setUint32(0, 0x564b4e49, true);
+  view.setUint32(0, 0x48434e48, true);
   view.setUint8(4, 1);
   view.setUint8(5, 1);
   view.setUint32(8, 4, true);
@@ -149,7 +149,7 @@ function withHeader(json: string, version = 1): ArrayBuffer {
   // Room for an empty shard's columns (version 2: one metadata offset, 0).
   const out = new Uint8Array(start + text.length + 16);
   const view = new DataView(out.buffer);
-  view.setUint32(0, 0x564b4e49, true);
+  view.setUint32(0, 0x48434e48, true);
   view.setUint8(4, version);
   view.setUint8(5, 1);
   view.setUint32(8, 4, true);

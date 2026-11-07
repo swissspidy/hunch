@@ -50,12 +50,12 @@ test('builds the catalog from the built pages, and rebuilds from the cache', asy
   const first = countingProvider();
   await buildFixture(out, { provider: first, cacheDir });
 
-  const manifest = await readManifest(join(out, 'inkling'));
+  const manifest = await readManifest(join(out, 'hunch'));
   // Every page but the 404 page.
   assert.equal(manifest.count, 7);
   assert.equal(first.calls.length, 7);
   assert.deepEqual(manifest.sections, ['Travel', 'Food']);
-  const items = await shardItems(join(out, 'inkling'), manifest);
+  const items = await shardItems(join(out, 'hunch'), manifest);
   assert.deepEqual(items.map((item) => item.id).sort(), ['/', ...POSTS, '/tags/']);
   const rye = items.find((item) => item.id === '/blog/rye-bread/');
   assert.deepEqual(
@@ -76,14 +76,14 @@ test('builds the catalog from the built pages, and rebuilds from the cache', asy
   // The article's text is embedded, not the page around it.
   assert.ok(first.calls.some((input) => /sourdough starter, flour, water/.test(input)));
   assert.ok(!first.calls.some((input) => /Related/.test(input)));
-  const files = await readdir(join(out, 'inkling/shards'));
+  const files = await readdir(join(out, 'hunch/shards'));
   assert.deepEqual(files.sort(), manifest.shards.map((s) => s.url.slice('shards/'.length)).sort());
 
   // A second build embeds nothing, and publishes the same vectors.
   const second = countingProvider();
   await buildFixture(out, { provider: second, cacheDir });
   assert.equal(second.calls.length, 0);
-  assert.equal((await readManifest(join(out, 'inkling'))).version, manifest.version);
+  assert.equal((await readManifest(join(out, 'hunch'))).version, manifest.version);
 
   // One changed page is the only one embedded.
   const third = countingProvider();
@@ -100,14 +100,14 @@ test('loads the web components on every page, with the manifest preset', async (
   await buildFixture(out, { cacheDir: false });
   for (const page of ['index.html', 'blog/rye-bread/index.html']) {
     const code = await pageScripts(out, page);
-    assert.match(code, /InklingConfig/);
+    assert.match(code, /HunchConfig/);
     // Set before the components register: first in the bundle.
-    assert.match(code, /^globalThis\.InklingConfig=\{manifest:["'`]\/inkling\/manifest\.json["'`]/);
-    assert.match(code, /inkling-related/);
+    assert.match(code, /^globalThis\.HunchConfig=\{manifest:["'`]\/hunch\/manifest\.json["'`]/);
+    assert.match(code, /hunch-related/);
   }
   // The page renders the slots; the integration adds no markup to them.
   const html = await readFile(join(out, 'blog/rye-bread/index.html'), 'utf8');
-  assert.match(html, /<inkling-related item="\/blog\/rye-bread\/" section="Food"/);
+  assert.match(html, /<hunch-related item="\/blog\/rye-bread\/" section="Food"/);
 });
 
 test('include, exclude and page select the pages', async () => {
@@ -118,8 +118,8 @@ test('include, exclude and page select the pages', async () => {
     exclude: (path) => path === '/blog/cold-brew/',
     page: (item) => (item.id === '/blog/alpine-hut/' ? null : { ...item, section: 'Posts' }),
   });
-  const manifest = await readManifest(join(out, 'inkling'));
-  const items = await shardItems(join(out, 'inkling'), manifest);
+  const manifest = await readManifest(join(out, 'hunch'));
+  const items = await shardItems(join(out, 'hunch'), manifest);
   assert.deepEqual(items.map((item) => item.id).sort(), [
     '/blog/night-train/',
     '/blog/rye-bread/',
@@ -133,10 +133,7 @@ test('include, exclude and page select the pages', async () => {
     cacheDir: false,
     exclude: ['/', '/tags', /cold|night/, '/**/alpine-*/'],
   });
-  const left = await shardItems(
-    join(globbed, 'inkling'),
-    await readManifest(join(globbed, 'inkling')),
-  );
+  const left = await shardItems(join(globbed, 'hunch'), await readManifest(join(globbed, 'hunch')));
   assert.deepEqual(left.map((item) => item.id).sort(), ['/blog/rye-bread/', '/blog/sourdough/']);
 });
 
@@ -165,7 +162,7 @@ test('items replaces the catalog, and base and out move it', async () => {
     /manifest:["'`]\/sub\/vectors\/manifest\.json["'`]/,
   );
   const html = await readFile(join(out, 'blog/rye-bread/index.html'), 'utf8');
-  assert.match(html, /<inkling-related item="\/sub\/blog\/rye-bread\/"/);
+  assert.match(html, /<hunch-related item="\/sub\/blog\/rye-bread\/"/);
 });
 
 test('ids follow build.format, as Astro.url.pathname does', async () => {
@@ -178,7 +175,7 @@ test('ids follow build.format, as Astro.url.pathname does', async () => {
   );
   const out = await tempDir();
   await buildFixture(out, { cacheDir: false }, { build: { format: 'file' }, publicDir });
-  const items = await shardItems(join(out, 'inkling'), await readManifest(join(out, 'inkling')));
+  const items = await shardItems(join(out, 'hunch'), await readManifest(join(out, 'hunch')));
   assert.deepEqual(items.map((item) => item.id).sort(), [
     '/',
     ...POSTS.map((path) => path.replace(/\/$/, '.html')),
@@ -189,9 +186,9 @@ test('ids follow build.format, as Astro.url.pathname does', async () => {
     'Dense, dark rye bread',
   );
   const html = await readFile(join(out, 'blog/rye-bread.html'), 'utf8');
-  assert.match(html, /<inkling-related item="\/blog\/rye-bread\.html"/);
+  assert.match(html, /<hunch-related item="\/blog\/rye-bread\.html"/);
   // The fixture's fallback links are in the same form, and leave out the page itself.
-  const fallback = [...html.matchAll(/data-inkling-id="([^"]+)"/g)].map((m) => m[1]);
+  const fallback = [...html.matchAll(/data-hunch-id="([^"]+)"/g)].map((m) => m[1]);
   assert.equal(fallback.length, 3);
   assert.ok(fallback.every((id) => id!.endsWith('.html') && id !== '/blog/rye-bread.html'));
 
@@ -205,7 +202,7 @@ test('ids follow build.format, as Astro.url.pathname does', async () => {
       { build: { format: 'preserve' }, trailingSlash },
     );
     const ids = (
-      await shardItems(join(preserved, 'inkling'), await readManifest(join(preserved, 'inkling')))
+      await shardItems(join(preserved, 'hunch'), await readManifest(join(preserved, 'hunch')))
     ).map((item) => item.id);
     const tags = await readFile(join(preserved, 'tags/index.html'), 'utf8');
     const tagsPath = /data-path="([^"]+)"/.exec(tags)![1]!;
@@ -220,7 +217,7 @@ test('the manifest URL uses the final base, after every integration', async () =
     out,
     { cacheDir: false },
     {
-      // An integration after Inkling's that sets base.
+      // An integration after Hunch's that sets base.
       integrations: [
         {
           name: 'late-base',
@@ -233,7 +230,7 @@ test('the manifest URL uses the final base, after every integration', async () =
   );
   assert.match(
     await pageScripts(out, 'index.html', '/late/'),
-    /manifest:["'`]\/late\/inkling\/manifest\.json["'`]/,
+    /manifest:["'`]\/late\/hunch\/manifest\.json["'`]/,
   );
 });
 
@@ -242,24 +239,24 @@ test('astro dev serves the last build’s vectors and the components', async () 
   const server = await devFixture(out, { cacheDir: false });
   try {
     // No build yet: no vectors, and the page still renders its fallback.
-    assert.equal((await fetch(`${server.origin}/inkling/manifest.json`)).status, 404);
+    assert.equal((await fetch(`${server.origin}/hunch/manifest.json`)).status, 404);
     await buildFixture(out, { cacheDir: false });
-    const manifest = await fetch(`${server.origin}/inkling/manifest.json`);
+    const manifest = await fetch(`${server.origin}/hunch/manifest.json`);
     assert.equal(manifest.status, 200);
     assert.equal(((await manifest.json()) as Manifest).count, 7);
     const html = await (await fetch(`${server.origin}/blog/rye-bread/`)).text();
-    assert.match(html, /<inkling-related item="\/blog\/rye-bread\/"/);
+    assert.match(html, /<hunch-related item="\/blog\/rye-bread\/"/);
     const script = await (await fetch(`${server.origin}/@id/astro:scripts/page.js`)).text();
-    assert.match(script, /virtual:inkling\/config[\s\S]*elements/);
+    assert.match(script, /virtual:hunch\/config[\s\S]*elements/);
     // Directories are not files: no 200 with an error after it.
-    for (const path of ['/inkling/', '/inkling/shards/', '/inkling/shards']) {
+    for (const path of ['/hunch/', '/hunch/shards/', '/hunch/shards']) {
       assert.notEqual((await fetch(`${server.origin}${path}`)).status, 200, path);
     }
     // A site with on-demand pages has its vectors in the client directory.
-    await rm(join(out, 'inkling'), { recursive: true });
-    await mkdir(join(out, 'client/inkling'), { recursive: true });
-    await writeFile(join(out, 'client/inkling/manifest.json'), '{"count":1}');
-    const client = await fetch(`${server.origin}/inkling/manifest.json`);
+    await rm(join(out, 'hunch'), { recursive: true });
+    await mkdir(join(out, 'client/hunch'), { recursive: true });
+    await writeFile(join(out, 'client/hunch/manifest.json'), '{"count":1}');
+    const client = await fetch(`${server.origin}/hunch/manifest.json`);
     assert.equal(client.status, 200);
     assert.deepEqual(await client.json(), { count: 1 });
   } finally {

@@ -7,8 +7,8 @@
   "ignorePatterns": [
     "dist/**",
     "demo/dist/**",
-    "wordpress/inkling/vendor/**",
-    "wordpress/inkling/assets/inkling.global.js"
+    "wordpress/hunch/vendor/**",
+    "wordpress/hunch/assets/hunch.global.js"
   ],
   "rules": {
     "typescript/no-floating-promises": [

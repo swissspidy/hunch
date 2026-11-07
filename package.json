@@ -1,5 +1,5 @@
 {
-  "name": "@swissspidy/inkling",
+  "name": "@swissspidy/hunch",
   "version": "0.0.0",
   "description": "First-party, on-device personalization for websites: the visitor's interests stay in their browser.",
   "keywords": [
@@ -9,17 +9,17 @@
     "privacy",
     "recommendations"
   ],
-  "homepage": "https://github.com/swissspidy/inkling#readme",
+  "homepage": "https://github.com/swissspidy/hunch#readme",
   "bugs": {
-    "url": "https://github.com/swissspidy/inkling/issues"
+    "url": "https://github.com/swissspidy/hunch/issues"
   },
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/swissspidy/inkling.git"
+    "url": "git+https://github.com/swissspidy/hunch.git"
   },
   "bin": {
-    "inkling": "./bin/inkling.js"
+    "hunch": "./bin/hunch.js"
   },
   "files": [
     "bin",
@@ -29,7 +29,7 @@
   "sideEffects": [
     "./dist/elements/index.js",
     "./dist/elements/global.js",
-    "./dist/inkling.global.js",
+    "./dist/hunch.global.js",
     "./src/elements/index.ts",
     "./src/elements/global.ts"
   ],
@@ -62,7 +62,7 @@
       "types": "./dist/astro/index.d.ts",
       "default": "./dist/astro/index.js"
     },
-    "./inkling.global.js": "./dist/inkling.global.js",
+    "./hunch.global.js": "./dist/hunch.global.js",
     "./package.json": "./package.json"
   },
   "scripts": {

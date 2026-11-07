@@ -25,35 +25,35 @@ const FOOD = ['sourdough-starter', 'baguette-shaping', 'rye-bread'];
 async function context(consent: boolean, options = DESKTOP): Promise<BrowserContext> {
   const ctx = await site.browser.newContext(options);
   if (consent) {
-    await ctx.addInitScript(() => localStorage.setItem('inkling-demo-consent', 'yes'));
+    await ctx.addInitScript(() => localStorage.setItem('hunch-demo-consent', 'yes'));
   }
   return ctx;
 }
 
 async function visit(page: Page, id: string): Promise<void> {
   await page.goto(`${site.origin}/items/${id}.html`);
-  await ready(page, 'inkling-related');
+  await ready(page, 'hunch-related');
 }
 
 /** The demo's signals, read from IndexedDB as the page sees them. */
 function storedSignals(page: Page): Promise<{ itemId: string; kind: string }[]> {
   return page.evaluate(async () => {
-    const inkling = await (
+    const hunch = await (
       window as unknown as {
-        Inkling: {
+        Hunch: {
           shared(
             m: string,
           ): Promise<{ export(): Promise<{ signals: { itemId: string; kind: string }[] }> }>;
         };
       }
-    ).Inkling.shared(document.body.dataset.manifest!);
-    return (await inkling.export()).signals;
+    ).Hunch.shared(document.body.dataset.manifest!);
+    return (await hunch.export()).signals;
   });
 }
 
 async function home(page: Page): Promise<void> {
   await page.goto(`${site.origin}/`);
-  await ready(page, 'inkling-for-you');
+  await ready(page, 'hunch-for-you');
 }
 
 test('without consent nothing is stored and "for you" is the editors’ order', async () => {
@@ -63,11 +63,11 @@ test('without consent nothing is stored and "for you" is the editors’ order', 
   await page.click('[data-signal="follow"]');
   assert.match((await page.locator('#feedback').textContent()) ?? '', /Turn on personalization/);
   await home(page);
-  assert.equal(await page.getAttribute('inkling-for-you', 'data-inkling-personalized'), 'false');
+  assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'false');
   // The editors' order: the feed's first items, as the demo renders them (scripts/demo.ts).
   const editorial = (await loadSource('demo/feed.xml')).slice(0, 4).map((item) => item.id);
   assert.deepEqual(
-    (await slots(page, 'inkling-for-you')).map((s) => s.id),
+    (await slots(page, 'hunch-for-you')).map((s) => s.id),
     editorial,
   );
   // Not even an empty database was created.
@@ -91,11 +91,11 @@ for (const [name, options] of [
 
     await observeLayoutShifts(page);
     await home(page);
-    assert.equal(await page.getAttribute('inkling-for-you', 'data-inkling-personalized'), 'true');
-    const recs = await slots(page, 'inkling-for-you');
+    assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'true');
+    const recs = await slots(page, 'hunch-for-you');
     assert.equal(recs.length, 4);
     assert.ok(!recs.some((r) => FOOD.includes(r.id)), 'already read');
-    const sections = await page.$$eval('inkling-for-you [data-inkling-section]', (els) =>
+    const sections = await page.$$eval('hunch-for-you [data-hunch-section]', (els) =>
       els.map((el) => el.textContent),
     );
     assert.ok(sections.filter((s) => s === 'Food').length >= 2, sections.join(', '));
@@ -112,25 +112,25 @@ test('"Not interested" hides an item for good; "Forget everything" starts over',
   const page = await ctx.newPage();
   for (const id of FOOD) await read(site, page, id);
   await home(page);
-  const first = (await slots(page, 'inkling-for-you'))[0]!.id;
+  const first = (await slots(page, 'hunch-for-you'))[0]!.id;
 
   await visit(page, first);
   await page.click('[data-signal="hide"]');
   await page.waitForFunction(() => document.getElementById('feedback')!.textContent !== '');
   await home(page);
   // The hidden item is gone, and so is the visit to it (seen items are not recommended).
-  assert.ok(!(await slots(page, 'inkling-for-you')).some((r) => r.id === first));
+  assert.ok(!(await slots(page, 'hunch-for-you')).some((r) => r.id === first));
   // Hidden even where seen items are allowed: the hide signal, not the view, keeps it out.
   const withSeen = await page.evaluate(async () => {
     const shared = (
       window as unknown as {
-        Inkling: {
+        Hunch: {
           shared(m: string): Promise<{ recommend(o: object): Promise<{ id: string }[]> }>;
         };
       }
-    ).Inkling.shared;
-    const inkling = await shared(document.body.dataset.manifest!);
-    return (await inkling.recommend({ n: 40, includeSeen: true })).map((r) => r.id);
+    ).Hunch.shared;
+    const hunch = await shared(document.body.dataset.manifest!);
+    return (await hunch.recommend({ n: 40, includeSeen: true })).map((r) => r.id);
   });
   assert.ok(withSeen.length > 20);
   assert.ok(!withSeen.includes(first), `${first} came back with includeSeen`);
@@ -143,15 +143,15 @@ test('"Not interested" hides an item for good; "Forget everything" starts over',
   const editorial = (await loadSource('demo/feed.xml')).slice(0, 4).map((item) => item.id);
   await page.waitForFunction(
     (ids) =>
-      [...document.querySelectorAll<HTMLElement>('inkling-for-you [data-inkling-slot]')]
-        .map((el) => el.dataset.inklingId)
+      [...document.querySelectorAll<HTMLElement>('hunch-for-you [data-hunch-slot]')]
+        .map((el) => el.dataset.hunchId)
         .join() === ids.join(),
     editorial,
   );
   assert.equal(await page.locator('#why-list li').count(), 0);
   await page.reload();
-  await ready(page, 'inkling-for-you');
-  assert.equal(await page.getAttribute('inkling-for-you', 'data-inkling-personalized'), 'false');
+  await ready(page, 'hunch-for-you');
+  assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'false');
   await ctx.close();
 });
 
@@ -167,9 +167,9 @@ test('pause stops recording; withdrawing consent deletes the data; export downlo
   const download = page.waitForEvent('download');
   await page.click('#export');
   const file = await download;
-  assert.equal(file.suggestedFilename(), 'inkling-signals.json');
+  assert.equal(file.suggestedFilename(), 'hunch-signals.json');
   const exported = JSON.parse(await readFile(await file.path(), 'utf8'));
-  assert.equal(exported.format, 'inkling/signals');
+  assert.equal(exported.format, 'hunch/signals');
   assert.deepEqual(
     exported.signals.map((s: { itemId: string }) => s.itemId),
     [FOOD[0]],
@@ -200,14 +200,14 @@ test('staying on an article records dwell time', async () => {
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await page.waitForFunction(async () => {
-    const inkling = await (
+    const hunch = await (
       window as unknown as {
-        Inkling: {
+        Hunch: {
           shared(m: string): Promise<{ export(): Promise<{ signals: { kind: string }[] }> }>;
         };
       }
-    ).Inkling.shared(document.body.dataset.manifest!);
-    return (await inkling.export()).signals.some((s) => s.kind === 'dwell');
+    ).Hunch.shared(document.body.dataset.manifest!);
+    return (await hunch.export()).signals.some((s) => s.kind === 'dwell');
   });
   const dwell = (await storedSignals(page)).find((s) => s.kind === 'dwell') as unknown as {
     weight: number;
@@ -225,18 +225,18 @@ test('an item hidden before there is a profile leaves the fallback', async () =>
   await page.evaluate(async (id) => {
     const shared = (
       window as unknown as {
-        Inkling: {
+        Hunch: {
           shared(m: string): Promise<{ record(k: string, id: string): Promise<boolean> }>;
         };
       }
-    ).Inkling.shared;
+    ).Hunch.shared;
     await (await shared(document.body.dataset.manifest!)).record('hide', id);
   }, editorial[0]!);
   await page.reload();
-  await ready(page, 'inkling-for-you');
-  assert.equal(await page.getAttribute('inkling-for-you', 'data-inkling-personalized'), 'false');
+  await ready(page, 'hunch-for-you');
+  assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'false');
   assert.deepEqual(
-    (await slots(page, 'inkling-for-you')).map((s) => s.id),
+    (await slots(page, 'hunch-for-you')).map((s) => s.id),
     editorial.slice(1),
   );
   await ctx.close();

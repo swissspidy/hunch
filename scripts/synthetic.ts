@@ -53,7 +53,7 @@ export async function syntheticCatalog(
         dims,
         quantization,
       );
-      const url = `shards/section-${s}${n > maxItems ? `-${part}` : ''}.ink`;
+      const url = `shards/section-${s}${n > maxItems ? `-${part}` : ''}.hunch`;
       files.set(url, bytes);
       const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
       shards.push({
@@ -67,7 +67,7 @@ export async function syntheticCatalog(
   }
   return {
     manifest: {
-      format: 'inkling/manifest',
+      format: 'hunch/manifest',
       formatVersion: MANIFEST_FORMAT_VERSION,
       version: 'bench',
       generatedAt: new Date(0).toISOString(),

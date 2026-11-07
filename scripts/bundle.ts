@@ -11,7 +11,7 @@ const common: BuildOptions = {
   logLevel: 'warning',
 };
 
-/** `inkling.global.js`: the client as `window.Inkling` and the web components registered. */
+/** `hunch.global.js`: the client as `window.Hunch` and the web components registered. */
 export async function bundleGlobal(outfile: string): Promise<void> {
   await build({ ...common, entryPoints: ['src/elements/global.ts'], format: 'iife', outfile });
 }

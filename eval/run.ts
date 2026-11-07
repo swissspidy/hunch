@@ -1,11 +1,11 @@
 /**
- * `npm run eval`: offline evaluation of Inkling's ranking (milestones 3 and 4).
+ * `npm run eval`: offline evaluation of Hunch's ranking (milestones 3 and 4).
  *
  *   node eval/run.ts --dataset synthetic
  *   node eval/run.ts --dataset mind --mind-dir <dir> [--impressions 2000] [--models hash,gemma]
  *
  * For each impression, the user's history becomes signals (one view per item read), and the
- * items shown are ranked by `Inkling.rank()` through the real client: shards, profile and
+ * items shown are ranked by `Hunch.rank()` through the real client: shards, profile and
  * ranking function. Baselines: random order, and popularity (the catalog's prior). With two
  * models, the model-switch check records the signals through the client on the first model's
  * catalog and ranks with the second's, which must match a fresh profile on the second exactly.
@@ -23,7 +23,7 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { Inkling, MemoryStore } from '../src/client/index.ts';
+import { Hunch, MemoryStore } from '../src/client/index.ts';
 import type { Quantization } from '../src/format/manifest.ts';
 import { build } from '../src/node/build.ts';
 import { hashProvider } from '../src/node/providers/hash.ts';
@@ -80,7 +80,7 @@ interface Catalog {
   buildSeconds: number;
 }
 
-type RankOptions = Parameters<Inkling['rank']>[1];
+type RankOptions = Parameters<Hunch['rank']>[1];
 const VARIANTS: Record<string, [string, RankOptions]> = {
   profile: ['profile only', { prior: 'catalog', diversity: 0, weights: { prior: 0, recency: 0 } }],
   default: ['profile + popularity (default weights)', { prior: 'catalog', diversity: 0 }],
@@ -226,8 +226,8 @@ for (const { model, dims: dimsForModel, quantizations: quantsForModel } of plan)
         `${label}: ${result.embedded} embedded, ${result.cached} cached, ${(result.bytes / 1024).toFixed(0)} KB, ${catalog.buildSeconds.toFixed(1)} s`,
       );
       for (const [i, [variant, options]] of variants.entries()) {
-        const { metrics, ndcg10, rankMs } = await evaluateInkling(dir, options);
-        rows.push({ ranker: `Inkling, ${label}: ${variant}`, catalog: label, metrics, rankMs });
+        const { metrics, ndcg10, rankMs } = await evaluateHunch(dir, options);
+        rows.push({ ranker: `Hunch, ${label}: ${variant}`, catalog: label, metrics, rankMs });
         if (i === compared) perImpression.set(label, ndcg10);
         console.error(
           `  ${variant}: nDCG@10 ${metrics.ndcg10.toFixed(4)}, ${rankMs.toFixed(2)} ms`,
@@ -312,8 +312,8 @@ await writeFile(
 
 // ---------------------------------------------------------------------------------------------
 
-async function load(dir: string, store: MemoryStore, now: () => number): Promise<Inkling> {
-  return Inkling.load({
+async function load(dir: string, store: MemoryStore, now: () => number): Promise<Hunch> {
+  return Hunch.load({
     manifest: 'http://eval/manifest.json',
     fetch: async (input) => new Response(await readFile(join(dir, new URL(input).pathname))),
     consent: true,
@@ -322,7 +322,7 @@ async function load(dir: string, store: MemoryStore, now: () => number): Promise
   });
 }
 
-async function evaluateInkling(
+async function evaluateHunch(
   dir: string,
   options: RankOptions,
 ): Promise<{ metrics: Metrics; ndcg10: number[]; rankMs: number }> {
