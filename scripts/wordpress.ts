@@ -1,7 +1,7 @@
 /**
  * `npm run wordpress:build`: bundles the script-tag client into the WordPress plugin
- * (wordpress/inkling/assets/inkling.global.js, the same bundle as dist/inkling.global.js) and
- * zips the plugin for upload: wordpress/inkling.zip, without its tests and dev tools (ADR 0007).
+ * (wordpress/hunch/assets/hunch.global.js, the same bundle as dist/hunch.global.js) and
+ * zips the plugin for upload: wordpress/hunch.zip, without its tests and dev tools (ADR 0007).
  */
 
 import { readdir, readFile, writeFile } from 'node:fs/promises';
@@ -9,12 +9,12 @@ import { join, relative, sep } from 'node:path';
 import { crc32, deflateRawSync } from 'node:zlib';
 import { bundleGlobal } from './bundle.ts';
 
-const PLUGIN = 'wordpress/inkling';
-const ZIP = 'wordpress/inkling.zip';
+const PLUGIN = 'wordpress/hunch';
+const ZIP = 'wordpress/hunch.zip';
 /** What the plugin ships: the rest of the directory is for development. */
-const SHIPPED = ['inkling.php', 'uninstall.php', 'readme.txt', 'includes', 'assets'];
+const SHIPPED = ['hunch.php', 'uninstall.php', 'readme.txt', 'includes', 'assets'];
 
-await bundleGlobal(join(PLUGIN, 'assets', 'inkling.global.js'));
+await bundleGlobal(join(PLUGIN, 'assets', 'hunch.global.js'));
 
 const files: string[] = [];
 for (const entry of SHIPPED) {
@@ -31,12 +31,12 @@ files.sort();
 const zip = zipFiles([
   ...(await Promise.all(
     files.map(async (file) => ({
-      name: `inkling/${relative(PLUGIN, file).split(sep).join('/')}`,
+      name: `hunch/${relative(PLUGIN, file).split(sep).join('/')}`,
       data: await readFile(file),
     })),
   )),
   // The repository's Apache-2.0 license, at the plugin's root.
-  { name: 'inkling/LICENSE', data: await readFile('LICENSE') },
+  { name: 'hunch/LICENSE', data: await readFile('LICENSE') },
 ]);
 await writeFile(ZIP, zip);
 console.log(`${ZIP}: ${files.length + 1} files, ${(zip.length / 1024).toFixed(1)} KB`);

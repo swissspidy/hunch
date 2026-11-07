@@ -17,7 +17,7 @@ import { htmlToText } from '../../src/node/text.ts';
 import type { CatalogItem } from '../../src/node/types.ts';
 import { tempDir } from '../helpers.ts';
 
-const DRIVER = new URL('../../wordpress/inkling/tests/write-catalog.php', import.meta.url);
+const DRIVER = new URL('../../wordpress/hunch/tests/write-catalog.php', import.meta.url);
 const php = spawnSync('php', ['-r', 'echo class_exists("Normalizer") ? "intl" : "";'], {
   encoding: 'utf8',
 });
@@ -119,7 +119,7 @@ interface PhpResult {
   inputs: { input: string; hash: string }[];
   fnv1a: string;
   space: string;
-  /** What Inkling_Catalog::model() picks for the job's `weights`. */
+  /** What Hunch_Catalog::model() picks for the job's `weights`. */
   model: unknown;
 }
 
@@ -323,8 +323,8 @@ test('PHP reads dates as Date.parse reads them', { skip }, () => {
     'yesterday',
     '',
   ];
-  const script = `define('INKLING_STANDALONE', true); require 'wordpress/inkling/includes/class-inkling-shard.php';
-foreach (json_decode(stream_get_contents(STDIN)) as $d) echo bin2hex(Inkling_Shard::time($d)), "\\n";`;
+  const script = `define('HUNCH_STANDALONE', true); require 'wordpress/hunch/includes/class-hunch-shard.php';
+foreach (json_decode(stream_get_contents(STDIN)) as $d) echo bin2hex(Hunch_Shard::time($d)), "\\n";`;
   const run = spawnSync('php', ['-r', script], { input: JSON.stringify(dates), encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   const got = run.stdout.trim().split('\n');

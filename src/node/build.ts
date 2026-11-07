@@ -36,7 +36,7 @@ export interface BuildOptions {
   dims?: number;
   /** How the shards store vector components (default `int8`). */
   quantization?: Quantization;
-  /** Embedding cache directory; `false` for none (default `.inkling-cache`). */
+  /** Embedding cache directory; `false` for none (default `.hunch-cache`). */
   cacheDir?: string | false;
   /** One shard per section (default), or a single shard. */
   shardBy?: 'section' | 'none';
@@ -94,7 +94,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
   // Embed what the cache does not have.
   const cache = await EmbeddingCache.open(
     model,
-    options.cacheDir === false ? undefined : (options.cacheDir ?? '.inkling-cache'),
+    options.cacheDir === false ? undefined : (options.cacheDir ?? '.hunch-cache'),
   );
   const maxChars = options.maxTextChars ?? 4000;
   const inputs = items.map((item) =>
@@ -151,7 +151,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       if (members.length > maxItems) base += `-${part}`;
       while (names.has(base)) base += '_';
       names.add(base);
-      const file = `${base}.${sha256.slice(0, 12)}.ink`;
+      const file = `${base}.${sha256.slice(0, 12)}.hunch`;
       await writeFile(join(shardDir, file), bytes);
       shards.push({
         url: `shards/${file}`,
@@ -199,7 +199,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
   );
   const removed: string[] = [];
   for (const file of await readdir(shardDir)) {
-    if (file.endsWith('.ink') && !keep.has(file)) {
+    if (file.endsWith('.hunch') && !keep.has(file)) {
       await rm(join(shardDir, file));
       removed.push(file);
     }

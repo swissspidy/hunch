@@ -99,27 +99,27 @@ test('resolveImage resolves page-relative images against the page', () => {
 });
 
 test('out must stay inside the build output', () => {
-  assert.equal(checkOut(undefined), 'inkling');
+  assert.equal(checkOut(undefined), 'hunch');
   assert.equal(checkOut('/vectors/'), 'vectors');
-  assert.equal(checkOut('assets/inkling'), 'assets/inkling');
+  assert.equal(checkOut('assets/hunch'), 'assets/hunch');
   for (const out of [
     '',
     '/',
     '..',
     '../vectors',
     'a/../../b',
-    './inkling',
+    './hunch',
     '%2e%2e/vectors',
     '.%2E/vectors',
-    'file:///tmp/inkling',
-    'C:\\inkling',
+    'file:///tmp/hunch',
+    'C:\\hunch',
     'a//b',
   ]) {
     assert.throws(() => checkOut(out), /inside the build output/, out);
   }
   const dir = new URL('file:///site/dist/');
-  assert.equal(outDir(dir, 'inkling').href, 'file:///site/dist/inkling/');
-  assert.equal(outDir(new URL('file:///site/dist'), 'inkling').href, 'file:///site/dist/inkling/');
+  assert.equal(outDir(dir, 'hunch').href, 'file:///site/dist/hunch/');
+  assert.equal(outDir(new URL('file:///site/dist'), 'hunch').href, 'file:///site/dist/hunch/');
   assert.throws(() => outDir(dir, '%2e%2e/dist-other'), /not inside/);
   assert.throws(() => outDir(dir, 'file:///tmp/x'), /not inside/);
 });

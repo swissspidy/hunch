@@ -1,0 +1,46 @@
+/*
+ * Hunch's lists. Each slot has a fixed height and titles are clamped to two lines, so
+ * replacing a slot's post with another never moves the page (no layout shift).
+ */
+.hunch-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.hunch-slot {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 5em;
+  overflow: hidden;
+  margin: 0;
+  padding: 0.25em 0;
+}
+.hunch-slot[hidden] {
+  /* Fewer results than slots: the slot keeps its space, so nothing below it moves. */
+  display: flex;
+  visibility: hidden;
+}
+.hunch-slot__title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.3;
+  max-height: 2.6em;
+}
+.hunch-slot__meta {
+  font-size: 0.85em;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hunch-slot__meta [data-hunch-section]:not(:empty)::after {
+  content: ' · ';
+}
+.hunch-controls__buttons button {
+  margin-inline-end: 0.5em;
+}

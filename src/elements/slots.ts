@@ -1,7 +1,7 @@
 /**
- * The shared base of Inkling's list components: server-rendered slots, filled in idle time.
+ * The shared base of Hunch's list components: server-rendered slots, filled in idle time.
  *
- * The server renders a fixed number of slots (`[data-inkling-slot]`) holding a fallback. Once
+ * The server renders a fixed number of slots (`[data-hunch-slot]`) holding a fallback. Once
  * the browser is idle, the element ranks items and replaces each slot with a copy of it whose
  * link, title, section, date and image are the ranked item's: new nodes of the same size, so no
  * existing node moves and the layout does not shift, as long as the slots' sizes do not depend
@@ -15,12 +15,12 @@
  * Each refresh starts again from the server-rendered slots. When there are fewer results than
  * slots, the remaining slots are hidden rather than left showing a fallback item.
  *
- * State: `data-inkling-state` is `loading`, `ready` or `error`. Events: `inkling:ready` (detail:
- * `{ recommendations }`) and `inkling:error` (detail: `{ error }`). A click on a slot whose
- * `data-inkling-id` is set records a `click` signal (with consent).
+ * State: `data-hunch-state` is `loading`, `ready` or `error`. Events: `hunch:ready` (detail:
+ * `{ recommendations }`) and `hunch:error` (detail: `{ error }`). A click on a slot whose
+ * `data-hunch-id` is set records a `click` signal (with consent).
  */
 
-import { Inkling, type Recommendation } from '../client/index.ts';
+import { Hunch, type Recommendation } from '../client/index.ts';
 import { manifestOf } from './config.ts';
 
 // HTMLElement does not exist during server rendering; the classes are then never defined.
@@ -39,7 +39,7 @@ export abstract class SlotsElement extends Base {
    * are `fallback`) as it is.
    */
   protected abstract recommend(
-    inkling: Inkling,
+    hunch: Hunch,
     n: number,
     fallback: readonly string[],
     run: number,
@@ -64,10 +64,10 @@ export abstract class SlotsElement extends Base {
     this.schedule();
   }
 
-  protected inkling(): Promise<Inkling> {
+  protected hunch(): Promise<Hunch> {
     const manifest = manifestOf(this);
     if (!manifest) return Promise.reject(new Error(`<${this.localName}> needs a manifest`));
-    return Inkling.shared(manifest);
+    return Hunch.shared(manifest);
   }
 
   protected list(name: string): string[] | undefined {
@@ -87,26 +87,21 @@ export abstract class SlotsElement extends Base {
 
   private schedule(): void {
     const run = ++this.run;
-    this.dataset.inklingState = 'loading';
+    this.dataset.hunchState = 'loading';
     whenIdle(() => {
       if (run === this.run) void this.update(run);
     });
   }
 
   private async update(run: number): Promise<void> {
-    const slots = [...this.querySelectorAll<HTMLElement>('[data-inkling-slot]')];
+    const slots = [...this.querySelectorAll<HTMLElement>('[data-hunch-slot]')];
     // Every refresh starts from the server's markup, not from an earlier ranking's.
     this.original ??= slots.map((slot) => slot.cloneNode(true) as HTMLElement);
     const original = this.original;
     try {
-      if (slots.length === 0) throw new Error(`<${this.localName}> has no [data-inkling-slot]`);
-      const fallback = original.map((slot) => slot.dataset.inklingId ?? '').filter(Boolean);
-      const recommendations = await this.recommend(
-        await this.inkling(),
-        slots.length,
-        fallback,
-        run,
-      );
+      if (slots.length === 0) throw new Error(`<${this.localName}> has no [data-hunch-slot]`);
+      const fallback = original.map((slot) => slot.dataset.hunchId ?? '').filter(Boolean);
+      const recommendations = await this.recommend(await this.hunch(), slots.length, fallback, run);
       if (run !== this.run) return;
       // Replacing the slot that holds focus would drop focus to the page: wait until it leaves.
       await this.blurred();
@@ -121,15 +116,15 @@ export abstract class SlotsElement extends Base {
         }
         slot.replaceWith(copy);
       });
-      this.dataset.inklingState = 'ready';
+      this.dataset.hunchState = 'ready';
       this.dispatchEvent(
-        new CustomEvent('inkling:ready', { detail: { recommendations: recommendations ?? [] } }),
+        new CustomEvent('hunch:ready', { detail: { recommendations: recommendations ?? [] } }),
       );
     } catch (error) {
       if (run !== this.run) return;
       // The server-rendered fallback stays as it is.
-      this.dataset.inklingState = 'error';
-      this.dispatchEvent(new CustomEvent('inkling:error', { detail: { error } }));
+      this.dataset.hunchState = 'error';
+      this.dispatchEvent(new CustomEvent('hunch:error', { detail: { error } }));
     }
   }
 
@@ -155,27 +150,27 @@ export abstract class SlotsElement extends Base {
     // The focused element itself, also inside open shadow roots (activeElement is their host).
     let focused = document.activeElement;
     while (focused?.shadowRoot?.activeElement) focused = focused.shadowRoot.activeElement;
-    const slot = focused?.closest('[data-inkling-slot]');
+    const slot = focused?.closest('[data-hunch-slot]');
     return !!slot && this.contains(slot);
   }
 
   private onClick(event: Event): void {
-    const slot = (event.target as Element | null)?.closest<HTMLElement>('[data-inkling-slot]');
-    const id = slot?.dataset.inklingId;
+    const slot = (event.target as Element | null)?.closest<HTMLElement>('[data-hunch-slot]');
+    const id = slot?.dataset.hunchId;
     // Best effort: the page may be gone before the write lands (its view is recorded next).
     if (id)
-      void this.inkling().then(
-        (inkling) => inkling.record('click', id),
+      void this.hunch().then(
+        (hunch) => hunch.record('click', id),
         () => {},
       );
   }
 }
 
 function fill(slot: HTMLElement, rec: Recommendation): void {
-  slot.dataset.inklingId = rec.id;
+  slot.dataset.hunchId = rec.id;
   // An aria-label that names the fallback item (`Read: <title>`) would give the link the wrong
   // name: it names the new item instead.
-  const old = slot.querySelector('[data-inkling-title]')?.textContent?.trim();
+  const old = slot.querySelector('[data-hunch-title]')?.textContent?.trim();
   if (old) {
     for (const el of [slot, ...slot.querySelectorAll('[aria-label]')]) {
       const label = el.getAttribute('aria-label');
@@ -188,20 +183,20 @@ function fill(slot: HTMLElement, rec: Recommendation): void {
         );
     }
   }
-  const link = slot.matches('a') ? slot : slot.querySelector('[data-inkling-href], a');
+  const link = slot.matches('a') ? slot : slot.querySelector('[data-hunch-href], a');
   if (link) {
     // Only web URLs: a javascript: URL from a catalog would run script when clicked.
     if (isWebUrl(rec.url)) link.setAttribute('href', rec.url);
     else link.removeAttribute('href');
   }
-  setText(slot, '[data-inkling-title]', rec.title);
-  setText(slot, '[data-inkling-section]', rec.section ?? '');
-  const date = slot.querySelector('[data-inkling-date]');
+  setText(slot, '[data-hunch-title]', rec.title);
+  setText(slot, '[data-hunch-section]', rec.section ?? '');
+  const date = slot.querySelector('[data-hunch-date]');
   if (date) {
     date.textContent = rec.date ? formatDate(rec.date) : '';
     if (date.matches('time')) date.setAttribute('datetime', rec.date ?? '');
   }
-  const image = slot.querySelector('img[data-inkling-image]');
+  const image = slot.querySelector('img[data-hunch-image]');
   if (image) {
     if (rec.image && isWebUrl(rec.image)) image.setAttribute('src', rec.image);
     else image.removeAttribute('src');

@@ -1,28 +1,28 @@
-import { Inkling, type InklingOptions } from '../client/index.ts';
+import { Hunch, type HunchOptions } from '../client/index.ts';
 
 /**
- * `window.InklingConfig`: options an inline script sets before the components load. They are
- * applied (`Inkling.configure()`) when the components are registered, and `manifest` is the
+ * `window.HunchConfig`: options an inline script sets before the components load. They are
+ * applied (`Hunch.configure()`) when the components are registered, and `manifest` is the
  * manifest of components that have no `manifest` attribute.
  */
-export interface InklingConfig extends Omit<InklingOptions, 'manifest'> {
+export interface HunchConfig extends Omit<HunchOptions, 'manifest'> {
   /** URL of the manifest for components without a `manifest` attribute. */
   manifest?: string;
 }
 
-function pageConfig(): InklingConfig | undefined {
-  return (globalThis as { InklingConfig?: InklingConfig }).InklingConfig;
+function pageConfig(): HunchConfig | undefined {
+  return (globalThis as { HunchConfig?: HunchConfig }).HunchConfig;
 }
 
-/** Applies `window.InklingConfig`, if the page has one. */
+/** Applies `window.HunchConfig`, if the page has one. */
 export function applyPageConfig(): void {
   const config = pageConfig();
   if (!config) return;
   const { manifest: _, ...options } = config;
-  Inkling.configure(options);
+  Hunch.configure(options);
 }
 
-/** The element's `manifest` attribute, or else `window.InklingConfig.manifest`. */
+/** The element's `manifest` attribute, or else `window.HunchConfig.manifest`. */
 export function manifestOf(element: Element): string | null {
   return element.getAttribute('manifest') ?? pageConfig()?.manifest ?? null;
 }

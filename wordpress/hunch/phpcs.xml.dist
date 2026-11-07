@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<ruleset name="Hunch">
+  <description>WordPress coding standards for the Hunch plugin.</description>
+
+  <file>.</file>
+  <exclude-pattern>/vendor/*</exclude-pattern>
+  <exclude-pattern>/assets/hunch.global.js</exclude-pattern>
+  <exclude-pattern>*.js</exclude-pattern>
+  <exclude-pattern>*.css</exclude-pattern>
+
+  <arg name="extensions" value="php"/>
+  <arg value="sp"/>
+  <arg name="colors"/>
+
+  <config name="minimum_wp_version" value="6.5"/>
+  <config name="testVersion" value="7.4-"/>
+
+  <rule ref="WordPress">
+    <!-- Class files are named class-hunch-*.php; the test classes follow PHPUnit's naming. -->
+    <exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
+  </rule>
+  <rule ref="PHPCompatibilityWP"/>
+
+  <rule ref="WordPress.WP.I18n">
+    <properties>
+      <property name="text_domain" type="array">
+        <element value="hunch"/>
+      </property>
+    </properties>
+  </rule>
+  <rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+    <properties>
+      <property name="prefixes" type="array">
+        <element value="hunch"/>
+      </property>
+    </properties>
+  </rule>
+
+  <!-- The encoder's exceptions are caught by Hunch_Catalog::regenerate() and returned as a
+       WP_Error to the REST API; they are never printed into a page. -->
+  <rule ref="WordPress.Security.EscapeOutput.ExceptionNotEscaped">
+    <exclude-pattern>/includes/class-hunch-format.php</exclude-pattern>
+    <exclude-pattern>/includes/class-hunch-shard.php</exclude-pattern>
+    <exclude-pattern>/includes/class-hunch-writer.php</exclude-pattern>
+  </rule>
+
+  <!-- The tests run without WordPress: plain PHP functions and PHPUnit's conventions. -->
+  <rule ref="WordPress.WP.AlternativeFunctions">
+    <exclude-pattern>/tests/*</exclude-pattern>
+  </rule>
+  <rule ref="WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid">
+    <exclude-pattern>/tests/*</exclude-pattern>
+  </rule>
+  <rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+    <exclude-pattern>/tests/*</exclude-pattern>
+  </rule>
+  <rule ref="Squiz.Commenting">
+    <exclude-pattern>/tests/*</exclude-pattern>
+  </rule>
+  <rule ref="WordPress.Security.EscapeOutput">
+    <exclude-pattern>/tests/*</exclude-pattern>
+  </rule>
+  <rule ref="WordPress.PHP.NoSilencedErrors">
+    <exclude-pattern>/tests/*</exclude-pattern>
+  </rule>
+  <rule ref="Generic.Commenting.DocComment">
+    <exclude-pattern>/tests/*</exclude-pattern>
+  </rule>
+</ruleset>

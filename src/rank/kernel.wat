@@ -1,4 +1,4 @@
-;; Inkling's similarity kernel (ADR 0010): dot products of one query with many rows, with
+;; Hunch's similarity kernel (ADR 0010): dot products of one query with many rows, with
 ;; WebAssembly SIMD. `npm run kernel` compiles this file into kernel-wasm.ts; a unit test checks
 ;; that the two agree. Float32 rows use the JavaScript implementation (kernel.ts).
 (module

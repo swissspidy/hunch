@@ -15,7 +15,7 @@ what the components need from the page.
 
 ### Consent gates every read and write
 
-- `Inkling.load({ manifest, consent })` takes `true` or a function. **Without it,
+- `Hunch.load({ manifest, consent })` takes `true` or a function. **Without it,
   personalization is off.** The client asks the function before every read or write of signals,
   not once, so withdrawing consent takes effect on the next call. A function that throws, or
   returns anything but `true`, means no.
@@ -31,7 +31,7 @@ what the components need from the page.
 ### Signals
 
 - `record(kind, itemId, { seconds })` writes one signal with the weights of ADR 0001.
-  `observe(itemId)` (and `<inkling-page>`) records a view, then dwell time as the page is hidden
+  `observe(itemId)` (and `<hunch-page>`) records a view, then dwell time as the page is hidden
   or left. Dwell counts visible time only, from 10 seconds on, and is written as increments, so
   one visit adds up to at most 2 however often the tab is hidden.
 - **A followed item counts as seen.** The visitor already knows it, so "for you" leaves it out
@@ -41,9 +41,9 @@ what the components need from the page.
   page load. Explicit signals are pruned last.
 - `pause()` and `resume()` set `paused` in the `meta` store. While paused nothing is recorded,
   but stored signals still rank.
-- `export()` returns `{ format: "inkling/signals", formatVersion: 1, exportedAt,
+- `export()` returns `{ format: "hunch/signals", formatVersion: 1, exportedAt,
   manifestVersion, signals: [{ itemId, kind, weight, at }] }`.
-- `namespace` (database `inkling-<namespace>`) keeps several catalogs on one origin apart.
+- `namespace` (database `hunch-<namespace>`) keeps several catalogs on one origin apart.
   `store` replaces IndexedDB (`MemoryStore` is used in tests and wherever there is no
   IndexedDB).
 
@@ -68,17 +68,17 @@ what the components need from the page.
 
 ### Components
 
-- `Inkling.shared(manifest)` gives every component on a page one client, configured by
-  `Inkling.configure({ consent, namespace, … })`. The consent hook is looked up whenever it's
+- `Hunch.shared(manifest)` gives every component on a page one client, configured by
+  `Hunch.configure({ consent, namespace, … })`. The consent hook is looked up whenever it's
   needed, so it can be configured after the components start. For the script-tag build,
-  `window.InklingConfig`, set by an inline script before `inkling.global.js`, is applied before
+  `window.HunchConfig`, set by an inline script before `hunch.global.js`, is applied before
   the components are registered.
-- `<inkling-for-you>` fills its slots with `recommend()`. **Without a profile it leaves the
-  server's slots untouched** and sets `data-inkling-personalized="false"`. A visitor without
+- `<hunch-for-you>` fills its slots with `recommend()`. **Without a profile it leaves the
+  server's slots untouched** and sets `data-hunch-personalized="false"`. A visitor without
   consent never sees the list change.
-- `<inkling-related>` and `<inkling-for-you>` record a `click` when a slot with a
-  `data-inkling-id` is clicked. This is best effort: the next page's view is recorded either way.
-- `<inkling-page item>` calls `observe(item)` and renders nothing.
+- `<hunch-related>` and `<hunch-for-you>` record a `click` when a slot with a
+  `data-hunch-id` is clicked. This is best effort: the next page's view is recorded either way.
+- `<hunch-page item>` calls `observe(item)` and renders nothing.
 - `refresh()` ranks a list again, for example after a consent change.
 
 ### Performance on a phone

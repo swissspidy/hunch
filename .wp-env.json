@@ -1,4 +1,4 @@
 {
-  "plugins": ["./wordpress/inkling"],
+  "plugins": ["./wordpress/hunch"],
   "testsEnvironment": false
 }

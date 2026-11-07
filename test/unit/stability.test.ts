@@ -14,7 +14,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { IDBFactory } from 'fake-indexeddb';
-import { Inkling } from '../../src/client/index.ts';
+import { Hunch } from '../../src/client/index.ts';
 import { aggregate, IndexedDbStore, toPrune, type Signal } from '../../src/client/signals.ts';
 import {
   assertManifest,
@@ -43,9 +43,9 @@ function buffer(bytes: Uint8Array): ArrayBuffer {
 
 test('format v1: the frozen manifest is read as it was written', async () => {
   const { manifest } = await fixture();
-  assert.equal(manifest.format, 'inkling/manifest');
+  assert.equal(manifest.format, 'hunch/manifest');
   assert.equal(manifest.formatVersion, 1);
-  assert.equal(manifest.space, 'inkling/hash@1|native=16|dims=8|prompt=1e7c1420');
+  assert.equal(manifest.space, 'hunch/hash@1|native=16|dims=8|prompt=1e7c1420');
   assert.equal(manifest.dims, 8);
   assert.equal(manifest.quantization, 'int8');
   assert.equal(manifest.count, 4);
@@ -53,9 +53,9 @@ test('format v1: the frozen manifest is read as it was written', async () => {
   assert.deepEqual(
     manifest.shards.map((s) => [s.url, s.section, s.count]),
     [
-      ['shards/food.fb14f8babf77.ink', 'Food', 2],
-      ['shards/travel.6e15341d8ba0.ink', 'Travel', 1],
-      ['shards/all.00767dc57739.ink', null, 1],
+      ['shards/food.1f22b21852a8.hunch', 'Food', 2],
+      ['shards/travel.4166c44e0cbd.hunch', 'Travel', 1],
+      ['shards/all.9491766790d3.hunch', null, 1],
     ],
   );
 });
@@ -66,18 +66,18 @@ test('format v1: the frozen shards decode to the same items and vectors', async 
     const bytes = shards.get(ref.url)!;
     assert.equal(bytes.length, ref.bytes, ref.url);
     assert.equal(createHash('sha256').update(bytes).digest('hex'), ref.sha256, ref.url);
-    // The fixed header: magic "INKV", version 1, int8, reserved 0, dims 8.
-    assert.deepEqual([...bytes.subarray(0, 12)], [73, 78, 75, 86, 1, 1, 0, 0, 8, 0, 0, 0]);
+    // The fixed header: magic "HNCH", version 1, int8, reserved 0, dims 8.
+    assert.deepEqual([...bytes.subarray(0, 12)], [72, 78, 67, 72, 1, 1, 0, 0, 8, 0, 0, 0]);
     const shard = decodeShard(buffer(bytes));
     assert.equal(shard.space, manifest.space);
     assert.equal(shard.dims, 8);
     assert.equal(shard.quantization, 'int8');
     assert.equal(shard.items.length, ref.count);
   }
-  const food = decodeShard(buffer(shards.get('shards/food.fb14f8babf77.ink')!));
+  const food = decodeShard(buffer(shards.get('shards/food.1f22b21852a8.hunch')!));
   assert.deepEqual(food.items, FOOD);
   assert.deepEqual([...food.vectors], FOOD_VECTORS);
-  const travel = decodeShard(buffer(shards.get('shards/travel.6e15341d8ba0.ink')!));
+  const travel = decodeShard(buffer(shards.get('shards/travel.4166c44e0cbd.hunch')!));
   assert.deepEqual([...travel.vectors], TRAVEL_VECTORS);
 });
 
@@ -113,9 +113,9 @@ test('format v2: the frozen manifest is read as it was written', async () => {
   assert.deepEqual(
     manifest.shards.map((s) => [s.url, s.section, s.count]),
     [
-      ['shards/food.4a55e7a47ae2.ink', 'Food', 2],
-      ['shards/travel.f0b66251fb85.ink', 'Travel', 1],
-      ['shards/all.58649e7ac5af.ink', null, 1],
+      ['shards/food.5d8e60784e37.hunch', 'Food', 2],
+      ['shards/travel.e4dbde90ded2.hunch', 'Travel', 1],
+      ['shards/all.be533c3aa38e.hunch', null, 1],
     ],
   );
 });
@@ -127,8 +127,8 @@ test('format v2: the frozen shards decode to the same items and vectors as versi
     const bytes = shards.get(ref.url)!;
     assert.equal(bytes.length, ref.bytes, ref.url);
     assert.equal(createHash('sha256').update(bytes).digest('hex'), ref.sha256, ref.url);
-    // The fixed header: magic "INKV", version 2, int8, reserved 0, dims 8.
-    assert.deepEqual([...bytes.subarray(0, 12)], [73, 78, 75, 86, 2, 1, 0, 0, 8, 0, 0, 0]);
+    // The fixed header: magic "HNCH", version 2, int8, reserved 0, dims 8.
+    assert.deepEqual([...bytes.subarray(0, 12)], [72, 78, 67, 72, 2, 1, 0, 0, 8, 0, 0, 0]);
     const shard = decodeShard(buffer(bytes));
     const old = decodeShard(buffer(v1.shards.get(v1.manifest.shards[i]!.url)!));
     assert.equal(shard.version, 2);
@@ -141,7 +141,7 @@ test('format v2: the frozen shards decode to the same items and vectors as versi
       assert.deepEqual(shard[column], old[column], `${ref.url}: ${column}`);
     }
   }
-  const food = decodeShard(buffer(shards.get('shards/food.4a55e7a47ae2.ink')!));
+  const food = decodeShard(buffer(shards.get('shards/food.5d8e60784e37.hunch')!));
   assert.deepEqual(food.items, FOOD);
   assert.deepEqual(food.item(1), FOOD[1]);
   assert.deepEqual([...food.vectors], FOOD_VECTORS);
@@ -156,16 +156,16 @@ for (const [version, dir] of [
   [2, V2],
 ] as const) {
   test(`format v${version}: the client ranks the frozen catalog`, async () => {
-    const inkling = await Inkling.load({
+    const hunch = await Hunch.load({
       manifest: 'http://site/manifest.json',
       fetch: dirFetch(dir),
       consent: false,
     });
-    assert.equal(inkling.manifest.formatVersion, version);
-    const related = await inkling.related('sourdough', { n: 3 });
+    assert.equal(hunch.manifest.formatVersion, version);
+    const related = await hunch.related('sourdough', { n: 3 });
     assert.deepEqual(related.map((r) => r.id).sort(), ['about', 'night-train', 'rye']);
-    assert.equal((await inkling.item('night-train'))?.title, 'A night train through the Alps');
-    assert.deepEqual(await inkling.item('rye'), FOOD[1]);
+    assert.equal((await hunch.item('night-train'))?.title, 'A night train through the Alps');
+    assert.deepEqual(await hunch.item('rye'), FOOD[1]);
   });
 }
 
@@ -198,7 +198,7 @@ test('format v2: the writer writes it', async () => {
   assert.deepEqual(shape(result.manifest), shape(manifest));
   for (const file of await readdir(join(out, 'shards'))) {
     const bytes = await readFile(join(out, 'shards', file));
-    assert.deepEqual([...bytes.subarray(0, 12)], [73, 78, 75, 86, 2, 1, 0, 0, 8, 0, 0, 0], file);
+    assert.deepEqual([...bytes.subarray(0, 12)], [72, 78, 67, 72, 2, 1, 0, 0, 8, 0, 0, 0], file);
     assert.equal(decodeShard(buffer(bytes)).dims, result.manifest.dims, file);
   }
 });
@@ -222,11 +222,11 @@ test('a newer format version is refused, not misread', async () => {
     () => assertManifest({ ...manifest, formatVersion: 3 }),
     /format version 3 is not supported/,
   );
-  const bytes = new Uint8Array(shards.get('shards/food.fb14f8babf77.ink')!);
+  const bytes = new Uint8Array(shards.get('shards/food.1f22b21852a8.hunch')!);
   bytes[4] = 3;
   assert.throws(() => decodeShard(bytes.buffer), /format version 3 is not supported/);
   await assert.rejects(
-    Inkling.load({
+    Hunch.load({
       manifest: 'http://site/manifest.json',
       fetch: async () => Response.json({ ...manifest, formatVersion: 3 }),
     }),
@@ -254,7 +254,7 @@ test('a database from a newer release is left alone, not opened or deleted', asy
   try {
     // A newer release's database: schema version 2, with a signal in it.
     await new Promise<void>((resolve, reject) => {
-      const open = indexedDB.open('inkling', 2);
+      const open = indexedDB.open('hunch', 2);
       open.onupgradeneeded = () => {
         const db = open.result;
         db.createObjectStore('signals', { keyPath: 'seq', autoIncrement: true }).add({
@@ -271,23 +271,23 @@ test('a database from a newer release is left alone, not opened or deleted', asy
       };
       open.onerror = () => reject(open.error);
     });
-    const store = new IndexedDbStore('inkling');
+    const store = new IndexedDbStore('hunch');
     await assert.rejects(store.all(), { name: 'VersionError' });
-    const inkling = await Inkling.load({
+    const hunch = await Hunch.load({
       manifest: 'http://site/manifest.json',
       fetch: dirFetch(V1),
       consent: true,
       store,
     });
     // Personalization is unavailable: the cold start, and nothing is written.
-    const recs = await inkling.recommend({ n: 4 });
+    const recs = await hunch.recommend({ n: 4 });
     assert.ok(recs.every((r) => r.why.confidence === 0));
-    assert.equal(await inkling.record('view', 'sourdough'), false);
+    assert.equal(await hunch.record('view', 'sourdough'), false);
     const databases = await indexedDB.databases();
-    assert.deepEqual(databases, [{ name: 'inkling', version: 2 }]);
+    assert.deepEqual(databases, [{ name: 'hunch', version: 2 }]);
     // Its signal is still there (opened without a version: no upgrade runs).
     const rows = await new Promise<unknown[]>((resolve, reject) => {
-      const open = indexedDB.open('inkling');
+      const open = indexedDB.open('hunch');
       open.onsuccess = () => {
         const get = open.result.transaction('signals').objectStore('signals').getAll();
         get.onsuccess = () => {

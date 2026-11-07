@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { before, test } from 'node:test';
-import { Inkling, MemoryStore } from '../../src/client/index.ts';
+import { Hunch, MemoryStore } from '../../src/client/index.ts';
 import { createQueryEmbedder, type TransformersModule } from '../../src/query/index.ts';
 import { build } from '../../src/node/build.ts';
 import { hashProvider } from '../../src/node/providers/hash.ts';
@@ -9,19 +9,19 @@ import { loadSource } from '../../src/node/sources/index.ts';
 import { dirFetch, tempDir } from '../helpers.ts';
 
 let dir = '';
-const MANIFEST = 'http://site/inkling/manifest.json';
+const MANIFEST = 'http://site/hunch/manifest.json';
 before(async () => {
   dir = await tempDir();
   await build({
     items: await loadSource('demo/feed.xml'),
-    outDir: join(dir, 'inkling'),
+    outDir: join(dir, 'hunch'),
     provider: hashProvider(),
     cacheDir: false,
   });
 });
 
 const load = (options: { consent?: boolean; store?: MemoryStore } = {}) =>
-  Inkling.load({ manifest: MANIFEST, fetch: dirFetch(dir), ...options });
+  Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir), ...options });
 
 test('a text query, embedded in the browser with the catalog’s model, finds matching items', async () => {
   const ink = await load();

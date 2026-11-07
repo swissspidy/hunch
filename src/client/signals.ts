@@ -1,5 +1,5 @@
 /**
- * Signals: the only thing Inkling stores about a visitor (ADR 0001, "The signal schema"). A list
+ * Signals: the only thing Hunch stores about a visitor (ADR 0001, "The signal schema"). A list
  * of { itemId, kind, weight, at } in the site's own IndexedDB. The profile is never stored; it
  * is derived from these on every page.
  */
@@ -186,13 +186,13 @@ export class MemoryStore implements SignalStore {
   }
 }
 
-/** Signals in IndexedDB: database `name` (default `inkling`), version 1. Opened on first use. */
+/** Signals in IndexedDB: database `name` (default `hunch`), version 1. Opened on first use. */
 export class IndexedDbStore implements SignalStore {
   private readonly name: string;
   private opening: Promise<IDBDatabase> | undefined;
 
   /** A store in the IndexedDB database `name`. Nothing is opened until first use. */
-  constructor(name = 'inkling') {
+  constructor(name = 'hunch') {
     this.name = name;
   }
 

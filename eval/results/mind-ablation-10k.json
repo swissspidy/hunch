@@ -24,7 +24,7 @@
       }
     },
     {
-      "ranker": "Inkling, hash (lexical) (256 dims): profile only",
+      "ranker": "Hunch, hash (lexical) (256 dims): profile only",
       "catalog": "hash (lexical) (256 dims)",
       "metrics": {
         "auc": 0.5352611752149693,
@@ -36,7 +36,7 @@
       "rankMs": 1.2434574402000025
     },
     {
-      "ranker": "Inkling, hash (lexical) (256 dims): profile + popularity (default weights)",
+      "ranker": "Hunch, hash (lexical) (256 dims): profile + popularity (default weights)",
       "catalog": "hash (lexical) (256 dims)",
       "metrics": {
         "auc": 0.5450929136275056,
@@ -48,7 +48,7 @@
       "rankMs": 1.3000257806999973
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (128 dims): profile only",
+      "ranker": "Hunch, EmbeddingGemma q8 (128 dims): profile only",
       "catalog": "EmbeddingGemma q8 (128 dims)",
       "metrics": {
         "auc": 0.6217964863895535,
@@ -60,7 +60,7 @@
       "rankMs": 0.9241347606999567
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (128 dims): profile + popularity (default weights)",
+      "ranker": "Hunch, EmbeddingGemma q8 (128 dims): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q8 (128 dims)",
       "metrics": {
         "auc": 0.6263803537815262,
@@ -72,7 +72,7 @@
       "rankMs": 0.903053107499962
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (128 dims, float32): profile only",
+      "ranker": "Hunch, EmbeddingGemma q8 (128 dims, float32): profile only",
       "catalog": "EmbeddingGemma q8 (128 dims, float32)",
       "metrics": {
         "auc": 0.6219817211884684,
@@ -84,7 +84,7 @@
       "rankMs": 0.8851105662999434
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (128 dims, float32): profile + popularity (default weights)",
+      "ranker": "Hunch, EmbeddingGemma q8 (128 dims, float32): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q8 (128 dims, float32)",
       "metrics": {
         "auc": 0.6266432713154717,
@@ -96,7 +96,7 @@
       "rankMs": 0.9408901422000352
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (256 dims): profile only",
+      "ranker": "Hunch, EmbeddingGemma q8 (256 dims): profile only",
       "catalog": "EmbeddingGemma q8 (256 dims)",
       "metrics": {
         "auc": 0.6219921890281838,
@@ -108,7 +108,7 @@
       "rankMs": 1.6638229017000732
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (256 dims): profile + popularity (default weights)",
+      "ranker": "Hunch, EmbeddingGemma q8 (256 dims): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q8 (256 dims)",
       "metrics": {
         "auc": 0.6267821370281915,
@@ -120,7 +120,7 @@
       "rankMs": 1.6128494264001463
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (256 dims, float32): profile only",
+      "ranker": "Hunch, EmbeddingGemma q8 (256 dims, float32): profile only",
       "catalog": "EmbeddingGemma q8 (256 dims, float32)",
       "metrics": {
         "auc": 0.6219724367564456,
@@ -132,7 +132,7 @@
       "rankMs": 1.5073650017999622
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (256 dims, float32): profile + popularity (default weights)",
+      "ranker": "Hunch, EmbeddingGemma q8 (256 dims, float32): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q8 (256 dims, float32)",
       "metrics": {
         "auc": 0.6267068580226721,
@@ -144,7 +144,7 @@
       "rankMs": 1.6119861859998972
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (512 dims): profile only",
+      "ranker": "Hunch, EmbeddingGemma q8 (512 dims): profile only",
       "catalog": "EmbeddingGemma q8 (512 dims)",
       "metrics": {
         "auc": 0.6192737082767754,
@@ -156,7 +156,7 @@
       "rankMs": 2.7911368479999568
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (512 dims): profile + popularity (default weights)",
+      "ranker": "Hunch, EmbeddingGemma q8 (512 dims): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q8 (512 dims)",
       "metrics": {
         "auc": 0.624320359699574,
@@ -168,7 +168,7 @@
       "rankMs": 3.015069631000052
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (512 dims, float32): profile only",
+      "ranker": "Hunch, EmbeddingGemma q8 (512 dims, float32): profile only",
       "catalog": "EmbeddingGemma q8 (512 dims, float32)",
       "metrics": {
         "auc": 0.6192832632257943,
@@ -180,7 +180,7 @@
       "rankMs": 2.458872284500103
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (512 dims, float32): profile + popularity (default weights)",
+      "ranker": "Hunch, EmbeddingGemma q8 (512 dims, float32): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q8 (512 dims, float32)",
       "metrics": {
         "auc": 0.624344379112294,
@@ -192,7 +192,7 @@
       "rankMs": 2.5049496023000537
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (768 dims): profile only",
+      "ranker": "Hunch, EmbeddingGemma q8 (768 dims): profile only",
       "catalog": "EmbeddingGemma q8 (768 dims)",
       "metrics": {
         "auc": 0.6296460465650295,
@@ -204,7 +204,7 @@
       "rankMs": 3.8698507172999848
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (768 dims): profile + popularity (default weights)",
+      "ranker": "Hunch, EmbeddingGemma q8 (768 dims): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q8 (768 dims)",
       "metrics": {
         "auc": 0.6341159349551252,
@@ -216,7 +216,7 @@
       "rankMs": 3.8151101732998565
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (768 dims, float32): profile only",
+      "ranker": "Hunch, EmbeddingGemma q8 (768 dims, float32): profile only",
       "catalog": "EmbeddingGemma q8 (768 dims, float32)",
       "metrics": {
         "auc": 0.6295305040130642,
@@ -228,7 +228,7 @@
       "rankMs": 3.9398185557002026
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q8 (768 dims, float32): profile + popularity (default weights)",
+      "ranker": "Hunch, EmbeddingGemma q8 (768 dims, float32): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q8 (768 dims, float32)",
       "metrics": {
         "auc": 0.6340164580441221,
@@ -240,7 +240,7 @@
       "rankMs": 3.6252976051998385
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q4 (256 dims): profile only",
+      "ranker": "Hunch, EmbeddingGemma q4 (256 dims): profile only",
       "catalog": "EmbeddingGemma q4 (256 dims)",
       "metrics": {
         "auc": 0.624580359592416,
@@ -252,7 +252,7 @@
       "rankMs": 1.5149009735004568
     },
     {
-      "ranker": "Inkling, EmbeddingGemma q4 (256 dims): profile + popularity (default weights)",
+      "ranker": "Hunch, EmbeddingGemma q4 (256 dims): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q4 (256 dims)",
       "metrics": {
         "auc": 0.6293444344771045,
@@ -271,7 +271,7 @@
   "catalogs": [
     {
       "label": "hash (lexical) (256 dims)",
-      "model": "inkling/hash",
+      "model": "hunch/hash",
       "dims": 256,
       "quantization": "int8",
       "default": true,

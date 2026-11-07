@@ -1,5 +1,5 @@
 /**
- * Milestones 3 and 4 on the synthetic dataset: Inkling beats the popularity baseline on
+ * Milestones 3 and 4 on the synthetic dataset: Hunch beats the popularity baseline on
  * nDCG@10, and after a model switch every ranking equals a fresh profile's on the new model.
  * The same run is a small ablation (two sizes, int8 and float32) from one embedding pass.
  */
@@ -55,9 +55,9 @@ test('synthetic evaluation: beats popularity, a model switch loses nothing, one 
   const result = JSON.parse(await readFile(join(out, 'ablation.json'), 'utf8')) as Result;
   const row = (prefix: string) => result.rows.find((r) => r.ranker.startsWith(prefix))!.metrics;
   const popularity = row('popularity');
-  const inkling = row('Inkling, model A (128 dims): profile + popularity (default');
-  const afterSwitch = row('Inkling, model B (96 dims): profile + popularity (default');
-  assert.ok(inkling.ndcg10 > popularity.ndcg10 + 0.2, `${inkling.ndcg10} vs ${popularity.ndcg10}`);
+  const hunch = row('Hunch, model A (128 dims): profile + popularity (default');
+  const afterSwitch = row('Hunch, model B (96 dims): profile + popularity (default');
+  assert.ok(hunch.ndcg10 > popularity.ndcg10 + 0.2, `${hunch.ndcg10} vs ${popularity.ndcg10}`);
   assert.ok(afterSwitch.ndcg10 > popularity.ndcg10 + 0.2);
   assert.ok(row('random').auc > 0.45 && row('random').auc < 0.55);
   assert.ok(result.impressions > 1000);

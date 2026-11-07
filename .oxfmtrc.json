@@ -8,8 +8,8 @@
     "CHANGELOG.md",
     "package-lock.json",
     "test/fixtures/format-v*/**",
-    "wordpress/inkling/composer.lock",
-    "wordpress/inkling/vendor/**",
-    "wordpress/inkling/assets/inkling.global.js"
+    "wordpress/hunch/composer.lock",
+    "wordpress/hunch/vendor/**",
+    "wordpress/hunch/assets/hunch.global.js"
   ]
 }

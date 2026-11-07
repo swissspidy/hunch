@@ -74,7 +74,7 @@ function sniff(source: string, body: string): SourceKind {
 }
 
 async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, { headers: { 'user-agent': 'inkling-build' } });
+  const response = await fetch(url, { headers: { 'user-agent': 'hunch-build' } });
   if (!response.ok) throw new Error(`${url} returned ${response.status}`);
   return response.text();
 }

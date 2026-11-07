@@ -118,7 +118,7 @@ test('IndexedDbStore stores, deletes, keeps state and destroys its database', as
   const original = globalThis.indexedDB;
   globalThis.indexedDB = new IDBFactory();
   try {
-    const store = new IndexedDbStore('inkling-test');
+    const store = new IndexedDbStore('hunch-test');
     await store.add({ itemId: 'a', kind: 'view', weight: 1, at: 1 });
     await store.add({ itemId: 'b', kind: 'hide', weight: -5, at: 2 });
     const all = await store.all();
@@ -152,7 +152,7 @@ test('IndexedDbStore stores, deletes, keeps state and destroys its database', as
     assert.deepEqual(await store.getState(), { paused: false, lastSeen: 9, previousVisit: 3 });
     assert.deepEqual(
       (await indexedDB.databases()).map((d) => d.name),
-      ['inkling-test'],
+      ['hunch-test'],
     );
     await store.destroy();
     assert.deepEqual(await indexedDB.databases(), []);

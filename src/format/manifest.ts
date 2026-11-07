@@ -7,7 +7,7 @@
  */
 
 /** The manifest's `format`: identifies the document. */
-export const MANIFEST_FORMAT = 'inkling/manifest';
+export const MANIFEST_FORMAT = 'hunch/manifest';
 /** The manifest format version this release writes (ADR 0009, ADR 0011). */
 export const MANIFEST_FORMAT_VERSION = 2;
 /** The manifest format versions this release reads: its own and the previous one (ADR 0009). */
@@ -56,7 +56,7 @@ export interface ShardRef {
 
 /** `manifest.json`: the catalog's embedding space, encoding and shards. */
 export interface Manifest {
-  /** Always `inkling/manifest`. */
+  /** Always `hunch/manifest`. */
   format: typeof MANIFEST_FORMAT;
   /**
    * The format version; a reader refuses versions it doesn't know (ADR 0009). Version 2's
@@ -117,18 +117,18 @@ export function spaceKey(model: ModelInfo, dims: number): string {
   return `${model.id}@${model.revision}${dtype}${file}|native=${model.nativeDims}|dims=${dims}|prompt=${fnv1a(model.documentPrompt)}`;
 }
 
-/** Throws unless `value` looks like a manifest this version of Inkling can read. */
+/** Throws unless `value` looks like a manifest this version of Hunch can read. */
 export function assertManifest(value: unknown): asserts value is Manifest {
   if (typeof value !== 'object' || value === null) {
-    throw new TypeError('Inkling manifest: not an object');
+    throw new TypeError('Hunch manifest: not an object');
   }
   const m = value as Partial<Manifest>;
   if (m.format !== MANIFEST_FORMAT) {
-    throw new TypeError(`Inkling manifest: format is ${JSON.stringify(m.format)}`);
+    throw new TypeError(`Hunch manifest: format is ${JSON.stringify(m.format)}`);
   }
   if (!MANIFEST_FORMAT_VERSIONS.includes(m.formatVersion as number)) {
     throw new TypeError(
-      `Inkling manifest: format version ${m.formatVersion} is not supported (expected ${MANIFEST_FORMAT_VERSIONS.join(' or ')})`,
+      `Hunch manifest: format version ${m.formatVersion} is not supported (expected ${MANIFEST_FORMAT_VERSIONS.join(' or ')})`,
     );
   }
   if (
@@ -139,10 +139,10 @@ export function assertManifest(value: unknown): asserts value is Manifest {
     !Array.isArray(m.shards) ||
     !m.shards.every((shard: Partial<ShardRef> | null) => typeof shard?.url === 'string')
   ) {
-    throw new TypeError('Inkling manifest: missing space, dims, model or shard URLs');
+    throw new TypeError('Hunch manifest: missing space, dims, model or shard URLs');
   }
   if (m.quantization !== 'int8' && m.quantization !== 'float32') {
-    throw new TypeError(`Inkling manifest: unknown quantization ${JSON.stringify(m.quantization)}`);
+    throw new TypeError(`Hunch manifest: unknown quantization ${JSON.stringify(m.quantization)}`);
   }
 }
 

@@ -5,7 +5,7 @@
 
 ## Context
 
-Inkling ships two very different things in one package: a Node.js build step and a browser
+Hunch ships two very different things in one package: a Node.js build step and a browser
 client with no dependencies and a size budget. The tooling should be fast, need little
 configuration, and keep the two apart. It follows
 [swissspidy/sandburg](https://github.com/swissspidy/sandburg), whose setup has proven itself.
@@ -13,11 +13,11 @@ configuration, and keep the two apart. It follows
 ## Decision
 
 - **Node.js 24 or later** (`engines.node`). Node runs the TypeScript sources directly (type
-  stripping), so a checkout needs no build to test or to run `bin/inkling.js`. Sources use only
+  stripping), so a checkout needs no build to test or to run `bin/hunch.js`. Sources use only
   erasable syntax (`erasableSyntaxOnly`) and import with `.ts` extensions.
 - **TypeScript 7** (the native compiler) type-checks (`npm run typecheck`) and emits `dist/` with
   declarations (`npm run build`, run by `prepack`). `rewriteRelativeImportExtensions` turns the
-  `.ts` imports into `.js`. esbuild bundles only the script-tag build (`inkling.global.js`) and
+  `.ts` imports into `.js`. esbuild bundles only the script-tag build (`hunch.global.js`) and
   the size check.
 - **oxlint with type-aware rules** (`oxlint-tsgolint`), and **knip** for unused files, exports and
   dependencies (`npm run lint`). oxlint also enforces the client's boundary: files under
@@ -43,7 +43,7 @@ configuration, and keep the two apart. It follows
   starting the workflow by hand) finds the version on npm without a tag, and tags the commit
   that set it and creates its GitHub release from the changelog. A rejected stage is never
   tagged, so it is staged again. The `0.0.0` placeholder is never released.
-- **The package is `@swissspidy/inkling`** (`inkling` is taken on npm), and the version stays
+- **The package is `@swissspidy/hunch`** (`hunch` is taken on npm), and the version stays
   0.x while the API settles.
 - **GitHub Pages hosts the demo** (`.github/workflows/pages.yml`), built from `demo/` on every push
   to `main`.

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { after, before, test } from 'node:test';
 import { syntheticCatalog, type SyntheticCatalog } from '../../scripts/synthetic.ts';
-import { Inkling, MemoryStore } from '../../src/client/index.ts';
+import { Hunch, MemoryStore } from '../../src/client/index.ts';
 import { slicer } from '../../src/client/slices.ts';
 import { DEFAULT_WEIGHTS, rank, ranking, type RankInput } from '../../src/rank/rank.ts';
 import {
@@ -171,7 +171,7 @@ test('20,000 items: same ids and scores as before slicing, with scheduler.yield(
   const realNow = performance.now.bind(performance);
   performance.now = () => (clock += 20);
   try {
-    assertSameResults(await rankingCalls(Inkling, new MemoryStore(), catalog), expected);
+    assertSameResults(await rankingCalls(Hunch, new MemoryStore(), catalog), expected);
   } finally {
     performance.now = realNow;
     delete g.scheduler;
@@ -183,17 +183,17 @@ test('20,000 items: same ids and scores as before slicing, with scheduler.yield(
 
 test('20,000 items: same ids and scores without scheduler.yield() (new tasks instead)', async () => {
   assert.equal(g.scheduler, undefined);
-  assertSameResults(await rankingCalls(Inkling, new MemoryStore(), catalog), expected);
+  assertSameResults(await rankingCalls(Hunch, new MemoryStore(), catalog), expected);
 });
 
 test('20,000 items: the JavaScript kernel gives the same results as the WebAssembly one', async () => {
-  assertSameResults(await rankingCalls(Inkling, new MemoryStore(), catalog, 'js'), expected);
+  assertSameResults(await rankingCalls(Hunch, new MemoryStore(), catalog, 'js'), expected);
 });
 
 test('20,000 items: a manifest without a sections list filters by section as before', async () => {
   const { sections: _, ...manifest } = catalog.manifest;
   const bare = { ...catalog, manifest: manifest as typeof catalog.manifest };
-  assertSameResults(await rankingCalls(Inkling, new MemoryStore(), bare), expected);
+  assertSameResults(await rankingCalls(Hunch, new MemoryStore(), bare), expected);
 });
 
 test('ties come in manifest order, whatever order the shards arrive in', async () => {
@@ -219,7 +219,7 @@ test('ties come in manifest order, whatever order the shards arrive in', async (
       })();
     });
   };
-  const ink = await Inkling.load({
+  const ink = await Hunch.load({
     manifest: 'http://large/manifest.json',
     fetch: fetchFn,
     consent: true,

@@ -14,7 +14,7 @@ const SEPT_15 = Date.parse('2026-09-15');
 
 async function context(summarizer: boolean): Promise<BrowserContext> {
   const ctx = await site.browser.newContext(DESKTOP);
-  await ctx.addInitScript(() => localStorage.setItem('inkling-demo-consent', 'yes'));
+  await ctx.addInitScript(() => localStorage.setItem('hunch-demo-consent', 'yes'));
   if (summarizer) {
     await ctx.addInitScript(() => {
       (window as unknown as { Summarizer: unknown }).Summarizer = {
@@ -32,12 +32,12 @@ async function context(summarizer: boolean): Promise<BrowserContext> {
 }
 
 async function digest(page: Page) {
-  await ready(page, 'inkling-digest');
-  return page.$eval('inkling-digest', (el) => ({
-    new: (el as HTMLElement).dataset.inklingNew,
-    summarized: (el as HTMLElement).dataset.inklingSummarized,
-    summary: el.querySelector('[data-inkling-summary]')!.textContent,
-    dates: [...el.querySelectorAll('[data-inkling-slot]:not([hidden]) time')].map((t) =>
+  await ready(page, 'hunch-digest');
+  return page.$eval('hunch-digest', (el) => ({
+    new: (el as HTMLElement).dataset.hunchNew,
+    summarized: (el as HTMLElement).dataset.hunchSummarized,
+    summary: el.querySelector('[data-hunch-summary]')!.textContent,
+    dates: [...el.querySelectorAll('[data-hunch-slot]:not([hidden]) time')].map((t) =>
       t.getAttribute('datetime'),
     ),
   }));
@@ -62,11 +62,10 @@ test('a returning visitor sees what was published since the last visit, summariz
     back.dates.join(),
   );
   await page.waitForFunction(
-    () =>
-      document.querySelector('inkling-digest')!.getAttribute('data-inkling-summarized') === 'true',
+    () => document.querySelector('hunch-digest')!.getAttribute('data-hunch-summarized') === 'true',
   );
   assert.equal(
-    await page.locator('[data-inkling-summary]').textContent(),
+    await page.locator('[data-hunch-summary]').textContent(),
     '3 new articles while you were away.',
   );
   await assertNoLayoutShift(t, page);

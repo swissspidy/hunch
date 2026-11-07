@@ -71,7 +71,7 @@ jobs:
           release=false
           tag=false
           if [ "$version" != 0.0.0 ] && ! git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
-            if npm view "@swissspidy/inkling@$version" version >/dev/null 2>&1; then tag=true; else release=true; fi
+            if npm view "@swissspidy/hunch@$version" version >/dev/null 2>&1; then tag=true; else release=true; fi
           fi
           echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -173,13 +173,13 @@ jobs:
       # a failed run staged before re-running it. The stage ID goes in the job summary, for approving.
       - name: Stage
         run: |
-          if npm view "@swissspidy/inkling@$VERSION" version >/dev/null 2>&1; then
-            echo "@swissspidy/inkling@$VERSION is already on npm"
+          if npm view "@swissspidy/hunch@$VERSION" version >/dev/null 2>&1; then
+            echo "@swissspidy/hunch@$VERSION is already on npm"
           else
             npm stage publish ./release/*.tgz > stage.log
             cat stage.log
             stage_id="$(sed -n 's/.*(staged with id \(.*\))$/\1/p' stage.log)"
-            echo "Staged @swissspidy/inkling@$VERSION: approve it under Staged Packages on npmjs.com, or with \`npm stage approve ${stage_id:-<stage-id>}\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "Staged @swissspidy/hunch@$VERSION: approve it under Staged Packages on npmjs.com, or with \`npm stage approve ${stage_id:-<stage-id>}\`." >> "$GITHUB_STEP_SUMMARY"
             echo "Then run this workflow (Actions, Release, Run workflow) to tag it, or wait for the next push to main." >> "$GITHUB_STEP_SUMMARY"
           fi
 

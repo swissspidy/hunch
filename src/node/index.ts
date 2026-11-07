@@ -1,8 +1,8 @@
 /**
- * Inkling's build step as a library: load a catalog, embed it, write the manifest and shards.
+ * Hunch's build step as a library: load a catalog, embed it, write the manifest and shards.
  * Node only.
  *
- * @module @swissspidy/inkling/build
+ * @module @swissspidy/hunch/build
  */
 
 export { build, computePriors, type BuildOptions, type BuildResult } from './build.ts';

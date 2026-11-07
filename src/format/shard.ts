@@ -4,7 +4,7 @@
  * Version 2, little-endian:
  *
  *   offset  size          field
- *   0       4             magic "INKV"
+ *   0       4             magic "HNCH"
  *   4       1             format version (2)
  *   5       1             quantization: 1 = int8, 2 = float32
  *   6       2             reserved (0)
@@ -34,7 +34,7 @@
 
 import type { Quantization, ShardItem } from './manifest.ts';
 
-const MAGIC = 0x564b4e49; // "INKV" read as little-endian u32
+const MAGIC = 0x48434e48; // "HNCH" read as little-endian u32
 /** The shard format version this release writes. */
 export const SHARD_FORMAT_VERSION = 2;
 const NO_SECTION = 0xffff;
@@ -154,7 +154,7 @@ export function encodeShard(
  */
 export function decodeShard(buffer: ArrayBuffer): DecodedShard {
   const fail = (why: string): never => {
-    throw new TypeError(`Inkling shard: ${why}`);
+    throw new TypeError(`Hunch shard: ${why}`);
   };
   const truncated = (end: number) => {
     if (buffer.byteLength < end) fail('truncated');

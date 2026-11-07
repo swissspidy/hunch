@@ -1,11 +1,11 @@
 {
-  "format": "inkling/manifest",
+  "format": "hunch/manifest",
   "formatVersion": 1,
-  "version": "83d3311c05a2c3ad",
+  "version": "39e89aaf6cf6fdaf",
   "generatedAt": "2026-11-05T00:00:00.000Z",
-  "space": "inkling/hash@1|native=16|dims=8|prompt=1e7c1420",
+  "space": "hunch/hash@1|native=16|dims=8|prompt=1e7c1420",
   "model": {
-    "id": "inkling/hash",
+    "id": "hunch/hash",
     "revision": "1",
     "nativeDims": 16,
     "documentPrompt": "{title}\n{title}\n{text}",
@@ -20,25 +20,25 @@
   ],
   "shards": [
     {
-      "url": "shards/food.fb14f8babf77.ink",
+      "url": "shards/food.1f22b21852a8.hunch",
       "section": "Food",
       "count": 2,
       "bytes": 424,
-      "sha256": "fb14f8babf7777262d6ca7530a56e35844172f200794bf3e80dc9b486d6b8c24"
+      "sha256": "1f22b21852a8d8e2cad10cb7e693b460df351bb7faf92536e6f96c3d0987514c"
     },
     {
-      "url": "shards/travel.6e15341d8ba0.ink",
+      "url": "shards/travel.4166c44e0cbd.hunch",
       "section": "Travel",
       "count": 1,
-      "bytes": 220,
-      "sha256": "6e15341d8ba029e49edbe3b94c38a4bd2cf464a6f4d5a01575ff1f9df5ec91c0"
+      "bytes": 216,
+      "sha256": "4166c44e0cbdae81150dde95ca5b62ccbc66cfbfbaf5e1034c79076aa8a21f15"
     },
     {
-      "url": "shards/all.00767dc57739.ink",
+      "url": "shards/all.9491766790d3.hunch",
       "section": null,
       "count": 1,
       "bytes": 168,
-      "sha256": "00767dc577395a6aaf6ac89bd7b1783330a4920de6afc34bbb73071ce165302c"
+      "sha256": "9491766790d31930c0c26bdca23e35627d78c699b311151d723e832276d831b3"
     }
   ]
 }

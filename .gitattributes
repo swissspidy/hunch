@@ -2,4 +2,4 @@
 * text=auto eol=lf
 # Embedding caches and vector shards are binary.
 *.vec binary
-*.ink binary
+*.hunch binary

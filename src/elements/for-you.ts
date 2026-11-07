@@ -1,37 +1,37 @@
-import type { Inkling, Recommendation } from '../client/index.ts';
+import type { Hunch, Recommendation } from '../client/index.ts';
 import { SlotsElement } from './slots.ts';
 
 /**
- * `<inkling-for-you>`: the visitor's recommendations in server-rendered slots.
+ * `<hunch-for-you>`: the visitor's recommendations in server-rendered slots.
  *
  * The server renders the site's own order (the cold start). Without consent or signals the
  * slots stay exactly as they are; with a profile, they are replaced by its recommendations.
  * If the visitor hid an item the fallback shows, the catalog's own order without it is shown.
- * `data-inkling-personalized` says which happened.
+ * `data-hunch-personalized` says which happened.
  *
  * ```html
- * <inkling-for-you manifest="/inkling/manifest.json">
- *   <a data-inkling-slot data-inkling-id="post-1" href="/posts/1"><span data-inkling-title>…</span></a>
+ * <hunch-for-you manifest="/hunch/manifest.json">
+ *   <a data-hunch-slot data-hunch-id="post-1" href="/posts/1"><span data-hunch-title>…</span></a>
  *   …
- * </inkling-for-you>
+ * </hunch-for-you>
  * ```
  *
- * Attributes: `manifest` (or `InklingConfig.manifest`), `sections` (comma-separated),
+ * Attributes: `manifest` (or `HunchConfig.manifest`), `sections` (comma-separated),
  * `exclude` (comma-separated item ids), `include-seen`, `diversity`. The slots, states and
  * events are the module's.
  */
-export class InklingForYouElement extends SlotsElement {
+export class HunchForYouElement extends SlotsElement {
   /** @internal Custom element lifecycle, called by the browser. */
   static get observedAttributes(): string[] {
     return ['manifest', 'sections', 'exclude', 'include-seen', 'diversity'];
   }
 
   protected async recommend(
-    inkling: Inkling,
+    hunch: Hunch,
     n: number,
     fallback: readonly string[],
   ): Promise<Recommendation[] | null> {
-    const recommendations = await inkling.recommend({
+    const recommendations = await hunch.recommend({
       n,
       sections: this.list('sections'),
       exclude: this.list('exclude'),
@@ -39,11 +39,11 @@ export class InklingForYouElement extends SlotsElement {
       diversity: this.number('diversity'),
     });
     const personalized = recommendations.some((r) => r.why.confidence > 0);
-    this.dataset.inklingPersonalized = String(personalized);
+    this.dataset.hunchPersonalized = String(personalized);
     if (personalized) return recommendations;
     // No profile yet, but an item the visitor hid must not stay in the fallback: show the
     // site's own order without it instead.
-    const states = await Promise.all(fallback.map((id) => inkling.explain(id)));
+    const states = await Promise.all(fallback.map((id) => hunch.explain(id)));
     return states.some((state) => state?.hidden) ? recommendations : null;
   }
 }

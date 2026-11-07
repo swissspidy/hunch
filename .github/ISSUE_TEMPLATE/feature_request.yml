@@ -1,5 +1,5 @@
 name: Feature request
-description: Something Inkling should do, or do differently.
+description: Something Hunch should do, or do differently.
 labels: ['enhancement']
 body:
   - type: textarea

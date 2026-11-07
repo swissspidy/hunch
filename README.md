@@ -1,6 +1,6 @@
-# Inkling
+# Hunch
 
-First-party, on-device personalization for websites. Inkling ranks your catalog in the
+First-party, on-device personalization for websites. Hunch ranks your catalog in the
 visitor's browser: related items, "for you" modules and "since your last visit" digests. Your
 build step publishes a vector for each item, and the browser ranks them with plain arithmetic:
 the ranking runs no model. Two optional extras do run one on the device: free-text search
@@ -18,7 +18,7 @@ the signals and the ranking function are specified in
 
 ## How it works
 
-1. **At build time**, `inkling build` reads your catalog (RSS/Atom, JSON, a sitemap, or your own
+1. **At build time**, `hunch build` reads your catalog (RSS/Atom, JSON, a sitemap, or your own
    loader) and embeds every item with a pinned open model. The default is
    [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) through Transformers.js. It
    writes `manifest.json` and one small binary shard per section: 256-dimensional int8 vectors,
@@ -30,42 +30,42 @@ the signals and the ranking function are specified in
    12 ms in Node ([ADR 0010](docs/adr/0010-columnar-catalog-simd.md)).
    For "for you", similarity is to a profile derived from the visitor's signals (what they read,
    followed or hid), which stay in the site's own IndexedDB.
-3. **On the page**, the server renders a normal, non-personalized list. `<inkling-related>` and
-   `<inkling-for-you>` swap its entries in idle time, slot for slot, with no layout shift.
+3. **On the page**, the server renders a normal, non-personalized list. `<hunch-related>` and
+   `<hunch-for-you>` swap its entries in idle time, slot for slot, with no layout shift.
 
 ## Quick start
 
 Install the package, and Transformers.js for the build step:
 
 ```sh
-npm install @swissspidy/inkling
+npm install @swissspidy/hunch
 npm install --save-dev @huggingface/transformers
 ```
 
 Build the vectors from your feed into your public directory:
 
 ```sh
-npx inkling build --source https://example.com/feed.xml --out public/inkling
+npx hunch build --source https://example.com/feed.xml --out public/hunch
 ```
 
 The first build downloads the model (about 300 MB, once). Later builds embed only new or
-changed items, from `.inkling-cache/`. Commit that directory and CI rebuilds without the model.
+changed items, from `.hunch-cache/`. Commit that directory and CI rebuilds without the model.
 
 On an article page, render the fallback list as you would anyway, and wrap it:
 
 ```html
-<script src="/inkling.global.js" defer></script>
-<!-- copy it from node_modules/@swissspidy/inkling/dist/inkling.global.js, or bundle the module -->
+<script src="/hunch.global.js" defer></script>
+<!-- copy it from node_modules/@swissspidy/hunch/dist/hunch.global.js, or bundle the module -->
 
-<inkling-related manifest="/inkling/manifest.json" item="sourdough-starter" section="Food">
+<hunch-related manifest="/hunch/manifest.json" item="sourdough-starter" section="Food">
   <ol>
-    <li data-inkling-slot>
-      <a href="/food/rye-bread/"><span data-inkling-title>Dense, dark rye bread</span></a>
-      <span data-inkling-section>Food</span> · <time data-inkling-date>Oct 9, 2026</time>
+    <li data-hunch-slot>
+      <a href="/food/rye-bread/"><span data-hunch-title>Dense, dark rye bread</span></a>
+      <span data-hunch-section>Food</span> · <time data-hunch-date>Oct 9, 2026</time>
     </li>
     <!-- … one slot per item to show -->
   </ol>
-</inkling-related>
+</hunch-related>
 ```
 
 `item` is the item's id in the catalog: the feed item's `guid`, or its link. Give the slots a
@@ -73,8 +73,8 @@ fixed height and clamp titles to a fixed number of lines (see
 [`demo/style.css`](demo/style.css)). If your CSS removes the list's markers
 (`list-style: none`), add `role="list"` to it: Safari then no longer reports it as a list. Each slot is replaced by a copy of itself with the related
 item's link, title, section, date and image, so nothing moves. If the manifest can't be
-loaded, the fallback stays. The element sets `data-inkling-state` to `loading`, `ready` or
-`error`, and fires `inkling:ready` with the recommendations.
+loaded, the fallback stays. The element sets `data-hunch-state` to `loading`, `ready` or
+`error`, and fires `hunch:ready` with the recommendations.
 
 ### "For you"
 
@@ -84,86 +84,86 @@ start) on the home page:
 
 ```html
 <script>
-  window.InklingConfig = { consent: () => myConsentManager.allows('personalization') };
+  window.HunchConfig = { consent: () => myConsentManager.allows('personalization') };
 </script>
-<script src="/inkling.global.js" defer></script>
+<script src="/hunch.global.js" defer></script>
 
 <!-- On an article page: records the view, and dwell time from 10 seconds on. -->
-<inkling-page manifest="/inkling/manifest.json" item="sourdough-starter"></inkling-page>
+<hunch-page manifest="/hunch/manifest.json" item="sourdough-starter"></hunch-page>
 
 <!-- On the home page: the editors' picks, replaced once the visitor has a profile. -->
-<inkling-for-you manifest="/inkling/manifest.json">
+<hunch-for-you manifest="/hunch/manifest.json">
   <ol>
-    <li data-inkling-slot data-inkling-id="night-train-alps">…</li>
+    <li data-hunch-slot data-hunch-id="night-train-alps">…</li>
     <!-- … -->
   </ol>
-</inkling-for-you>
+</hunch-for-you>
 ```
 
 Without consent nothing is stored (not even an empty database) and the list never changes.
 With consent, items the visitor has read are left out, hidden items never come back, and the
-profile takes over gradually as signals accumulate. `InklingConfig.manifest` sets the manifest
+profile takes over gradually as signals accumulate. `HunchConfig.manifest` sets the manifest
 of components that have no `manifest` attribute.
 
 ### The client
 
 ```js
-import { Inkling } from '@swissspidy/inkling';
+import { Hunch } from '@swissspidy/hunch';
 
-const inkling = await Inkling.load({
-  manifest: '/inkling/manifest.json',
+const hunch = await Hunch.load({
+  manifest: '/hunch/manifest.json',
   consent: () => myConsentManager.allows('personalization'), // asked before every read or write
 });
 
-await inkling.related('sourdough-starter', { n: 4, sections: 'same' }); // no visitor data
-inkling.observe('sourdough-starter'); // a view now, dwell time as the page is left
-await inkling.record('follow', 'rye-bread'); // or 'hide', 'click', 'view', 'dwell'
-await inkling.recommend({ n: 4 }); // "for you"
-await inkling.rank(['a', 'b', 'c']); // reorder a server-rendered list
-await inkling.explain('cold-brew'); // { similarity, confidence, because: [{ id, title, share }], … }
+await hunch.related('sourdough-starter', { n: 4, sections: 'same' }); // no visitor data
+hunch.observe('sourdough-starter'); // a view now, dwell time as the page is left
+await hunch.record('follow', 'rye-bread'); // or 'hide', 'click', 'view', 'dwell'
+await hunch.recommend({ n: 4 }); // "for you"
+await hunch.rank(['a', 'b', 'c']); // reorder a server-rendered list
+await hunch.explain('cold-brew'); // { similarity, confidence, because: [{ id, title, share }], … }
 
 // The visitor's controls
-await inkling.pause(); // and resume(), paused()
-await inkling.export(); // { format: 'inkling/signals', signals: [{ itemId, kind, weight, at }] }
-await inkling.forget(); // deletes everything; forget(itemId) one item's signals
+await hunch.pause(); // and resume(), paused()
+await hunch.export(); // { format: 'hunch/signals', signals: [{ itemId, kind, weight, at }] }
+await hunch.forget(); // deletes everything; forget(itemId) one item's signals
 ```
 
-The [API reference](https://swissspidy.github.io/inkling/api/) documents every entry point:
+The [API reference](https://swissspidy.github.io/hunch/api/) documents every entry point:
 the client, `/elements`, `/digest`, `/query`, `/format`, `/build` and `/astro`.
 
 ### "Since your last visit"
 
-`<inkling-digest>` shows what was published since the visitor's previous visit (with consent),
+`<hunch-digest>` shows what was published since the visitor's previous visit (with consent),
 ranked by their interests. Where the browser has a built-in Summarizer with its on-device model,
 it also writes a one-line summary. Elsewhere the placeholder stays:
 
 ```html
-<inkling-digest manifest="/inkling/manifest.json">
-  <p data-inkling-summary>The latest articles.</p>
+<hunch-digest manifest="/hunch/manifest.json">
+  <p data-hunch-summary>The latest articles.</p>
   <ol>
-    <li data-inkling-slot data-inkling-id="newest-post">…</li>
+    <li data-hunch-slot data-hunch-id="newest-post">…</li>
   </ol>
-</inkling-digest>
+</hunch-digest>
 ```
 
-In code: `await inkling.sinceLastVisit({ n: 5 })`, and `summarize(items)` from
-`@swissspidy/inkling/digest`. A visit ends after 30 minutes without activity
+In code: `await hunch.sinceLastVisit({ n: 5 })`, and `summarize(items)` from
+`@swissspidy/hunch/digest`. A visit ends after 30 minutes without activity
 ([ADR 0004](docs/adr/0004-since-your-last-visit.md)).
 
 ### Search
 
-`@swissspidy/inkling/query` embeds a query on the device with the catalog's own pinned model
-(Transformers.js, loaded on the first search), and `inkling.search()` ranks the catalog against
+`@swissspidy/hunch/query` embeds a query on the device with the catalog's own pinned model
+(Transformers.js, loaded on the first search), and `hunch.search()` ranks the catalog against
 it. The query text is never sent ([ADR 0005](docs/adr/0005-query-embedding.md)):
 
 ```js
-import { createQueryEmbedder } from '@swissspidy/inkling/query';
+import { createQueryEmbedder } from '@swissspidy/hunch/query';
 
-const embedder = await createQueryEmbedder(inkling.manifest, {
+const embedder = await createQueryEmbedder(hunch.manifest, {
   transformers: () => import('@huggingface/transformers'),
   dtype: 'q4', // the same model in smaller weights: ~200 MB, once, then cached
 });
-const results = await inkling.search(await embedder.embed('night trains'), { n: 5 });
+const results = await hunch.search(await embedder.embed('night trains'), { n: 5 });
 ```
 
 `personalize: 0.3` blends in the visitor's profile; hidden items never appear.
@@ -174,18 +174,18 @@ editors' pick) and `because` (the visitor's items it leans on).
 
 ## WordPress
 
-The [WordPress plugin](wordpress/inkling/readme.txt) needs no Node on the server and no CI.
+The [WordPress plugin](wordpress/hunch/readme.txt) needs no Node on the server and no CI.
 Posts are embedded with the same pinned EmbeddingGemma in the editor's browser, in wp-admin, on
 publish and with a "Build index" button. PHP writes the same manifest and shards as the CLI, in
-`wp-content/uploads/inkling/`. It adds related posts after each post, a "For you" block and a
+`wp-content/uploads/hunch/`. It adds related posts after each post, a "For you" block and a
 block with the visitor's controls, with the consent setting of your choice
 ([ADR 0007](docs/adr/0007-wordpress-plugin.md)). `npm run wordpress:build` bundles the client
-into the plugin and writes `wordpress/inkling.zip`.
+into the plugin and writes `wordpress/hunch.zip`.
 
 ## The demo
 
-**Live:** [swissspidy.github.io/inkling](https://swissspidy.github.io/inkling/), with the
-[API reference](https://swissspidy.github.io/inkling/api/), deployed from `main` by
+**Live:** [swissspidy.github.io/hunch](https://swissspidy.github.io/hunch/), with the
+[API reference](https://swissspidy.github.io/hunch/api/), deployed from `main` by
 [`pages.yml`](.github/workflows/pages.yml). To run it locally:
 
 ```sh
@@ -208,20 +208,20 @@ consent, and that the layout shift is 0 on desktop and phone viewports.
 ## The CLI
 
 ```
-inkling build --source <file|url> [--source …] --out <dir> [options]
+hunch build --source <file|url> [--source …] --out <dir> [options]
   --source <file|url>     JSON, RSS/Atom, sitemap, or a loader module (.js/.mjs/.ts)
   --provider <name|file>  transformers (default) | hash | a provider module
   --dims <n>              Published dimensions (Matryoshka truncation; default 256)
   --quantization <q>      int8 (default) | float32
   --shard-by <how>        section (default) | none
-  --cache-dir <dir>       Embedding cache (default: .inkling-cache)
-inkling inspect [manifest.json]
+  --cache-dir <dir>       Embedding cache (default: .hunch-cache)
+hunch inspect [manifest.json]
 ```
 
-`inkling --help` lists every option. A JSON catalog is an array of
+`hunch --help` lists every option. A JSON catalog is an array of
 `{ id, url, title, text, section?, tags?, date?, image?, popularity? }`. A loader module's default
 export returns that array. `popularity` (or, without it, catalog order) sets the cold-start
-order. The same build step is a library, `@swissspidy/inkling/build`, for build helpers in
+order. The same build step is a library, `@swissspidy/hunch/build`, for build helpers in
 Next.js or static site generators (Astro has [its own integration](#astro)).
 
 The `hash` provider is a deterministic lexical embedding that needs no model. It is for tests
@@ -235,16 +235,16 @@ page ([ADR 0006](docs/adr/0006-astro-integration.md)):
 ```js
 // astro.config.mjs
 import { defineConfig } from 'astro/config';
-import inkling from '@swissspidy/inkling/astro';
+import hunch from '@swissspidy/hunch/astro';
 
 export default defineConfig({
-  integrations: [inkling({ include: ['/blog/*'] })],
+  integrations: [hunch({ include: ['/blog/*'] })],
 });
 ```
 
 After the pages are built, it reads each one's HTML as the sitemap source does (`og:title`,
 `article:section`, `article:published_time`, `article:tag`, `og:image`, and the text of
-`<article>` or `<main>`), embeds them, and writes `dist/inkling/`. An item's id is its path,
+`<article>` or `<main>`), embeds them, and writes `dist/hunch/`. An item's id is its path,
 as `Astro.url.pathname` gives it, for every `build.format` and `trailingSlash`. In a layout,
 render the slots and leave out `manifest`:
 
@@ -252,31 +252,31 @@ render the slots and leave out `manifest`:
 ---
 const related = await sameSectionPosts(Astro.props.section); // your own fallback query
 ---
-<inkling-page item={Astro.url.pathname}></inkling-page>
-<inkling-related item={Astro.url.pathname} section={Astro.props.section}>
+<hunch-page item={Astro.url.pathname}></hunch-page>
+<hunch-related item={Astro.url.pathname} section={Astro.props.section}>
   <ol>
     {related.slice(0, 4).map((post) => (
-      <li data-inkling-slot data-inkling-id={post.url}>
-        <a href={post.url}><span data-inkling-title>{post.title}</span></a>
+      <li data-hunch-slot data-hunch-id={post.url}>
+        <a href={post.url}><span data-hunch-title>{post.title}</span></a>
       </li>
     ))}
   </ol>
-</inkling-related>
+</hunch-related>
 ```
 
 The consent hook goes in `<head>`, as on any site:
-`<script is:inline>window.InklingConfig = { consent: () => … };</script>`.
+`<script is:inline>window.HunchConfig = { consent: () => … };</script>`.
 
-| Option                            | Default                       |                                                                                                |
-| --------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------- |
-| `include`, `exclude`              | all pages                     | Paths without `base`: `'/blog/*'` (not `/blog/` itself), `'/tags/**'`, a RegExp, or a function |
-| `page(item, { path, html })`      |                               | Change an item (its section, say), or return `null` to drop it                                 |
-| `items({ pages })`                |                               | The whole catalog: the built pages, filtered or enriched, or other items                       |
-| `provider`                        | `'transformers'`              | EmbeddingGemma; `'hash'` for tests, or a provider object                                       |
-| `cacheDir`                        | `node_modules/.cache/inkling` | The embedding cache, relative to the project; `false` for none                                 |
-| `out`                             | `'inkling'`                   | Directory in the build output                                                                  |
-| `dims`, `quantization`, `shardBy` |                               | As for the CLI                                                                                 |
-| `script`                          | `true`                        | `false` to load the components yourself                                                        |
+| Option                            | Default                     |                                                                                                |
+| --------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
+| `include`, `exclude`              | all pages                   | Paths without `base`: `'/blog/*'` (not `/blog/` itself), `'/tags/**'`, a RegExp, or a function |
+| `page(item, { path, html })`      |                             | Change an item (its section, say), or return `null` to drop it                                 |
+| `items({ pages })`                |                             | The whole catalog: the built pages, filtered or enriched, or other items                       |
+| `provider`                        | `'transformers'`            | EmbeddingGemma; `'hash'` for tests, or a provider object                                       |
+| `cacheDir`                        | `node_modules/.cache/hunch` | The embedding cache, relative to the project; `false` for none                                 |
+| `out`                             | `'hunch'`                   | Directory in the build output                                                                  |
+| `dims`, `quantization`, `shardBy` |                             | As for the CLI                                                                                 |
+| `script`                          | `true`                      | `false` to load the components yourself                                                        |
 
 Install `@huggingface/transformers` as a dev dependency for the default provider. A build
 embeds only pages that are new or changed since the cached ones. In CI, restore the cache after
@@ -286,13 +286,13 @@ embeds only pages that are new or changed since the cached ones. In CI, restore 
 - run: npm ci
 - uses: actions/cache@v4
   with:
-    path: node_modules/.cache/inkling
-    key: inkling-${{ github.run_id }}
-    restore-keys: inkling-
+    path: node_modules/.cache/hunch
+    key: hunch-${{ github.run_id }}
+    restore-keys: hunch-
 - run: npx astro build
 ```
 
-`astro dev` builds no vectors. It serves those of the last `astro build` from `dist/inkling/`,
+`astro dev` builds no vectors. It serves those of the last `astro build` from `dist/hunch/`,
 and before the first build the lists keep their server-rendered fallback.
 
 ## Privacy
@@ -322,7 +322,7 @@ and before the first build the lists keep their server-rendered fallback.
 
 ## Stability
 
-Inkling is 0.x: a breaking change comes in a minor release, with a changeset that says what to
+Hunch is 0.x: a breaking change comes in a minor release, with a changeset that says what to
 do. [ADR 0009](docs/adr/0009-stability.md) says what counts as breaking:
 
 - **Published files.** A client refuses a manifest or shard format version it doesn't know (the
@@ -337,7 +337,7 @@ do. [ADR 0009](docs/adr/0009-stability.md) says what counts as breaking:
 
 ## Evaluation
 
-[`eval/`](eval/README.md) replays click logs through the real client and compares Inkling with
+[`eval/`](eval/README.md) replays click logs through the real client and compares Hunch with
 random and popularity rankings: a synthetic dataset in CI, and
 [MIND](https://msnews.github.io/) (Microsoft News) on demand. The results are in
 [docs/evaluation.md](docs/evaluation.md).

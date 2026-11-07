@@ -8,13 +8,13 @@ import { hashEmbed } from '../../rank/hash.ts';
 import type { EmbeddingProvider } from './types.ts';
 
 /**
- * The `inkling/hash` provider: lexical feature hashing in plain JavaScript, no model and no
+ * The `hunch/hash` provider: lexical feature hashing in plain JavaScript, no model and no
  * download. For tests, CI and offline builds; search with it works without Transformers.js.
  */
 export function hashProvider(nativeDims = 512): EmbeddingProvider {
   return {
     model: {
-      id: 'inkling/hash',
+      id: 'hunch/hash',
       revision: '1',
       nativeDims,
       documentPrompt: '{title}\n{title}\n{text}',

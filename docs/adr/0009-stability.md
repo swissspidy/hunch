@@ -9,7 +9,7 @@
 need rules before then:
 
 - **Published files.** A site publishes `manifest.json` and shards built by one version of
-  Inkling, and pages run the client of another: a cached script after a rebuild, a rebuild
+  Hunch, and pages run the client of another: a cached script after a rebuild, a rebuild
   after an upgrade, a CDN that serves an old shard for a while.
 - **The visitor's data.** Signals stay in the visitor's IndexedDB for months, across every
   upgrade of the site. A visitor can't redo what a bad migration lost, and must not be
@@ -31,9 +31,9 @@ counts as breaking, and what is not promised at all.
   shard's reserved bytes are written as 0 and not read. The `space` string is opaque: readers
   only compare it for equality, and its spelling may change with any rebuild.
 - **A reader refuses a version it doesn't know.** `assertManifest()` and `decodeShard()` throw,
-  so `Inkling.load()` rejects (for the manifest), or the call that first needs the shard does
+  so `Hunch.load()` rejects (for the manifest), or the call that first needs the shard does
   (shards load lazily), and the elements keep the server-rendered fallback
-  (`data-inkling-state="error"`). Nothing guesses at a newer format, and nothing mixes it with
+  (`data-hunch-state="error"`). Nothing guesses at a newer format, and nothing mixes it with
   vectors it can read.
 - **The build writes one version, the newest.** A release that introduces version N + 1 is a
   minor release in 0.x (a major from 1.0), with a changeset that says so.
@@ -67,18 +67,18 @@ counts as breaking, and what is not promised at all.
 - **Unknown signal kinds are kept and ignored.** Should a record of a kind the client doesn't
   know reach it anyway, it is neither scored nor treated as a view, and it isn't pruned by age;
   only the count cap drops it, after the known implicit signals.
-- **The export format is versioned too.** `export()` returns `format: "inkling/signals"`,
+- **The export format is versioned too.** `export()` returns `format: "hunch/signals"`,
   `formatVersion: 1`. Its fields keep their meaning; a change bumps the version.
 - **The profile is never stored**, so a new model or new ranking needs no migration (ADR 0001).
 
 ### The public API
 
 - **What is public:** the exports of the package's entry points (`.`, `./elements`,
-  `./digest`, `./query`, `./format`, `./build`, `./astro`, `./inkling.global.js`) and their TypeScript
-  types, as the [API reference](https://swissspidy.github.io/inkling/api/) lists them;
-  `window.InklingConfig`; the elements' names, attributes, events (`inkling:ready`,
-  `inkling:error`, `inkling:summary`) and the `data-inkling-*` attributes they read and set
-  (`data-inkling-slot`, `-id`, `-title`, `-section`, `-date`, `-image`, `-href`, `-summary`,
+  `./digest`, `./query`, `./format`, `./build`, `./astro`, `./hunch.global.js`) and their TypeScript
+  types, as the [API reference](https://swissspidy.github.io/hunch/api/) lists them;
+  `window.HunchConfig`; the elements' names, attributes, events (`hunch:ready`,
+  `hunch:error`, `hunch:summary`) and the `data-hunch-*` attributes they read and set
+  (`data-hunch-slot`, `-id`, `-title`, `-section`, `-date`, `-image`, `-href`, `-summary`,
   `-state` and its values, `-personalized`, `-new`, `-summarized`); the CLI's commands, options
   and exit codes; and the manifest, shard and export formats above.
 - **Semantic versioning from 1.0.** In 0.x, a breaking change is a minor release and anything
@@ -97,13 +97,13 @@ counts as breaking, and what is not promised at all.
   `why` and `explain()`, may change in any release, a patch included. Results should get
   better; they won't stay the same. Tests and sites must not pin them. Which terms `why`
   reports, and what each one means, is kept.
-- **The `inkling/hash` provider's vectors.** They change only with its model revision, which
+- **The `hunch/hash` provider's vectors.** They change only with its model revision, which
   changes the space; a rebuild picks it up.
 - **The Summarizer's text**, which is the browser's.
 
 ## Consequences
 
-- A site can upgrade Inkling and rebuild in either order, and a page never shows vectors it
+- A site can upgrade Hunch and rebuild in either order, and a page never shows vectors it
   misread: at worst, the fallback.
 - A visitor's signals survive every 0.x and 1.x upgrade, and a rollback leaves them untouched.
 - Format and schema changes cost more: a version, a migration or a second reader, a fixture,

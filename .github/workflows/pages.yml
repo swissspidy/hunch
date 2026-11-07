@@ -43,7 +43,7 @@ jobs:
       # TypeDoc and the TypeScript 6 it needs, apart from the package's TypeScript 7.
       - run: npm ci --prefix docs/api --ignore-scripts
       # From the committed embedding cache: fails rather than downloading the model if the feed
-      # changed without the cache (run `npm run demo` locally and commit demo/inkling-cache).
+      # changed without the cache (run `npm run demo` locally and commit demo/hunch-cache).
       - run: node scripts/demo.ts --base "/${GITHUB_REPOSITORY#*/}/"
       # Into demo/dist/api: fails on an undocumented export or a broken link.
       - run: npm run api

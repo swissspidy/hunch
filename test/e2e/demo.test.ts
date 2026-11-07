@@ -27,7 +27,7 @@ async function open(path: string, options: BrowserContextOptions = DESKTOP, gate
   const page = await context.newPage();
   // Holds the manifest back until `gate` settles, so a test can see the fallback first.
   if (gate)
-    await page.route('**/inkling/manifest.json', (route) => gate.then(() => route.continue()));
+    await page.route('**/hunch/manifest.json', (route) => gate.then(() => route.continue()));
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   await observeLayoutShifts(page);
@@ -35,8 +35,8 @@ async function open(path: string, options: BrowserContextOptions = DESKTOP, gate
   return { page, requests, close: () => context.close() };
 }
 
-const slots = (page: Page) => slotsOf(page, 'inkling-related');
-const ready = (page: Page) => readyFor(page, 'inkling-related');
+const slots = (page: Page) => slotsOf(page, 'hunch-related');
+const ready = (page: Page) => readyFor(page, 'hunch-related');
 
 for (const [name, options] of [
   ['desktop', DESKTOP],
@@ -47,7 +47,7 @@ for (const [name, options] of [
     const gate = new Promise<void>((resolve) => (release = resolve));
     const { page, requests, close } = await open('/items/stargazing-atacama.html', options, gate);
     const fallback = await slots(page);
-    const box = await page.locator('inkling-related').boundingBox();
+    const box = await page.locator('hunch-related').boundingBox();
     assert.ok(fallback.every((f) => f.href === `/items/${f.id}.html`));
     release();
     await ready(page);
@@ -58,31 +58,31 @@ for (const [name, options] of [
     assert.notDeepEqual(related, fallback);
     assert.ok(related.every((r) => r.href === `/items/${r.id}.html`));
     assert.ok(!related.some((r) => r.id === 'stargazing-atacama'));
-    assert.deepEqual(await page.locator('inkling-related').boundingBox(), box);
+    assert.deepEqual(await page.locator('hunch-related').boundingBox(), box);
     await assertNoLayoutShift(t, page);
 
-    // No model: the page fetched the manifest and the vector shards, nothing else of Inkling's.
+    // No model: the page fetched the manifest and the vector shards, nothing else of Hunch's.
     const paths = requests.map((url) => new URL(url).pathname);
     assert.ok(
       requests.every((url) => url.startsWith(site.origin)),
       requests.join('\n'),
     );
     assert.ok(!paths.some((p) => /\.onnx|tokenizer|transformers/i.test(p)), paths.join('\n'));
-    let inkling = paths
-      .filter((p) => p.startsWith('/inkling/'))
-      .map((p) => p.replace(/\.[0-9a-f]{12}\.ink$/, '.ink'));
+    let hunch = paths
+      .filter((p) => p.startsWith('/hunch/'))
+      .map((p) => p.replace(/\.[0-9a-f]{12}\.hunch$/, '.hunch'));
     // WebKit doesn't hand the `<link rel="preload" as="fetch">` response to the client's
     // fetch(), so it requests the manifest a second time.
     if (BROWSER === 'webkit') {
-      const duplicate = inkling.indexOf('/inkling/manifest.json', 1);
-      if (duplicate > 0) inkling.splice(duplicate, 1);
+      const duplicate = hunch.indexOf('/hunch/manifest.json', 1);
+      if (duplicate > 0) hunch.splice(duplicate, 1);
     }
     // The manifest, then the item's own section (the element's section hint), then the rest.
-    assert.deepEqual(inkling.slice(0, 2), ['/inkling/manifest.json', '/inkling/shards/travel.ink']);
-    assert.deepEqual(inkling.slice(2).sort(), [
-      '/inkling/shards/food.ink',
-      '/inkling/shards/science.ink',
-      '/inkling/shards/technology.ink',
+    assert.deepEqual(hunch.slice(0, 2), ['/hunch/manifest.json', '/hunch/shards/travel.hunch']);
+    assert.deepEqual(hunch.slice(2).sort(), [
+      '/hunch/shards/food.hunch',
+      '/hunch/shards/science.hunch',
+      '/hunch/shards/technology.hunch',
     ]);
     await close();
   });
@@ -92,8 +92,8 @@ test(`the WebAssembly SIMD kernel runs in ${BROWSER}, with the JavaScript one's 
   const { page, close } = await open('/items/cold-brew.html');
   await ready(page);
   const result = await page.evaluate(async () => {
-    const { Inkling } = window as unknown as {
-      Inkling: {
+    const { Hunch } = window as unknown as {
+      Hunch: {
         load(o: object): Promise<{
           kernel: string;
           related(id: string, o: object): Promise<{ id: string; score: number }[]>;
@@ -102,8 +102,8 @@ test(`the WebAssembly SIMD kernel runs in ${BROWSER}, with the JavaScript one's 
     };
     const manifest = document.body.dataset.manifest!;
     const [wasm, js] = await Promise.all([
-      Inkling.load({ manifest }),
-      Inkling.load({ manifest, kernel: 'js' }),
+      Hunch.load({ manifest }),
+      Hunch.load({ manifest, kernel: 'js' }),
     ]);
     return {
       kinds: [wasm.kernel, js.kernel],
@@ -145,9 +145,9 @@ test('no animation when the visitor prefers reduced motion', async () => {
 
 test('a javascript: URL in the catalog never becomes a link', async () => {
   // The Food shard, re-encoded with a script URL for every item, and the manifest to match.
-  const manifest = JSON.parse(await readFile('demo/dist/inkling/manifest.json', 'utf8'));
+  const manifest = JSON.parse(await readFile('demo/dist/hunch/manifest.json', 'utf8'));
   const ref = manifest.shards.find((s: { section: string }) => s.section === 'Food');
-  const shard = decodeShard(new Uint8Array(await readFile(`demo/dist/inkling/${ref.url}`)).buffer);
+  const shard = decodeShard(new Uint8Array(await readFile(`demo/dist/hunch/${ref.url}`)).buffer);
   const vectors = shard.items.map((_, i) => {
     const row = Float32Array.from(shard.vectors.subarray(i * shard.dims, (i + 1) * shard.dims));
     return row.map((x) => x * shard.invNorms[i]!);
@@ -165,13 +165,13 @@ test('a javascript: URL in the catalog never becomes a link', async () => {
   ref.bytes = bytes.length;
   const context = await site.browser.newContext(DESKTOP);
   const page = await context.newPage();
-  await page.route('**/inkling/manifest.json', (route) => route.fulfill({ json: manifest }));
-  await page.route(`**/inkling/${ref.url}`, (route) => route.fulfill({ body: Buffer.from(bytes) }));
+  await page.route('**/hunch/manifest.json', (route) => route.fulfill({ json: manifest }));
+  await page.route(`**/hunch/${ref.url}`, (route) => route.fulfill({ body: Buffer.from(bytes) }));
   await page.goto(`${site.origin}/items/cold-brew.html`);
   await ready(page);
-  const links = await page.$$eval('inkling-related [data-inkling-slot]', (els) =>
+  const links = await page.$$eval('hunch-related [data-hunch-slot]', (els) =>
     els.map((el) => [
-      el.querySelector('[data-inkling-section]')?.textContent,
+      el.querySelector('[data-hunch-section]')?.textContent,
       el.querySelector('a')?.getAttribute('href') ?? null,
     ]),
   );
@@ -188,10 +188,10 @@ test('a javascript: URL in the catalog never becomes a link', async () => {
 test('the server-rendered fallback stays when the manifest cannot load', async () => {
   const context = await site.browser.newContext(DESKTOP);
   const page = await context.newPage();
-  await page.route('**/inkling/manifest.json', (route) => route.fulfill({ status: 503 }));
+  await page.route('**/hunch/manifest.json', (route) => route.fulfill({ status: 503 }));
   await page.goto(`${site.origin}/items/cold-brew.html`);
   const fallback = await slots(page);
-  await page.waitForSelector('inkling-related[data-inkling-state="error"]');
+  await page.waitForSelector('hunch-related[data-hunch-state="error"]');
   assert.deepEqual(await slots(page), fallback);
   await context.close();
 });

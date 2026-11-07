@@ -36,10 +36,10 @@ before(async () => {
 });
 
 test('the package holds dist, bin and the docs, and no sources or tests', () => {
-  assert.ok(files.includes('bin/inkling.js'));
+  assert.ok(files.includes('bin/hunch.js'));
   assert.ok(files.includes('dist/client/index.js'));
   assert.ok(files.includes('dist/client/index.d.ts'));
-  assert.ok(files.includes('dist/inkling.global.js'));
+  assert.ok(files.includes('dist/hunch.global.js'));
   assert.ok(files.includes('dist/node/cli.js'));
   assert.ok(files.includes('README.md'));
   assert.ok(files.includes('LICENSE'));
@@ -60,15 +60,15 @@ test('the Astro integration loads without Astro installed', async () => {
     [
       '--input-type=module',
       '-e',
-      `import inkling from '@swissspidy/inkling/astro';
-const integration = inkling({ provider: 'hash' });
+      `import hunch from '@swissspidy/hunch/astro';
+const integration = hunch({ provider: 'hash' });
 console.log(integration.name, Object.keys(integration.hooks).join(','));`,
     ],
     { cwd: project },
   );
   assert.equal(
     stdout.trim(),
-    '@swissspidy/inkling astro:config:setup,astro:config:done,astro:server:setup,astro:build:done',
+    '@swissspidy/hunch astro:config:setup,astro:config:done,astro:server:setup,astro:build:done',
   );
 });
 
@@ -76,12 +76,12 @@ test('the installed CLI builds a catalog, and the client ranks it', async () => 
   await run(
     process.execPath,
     [
-      'node_modules/@swissspidy/inkling/bin/inkling.js',
+      'node_modules/@swissspidy/hunch/bin/hunch.js',
       'build',
       '--source',
       'catalog.json',
       '--out',
-      'public/inkling',
+      'public/hunch',
       '--provider',
       'hash',
       '--no-cache',
@@ -89,9 +89,7 @@ test('the installed CLI builds a catalog, and the client ranks it', async () => 
     ],
     { cwd: project },
   );
-  const manifest = JSON.parse(
-    await readFile(join(project, 'public/inkling/manifest.json'), 'utf8'),
-  );
+  const manifest = JSON.parse(await readFile(join(project, 'public/hunch/manifest.json'), 'utf8'));
   assert.equal(manifest.count, 4);
   const { stdout } = await run(process.execPath, ['related.mjs'], { cwd: project });
   assert.equal(stdout.trim(), 'banana-bread');
@@ -100,14 +98,14 @@ test('the installed CLI builds a catalog, and the client ranks it', async () => 
 test('the library typechecks from a consumer', async () => {
   await writeFile(
     join(project, 'check.ts'),
-    `import { Inkling, type Recommendation } from '@swissspidy/inkling';
-import { build, hashProvider, type CatalogItem } from '@swissspidy/inkling/build';
-import { InklingRelatedElement } from '@swissspidy/inkling/elements';
+    `import { Hunch, type Recommendation } from '@swissspidy/hunch';
+import { build, hashProvider, type CatalogItem } from '@swissspidy/hunch/build';
+import { HunchRelatedElement } from '@swissspidy/hunch/elements';
 const items: CatalogItem[] = [];
 void build({ items, outDir: 'x', provider: hashProvider() });
-const r: Promise<Recommendation[]> = Inkling.load({ manifest: '/m.json' }).then((i) => i.related('a'));
+const r: Promise<Recommendation[]> = Hunch.load({ manifest: '/m.json' }).then((i) => i.related('a'));
 void r;
-void InklingRelatedElement;
+void HunchRelatedElement;
 `,
   );
   const tsc = resolve('node_modules/typescript/bin/tsc');
@@ -136,11 +134,11 @@ void InklingRelatedElement;
 test('the browser entry points typecheck without Node.js types', async () => {
   await writeFile(
     join(project, 'check-browser.ts'),
-    `import { Inkling } from '@swissspidy/inkling';
-import { InklingRelatedElement } from '@swissspidy/inkling/elements';
-import { decodeShard, encodeShard } from '@swissspidy/inkling/format';
-void Inkling;
-void InklingRelatedElement;
+    `import { Hunch } from '@swissspidy/hunch';
+import { HunchRelatedElement } from '@swissspidy/hunch/elements';
+import { decodeShard, encodeShard } from '@swissspidy/hunch/format';
+void Hunch;
+void HunchRelatedElement;
 void decodeShard;
 void encodeShard;
 `,

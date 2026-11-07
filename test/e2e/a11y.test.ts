@@ -64,15 +64,15 @@ function assertClean(violations: Violation[], state: string): void {
 async function context(consent: boolean): Promise<BrowserContext> {
   const ctx = await site.browser.newContext(DESKTOP);
   if (consent) {
-    await ctx.addInitScript(() => localStorage.setItem('inkling-demo-consent', 'yes'));
+    await ctx.addInitScript(() => localStorage.setItem('hunch-demo-consent', 'yes'));
   }
   return ctx;
 }
 
 async function home(page: Page, query = ''): Promise<void> {
   await page.goto(`${site.origin}/${query}`);
-  await ready(page, 'inkling-for-you');
-  await ready(page, 'inkling-digest');
+  await ready(page, 'hunch-for-you');
+  await ready(page, 'hunch-digest');
 }
 
 for (const colorScheme of ['light', 'dark'] as const) {
@@ -89,7 +89,7 @@ test('axe: an article page, with its related items', async () => {
   const ctx = await context(false);
   const page = await ctx.newPage();
   await page.goto(`${site.origin}/items/cold-brew.html`);
-  await ready(page, 'inkling-related');
+  await ready(page, 'hunch-related');
   assertClean(await axe(page), 'article');
   await ctx.close();
 });
@@ -99,7 +99,7 @@ test('axe: the home page, personalized', async () => {
   const page = await ctx.newPage();
   for (const id of FOOD) await read(site, page, id);
   await home(page);
-  assert.equal(await page.getAttribute('inkling-for-you', 'data-inkling-personalized'), 'true');
+  assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'true');
   assertClean(await axe(page), 'personalized');
   await ctx.close();
 });
@@ -128,7 +128,7 @@ test('axe: the home page with a digest of what is new', async () => {
   const page = await ctx.newPage();
   await home(page, '?as-of=2026-09-15');
   await home(page);
-  assert.equal(await page.getAttribute('inkling-digest', 'data-inkling-new'), '3');
+  assert.equal(await page.getAttribute('hunch-digest', 'data-hunch-new'), '3');
   assertClean(await axe(page), 'digest');
   await ctx.close();
 });
@@ -137,9 +137,9 @@ test('filled slots stay a list of links named by their titles', async () => {
   const ctx = await context(false);
   const page = await ctx.newPage();
   await page.goto(`${site.origin}/items/cold-brew.html`);
-  await ready(page, 'inkling-related');
-  const filled = await slots(page, 'inkling-related');
-  const tree = await page.locator('inkling-related').ariaSnapshot();
+  await ready(page, 'hunch-related');
+  const filled = await slots(page, 'hunch-related');
+  const tree = await page.locator('hunch-related').ariaSnapshot();
   assert.match(tree, /^- list:/, tree);
   assert.equal(tree.match(/^ {2}- listitem:/gm)?.length, filled.length, tree);
   for (const { title } of filled) {
@@ -155,23 +155,23 @@ test('a stale aria-label on a slot follows the item it now shows', async () => {
   await page.route('**/items/cold-brew.html', async (route) => {
     const html = await (await route.fetch()).text();
     const labelled = html.replace(
-      /<a href="([^"]+)"><span class="title" data-inkling-title>([^<]+)</g,
-      '<a href="$1" aria-label="Read: $2"><span class="title" data-inkling-title>$2<',
+      /<a href="([^"]+)"><span class="title" data-hunch-title>([^<]+)</g,
+      '<a href="$1" aria-label="Read: $2"><span class="title" data-hunch-title>$2<',
     );
     assert.notEqual(labelled, html);
     await route.fulfill({ body: labelled, contentType: 'text/html' });
   });
   let release = () => {};
   const gate = new Promise<void>((resolve) => (release = resolve));
-  await page.route('**/inkling/manifest.json', (route) => gate.then(() => route.continue()));
+  await page.route('**/hunch/manifest.json', (route) => gate.then(() => route.continue()));
   await page.goto(`${site.origin}/items/cold-brew.html`);
-  const original = (await slots(page, 'inkling-related')).map((s) => s.title);
+  const original = (await slots(page, 'hunch-related')).map((s) => s.title);
   release();
-  await ready(page, 'inkling-related');
-  const labels = await page.$$eval('inkling-related [data-inkling-slot] a', (links) =>
+  await ready(page, 'hunch-related');
+  const labels = await page.$$eval('hunch-related [data-hunch-slot] a', (links) =>
     links.map((a) => [
       a.getAttribute('aria-label'),
-      a.querySelector('[data-inkling-title]')!.textContent,
+      a.querySelector('[data-hunch-title]')!.textContent,
     ]),
   );
   assert.equal(labels.length, 4);
@@ -188,42 +188,42 @@ test('focus stays on a focused slot while the list is ranked', async () => {
   const page = await ctx.newPage();
   let release = () => {};
   const gate = new Promise<void>((resolve) => (release = resolve));
-  await page.route('**/inkling/manifest.json', (route) => gate.then(() => route.continue()));
+  await page.route('**/hunch/manifest.json', (route) => gate.then(() => route.continue()));
   await page.goto(`${site.origin}/items/stargazing-atacama.html`);
-  const fallback = await slots(page, 'inkling-related');
-  await page.focus('inkling-related [data-inkling-slot]:nth-child(2) a');
+  const fallback = await slots(page, 'hunch-related');
+  await page.focus('hunch-related [data-hunch-slot]:nth-child(2) a');
   release();
   // The ranking is done (the page's shared client has the shards), but the list waits until
   // focus leaves it.
   await page.evaluate(async () => {
-    const { Inkling } = window as unknown as {
-      Inkling: { shared(m: string): Promise<{ related(id: string): Promise<unknown> }> };
+    const { Hunch } = window as unknown as {
+      Hunch: { shared(m: string): Promise<{ related(id: string): Promise<unknown> }> };
     };
-    await (await Inkling.shared(document.body.dataset.manifest!)).related('stargazing-atacama');
+    await (await Hunch.shared(document.body.dataset.manifest!)).related('stargazing-atacama');
   });
   await page.waitForTimeout(300);
-  assert.equal(await page.getAttribute('inkling-related', 'data-inkling-state'), 'loading');
-  assert.deepEqual(await slots(page, 'inkling-related'), fallback);
+  assert.equal(await page.getAttribute('hunch-related', 'data-hunch-state'), 'loading');
+  assert.deepEqual(await slots(page, 'hunch-related'), fallback);
   assert.equal(
     await page.evaluate(() =>
-      document.activeElement?.closest('[data-inkling-slot]')?.getAttribute('data-inkling-id'),
+      document.activeElement?.closest('[data-hunch-slot]')?.getAttribute('data-hunch-id'),
     ),
     fallback[1]!.id,
   );
   // Moving focus to another slot doesn't fill it either.
-  await page.focus('inkling-related [data-inkling-slot]:nth-child(1) a');
+  await page.focus('hunch-related [data-hunch-slot]:nth-child(1) a');
   await page.waitForTimeout(100);
-  assert.equal(await page.getAttribute('inkling-related', 'data-inkling-state'), 'loading');
+  assert.equal(await page.getAttribute('hunch-related', 'data-hunch-state'), 'loading');
   assert.equal(
     await page.evaluate(() =>
-      document.activeElement?.closest('[data-inkling-slot]')?.getAttribute('data-inkling-id'),
+      document.activeElement?.closest('[data-hunch-slot]')?.getAttribute('data-hunch-id'),
     ),
     fallback[0]!.id,
   );
   // Leaving the list fills it, and focus is where the visitor moved it.
   await page.focus('details.why summary');
-  await ready(page, 'inkling-related');
-  assert.notDeepEqual(await slots(page, 'inkling-related'), fallback);
+  await ready(page, 'hunch-related');
+  assert.notDeepEqual(await slots(page, 'hunch-related'), fallback);
   assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'SUMMARY');
   await ctx.close();
 });

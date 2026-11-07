@@ -1,7 +1,7 @@
 // The demo's controls: consent, pause, forget and export on the home page; "More like this"
 // and "Not interested" on articles; and the "Why these?" lists. Plain script, no build.
 const manifest = document.body.dataset.manifest;
-const CONSENT_KEY = 'inkling-demo-consent';
+const CONSENT_KEY = 'hunch-demo-consent';
 const $ = (id) => document.getElementById(id);
 /** An async event listener whose failures are logged. */
 const on = (el, type, listener) =>
@@ -23,11 +23,11 @@ function hasConsent() {
 async function updateStatus() {
   const status = $('status');
   if (!status) return;
-  const inkling = await Inkling.shared(manifest);
+  const hunch = await Hunch.shared(manifest);
   let text = 'Personalization is off. Nothing is stored.';
   if (hasConsent()) {
-    const { signals } = await inkling.export();
-    const paused = await inkling.paused();
+    const { signals } = await hunch.export();
+    const paused = await hunch.paused();
     $('pause').textContent = paused ? 'Resume' : 'Pause';
     text = `${signals.length} ${signals.length === 1 ? 'signal' : 'signals'} stored in this browser${paused ? ' (paused)' : ''}.`;
   }
@@ -35,7 +35,7 @@ async function updateStatus() {
 }
 
 function refreshForYou() {
-  document.querySelector('inkling-for-you')?.refresh();
+  document.querySelector('hunch-for-you')?.refresh();
 }
 
 const consent = $('consent');
@@ -46,35 +46,35 @@ if (consent) {
   controls.addEventListener('focusin', speak, { once: true });
   controls.addEventListener('pointerdown', speak, { once: true });
   on(consent, 'change', async () => {
-    const inkling = await Inkling.shared(manifest);
+    const hunch = await Hunch.shared(manifest);
     if (consent.checked) {
       localStorage.setItem(CONSENT_KEY, 'yes');
     } else {
       // Withdrawing consent deletes what was stored.
       localStorage.removeItem(CONSENT_KEY);
-      await inkling.forget();
+      await hunch.forget();
     }
     await updateStatus();
     refreshForYou();
   });
   on($('pause'), 'click', async () => {
-    const inkling = await Inkling.shared(manifest);
-    if (await inkling.paused()) await inkling.resume();
-    else await inkling.pause();
+    const hunch = await Hunch.shared(manifest);
+    if (await hunch.paused()) await hunch.resume();
+    else await hunch.pause();
     await updateStatus();
   });
   on($('forget'), 'click', async () => {
-    await (await Inkling.shared(manifest)).forget();
+    await (await Hunch.shared(manifest)).forget();
     await updateStatus();
     refreshForYou();
   });
   on($('export'), 'click', async () => {
-    const data = await (await Inkling.shared(manifest)).export();
+    const data = await (await Hunch.shared(manifest)).export();
     const link = document.createElement('a');
     link.href = URL.createObjectURL(
       new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
     );
-    link.download = 'inkling-signals.json';
+    link.download = 'hunch-signals.json';
     link.click();
     URL.revokeObjectURL(link.href);
   });
@@ -86,7 +86,7 @@ const travel = $('travel');
 if (travel) {
   on(travel, 'click', async (event) => {
     event.preventDefault();
-    await (await Inkling.shared(manifest)).forget();
+    await (await Hunch.shared(manifest)).forget();
     location.href = travel.href;
   });
 }
@@ -95,8 +95,8 @@ if (travel) {
 for (const button of document.querySelectorAll('[data-signal]')) {
   on(button, 'click', async () => {
     const id = button.closest('[data-item]').dataset.item;
-    const inkling = await Inkling.shared(manifest);
-    const recorded = await inkling.record(button.dataset.signal, id);
+    const hunch = await Hunch.shared(manifest);
+    const recorded = await hunch.record(button.dataset.signal, id);
     $('feedback').value = !recorded
       ? 'Turn on personalization on the home page first.'
       : button.dataset.signal === 'follow'
@@ -107,16 +107,16 @@ for (const button of document.querySelectorAll('[data-signal]')) {
 
 // "Why these?": the ranking's terms for each item.
 const percent = (x) => `${Math.round(x * 100)}%`;
-for (const list of document.querySelectorAll('inkling-related, inkling-for-you')) {
-  list.addEventListener('inkling:ready', ({ detail }) => {
+for (const list of document.querySelectorAll('hunch-related, hunch-for-you')) {
+  list.addEventListener('hunch:ready', ({ detail }) => {
     const why = $('why-list');
     if (detail.recommendations.length === 0) {
       // A refresh without results (after forget, or consent withdrawn): no stale reasons. On
       // the first ranking, the placeholder stays.
-      if (list.dataset.inklingRanked) why.replaceChildren();
+      if (list.dataset.hunchRanked) why.replaceChildren();
       return;
     }
-    list.dataset.inklingRanked = 'true';
+    list.dataset.hunchRanked = 'true';
     why.replaceChildren(
       ...detail.recommendations.map((r) => {
         const li = document.createElement('li');
@@ -134,7 +134,7 @@ for (const list of document.querySelectorAll('inkling-related, inkling-for-you')
 }
 
 // Search: the query is embedded on this device with the catalog's own model (Transformers.js,
-// loaded on the first search), then ranked by inkling.search().
+// loaded on the first search), then ranked by hunch.search().
 const TRANSFORMERS =
   'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2/dist/transformers.min.js';
 const assets = new URL('.', document.currentScript.src);
@@ -143,11 +143,11 @@ let searches = 0;
 const searchForm = $('search');
 if (searchForm) {
   /** The embedder, loaded once: concurrent searches share the same load. */
-  const loadEmbedder = (inkling) => {
+  const loadEmbedder = (hunch) => {
     embedder ??= (async () => {
-      const { createQueryEmbedder } = await import(new URL('inkling-query.js', assets).href);
+      const { createQueryEmbedder } = await import(new URL('hunch-query.js', assets).href);
       // q4 weights: a fifth of the download of q8, with the same results (ADR 0005).
-      return createQueryEmbedder(inkling.manifest, {
+      return createQueryEmbedder(hunch.manifest, {
         transformers: () => import(TRANSFORMERS),
         dtype: 'q4',
       });
@@ -159,11 +159,11 @@ if (searchForm) {
     const search = ++searches;
     const query = String(new FormData(searchForm).get('q'));
     const status = $('search-status');
-    const inkling = await Inkling.shared(manifest);
+    const hunch = await Hunch.shared(manifest);
     let vector;
     try {
       if (search === searches) status.value = 'Embedding the query on this device…';
-      vector = await (await loadEmbedder(inkling)).embed(query);
+      vector = await (await loadEmbedder(hunch)).embed(query);
     } catch (error) {
       embedder = undefined;
       if (search === searches) status.value = 'Search could not load its model in this browser.';
@@ -171,7 +171,7 @@ if (searchForm) {
     }
     let results;
     try {
-      results = await inkling.search(vector, { n: 5 });
+      results = await hunch.search(vector, { n: 5 });
     } catch (error) {
       if (search === searches) status.value = 'Search could not rank the articles.';
       throw error;

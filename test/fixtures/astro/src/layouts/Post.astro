@@ -1,6 +1,6 @@
 ---
 // An article page: Open Graph and article meta for the catalog, and a "Related" list whose
-// server-rendered slots <inkling-related> fills in place. The integration sets the manifest.
+// server-rendered slots <hunch-related> fills in place. The integration sets the manifest.
 const { frontmatter } = Astro.props;
 const posts = Object.values(import.meta.glob('../pages/blog/*.md', { eager: true })) as {
   url: string;
@@ -24,34 +24,34 @@ const fallback = posts.filter((post) => href(post) !== self).slice(0, 3);
       content={new Date(frontmatter.date).toISOString().slice(0, 10)}
     />
     <style>
-      [data-inkling-slot] {
+      [data-hunch-slot] {
         height: 3rem;
         overflow: hidden;
       }
     </style>
   </head>
   <body>
-    <inkling-page item={self}></inkling-page>
+    <hunch-page item={self}></hunch-page>
     <article>
       <h1>{frontmatter.title}</h1>
       <slot />
     </article>
     <aside>
       <h2>Related</h2>
-      <inkling-related item={self} section={frontmatter.section}>
+      <hunch-related item={self} section={frontmatter.section}>
         <ol>
           {
             fallback.map((post) => (
-              <li data-inkling-slot data-inkling-id={href(post)}>
+              <li data-hunch-slot data-hunch-id={href(post)}>
                 <a href={href(post)}>
-                  <span data-inkling-title>{post.frontmatter.title}</span>
+                  <span data-hunch-title>{post.frontmatter.title}</span>
                 </a>
-                <span data-inkling-section>{post.frontmatter.section}</span>
+                <span data-hunch-section>{post.frontmatter.section}</span>
               </li>
             ))
           }
         </ol>
-      </inkling-related>
+      </hunch-related>
     </aside>
   </body>
 </html>

@@ -1,7 +1,7 @@
 # Offline evaluation
 
-`eval/run.ts` measures how well Inkling ranks items a user actually clicked, through the real
-client: the build writes shards, the user's history becomes signals, and `Inkling.rank()`
+`eval/run.ts` measures how well Hunch ranks items a user actually clicked, through the real
+client: the build writes shards, the user's history becomes signals, and `Hunch.rank()`
 orders each impression's shown items with the profile and ranking function of
 [ADR 0001](../docs/adr/0001-format-signals-ranking.md). The results and what they mean are in
 [docs/evaluation.md](../docs/evaluation.md).
@@ -50,8 +50,8 @@ node eval/run.ts --dataset mind --mind-dir eval/.data/mind --impressions 10000 \
 - **Metrics** follow MIND's: AUC, MRR, nDCG@5 and nDCG@10 per impression, averaged, plus
   recall@10.
 - **Baselines.** Random order, and popularity: the catalog's popularity, which is also the
-  prior Inkling falls back on.
-- **Inkling variants.** The profile alone (prior and recency weights 0), the default weights
+  prior Hunch falls back on.
+- **Hunch variants.** The profile alone (prior and recency weights 0), the default weights
   (the profile blended with popularity by confidence), and the default weights with diversity
   0.2, as `recommend()` uses by default.
 - **Model switch.** With two models, the history is recorded through the client on the first

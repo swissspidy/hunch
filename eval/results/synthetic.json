@@ -24,7 +24,7 @@
       }
     },
     {
-      "ranker": "Inkling, model A (128 dims): profile only",
+      "ranker": "Hunch, model A (128 dims): profile only",
       "metrics": {
         "auc": 0.8433997656735861,
         "mrr": 0.4972628693570242,
@@ -34,7 +34,7 @@
       }
     },
     {
-      "ranker": "Inkling, model A (128 dims): profile + popularity (default weights)",
+      "ranker": "Hunch, model A (128 dims): profile + popularity (default weights)",
       "metrics": {
         "auc": 0.8467048653244541,
         "mrr": 0.5018439159162382,
@@ -44,7 +44,7 @@
       }
     },
     {
-      "ranker": "Inkling, model A (128 dims): profile + popularity + diversity 0.2",
+      "ranker": "Hunch, model A (128 dims): profile + popularity + diversity 0.2",
       "metrics": {
         "auc": 0.8416168306416119,
         "mrr": 0.49790017033296297,
@@ -54,7 +54,7 @@
       }
     },
     {
-      "ranker": "Inkling, model B (96 dims): profile only",
+      "ranker": "Hunch, model B (96 dims): profile only",
       "metrics": {
         "auc": 0.8262469838332548,
         "mrr": 0.4763276818965308,
@@ -64,7 +64,7 @@
       }
     },
     {
-      "ranker": "Inkling, model B (96 dims): profile + popularity (default weights)",
+      "ranker": "Hunch, model B (96 dims): profile + popularity (default weights)",
       "metrics": {
         "auc": 0.8285158421001507,
         "mrr": 0.47750578742979244,
@@ -74,7 +74,7 @@
       }
     },
     {
-      "ranker": "Inkling, model B (96 dims): profile + popularity + diversity 0.2",
+      "ranker": "Hunch, model B (96 dims): profile + popularity + diversity 0.2",
       "metrics": {
         "auc": 0.8243740792280441,
         "mrr": 0.4728329920354229,

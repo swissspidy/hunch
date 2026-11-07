@@ -1,5 +1,5 @@
 {
-  "name": "inkling-api-docs",
+  "name": "hunch-api-docs",
   "private": true,
   "description": "TypeDoc for the API reference, with the TypeScript 6 compiler API it needs (TypeScript 7 has none), apart from the package's own TypeScript 7.",
   "type": "module",

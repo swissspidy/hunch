@@ -33,17 +33,17 @@ test('the related list fills in place from the integration’s manifest', async 
   // race the snapshot.
   let release!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  await page.route('**/inkling/manifest.json', async (route) => {
+  await page.route('**/hunch/manifest.json', async (route) => {
     await gate;
     await route.continue();
   });
   await page.goto(`${site.origin}/blog/rye-bread/`);
-  const fallback = await slots(page, 'inkling-related');
-  const box = await page.locator('inkling-related').boundingBox();
+  const fallback = await slots(page, 'hunch-related');
+  const box = await page.locator('hunch-related').boundingBox();
   release();
 
-  await ready(page, 'inkling-related');
-  const related = await slots(page, 'inkling-related');
+  await ready(page, 'hunch-related');
+  const related = await slots(page, 'hunch-related');
   assert.equal(related.length, 3);
   // The hash embedding is lexical: the other sourdough article is the closest.
   assert.equal(related[0]!.id, '/blog/sourdough/', JSON.stringify(related));
@@ -51,32 +51,32 @@ test('the related list fills in place from the integration’s manifest', async 
   assert.ok(related.every((r) => r.href === r.id && r.id.startsWith('/blog/')));
   assert.ok(!related.some((r) => r.id === '/blog/rye-bread/'));
   assert.equal(related[0]!.title, 'Keeping a sourdough starter alive');
-  assert.deepEqual(await page.locator('inkling-related').boundingBox(), box);
+  assert.deepEqual(await page.locator('hunch-related').boundingBox(), box);
   await assertNoLayoutShift(t, page);
-  assert.ok(requests.includes('/inkling/manifest.json'), requests.join('\n'));
-  // Without consent, <inkling-page> stores nothing.
+  assert.ok(requests.includes('/hunch/manifest.json'), requests.join('\n'));
+  // Without consent, <hunch-page> stores nothing.
   assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);
   await context.close();
 });
 
-test('the site’s InklingConfig keeps its consent hook and gets the manifest', async () => {
+test('the site’s HunchConfig keeps its consent hook and gets the manifest', async () => {
   const context = await site.browser.newContext(DESKTOP);
   // As an inline script in the site's <head> would.
   await context.addInitScript(() => {
-    (window as unknown as { InklingConfig: object }).InklingConfig = { consent: () => true };
+    (window as unknown as { HunchConfig: object }).HunchConfig = { consent: () => true };
   });
   const page = await context.newPage();
   await page.goto(`${site.origin}/`);
   // Nothing stored before an article page is opened.
   assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);
   await page.goto(`${site.origin}/blog/rye-bread/`);
-  await ready(page, 'inkling-related');
-  // <inkling-page> has no manifest attribute either: it recorded the view, with consent.
+  await ready(page, 'hunch-related');
+  // <hunch-page> has no manifest attribute either: it recorded the view, with consent.
   await page.waitForFunction(
     async () => {
-      if (!(await indexedDB.databases()).some((db) => db.name === 'inkling')) return false;
+      if (!(await indexedDB.databases()).some((db) => db.name === 'hunch')) return false;
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const open = indexedDB.open('inkling');
+        const open = indexedDB.open('hunch');
         open.onsuccess = () => resolve(open.result);
         open.onerror = () => reject(open.error);
       });
@@ -97,31 +97,31 @@ test('the site’s InklingConfig keeps its consent hook and gets the manifest', 
   );
   assert.equal(
     await page.evaluate(
-      () => (window as unknown as { InklingConfig: { manifest: string } }).InklingConfig.manifest,
+      () => (window as unknown as { HunchConfig: { manifest: string } }).HunchConfig.manifest,
     ),
-    '/inkling/manifest.json',
+    '/hunch/manifest.json',
   );
   await context.close();
 });
 
-test('a manifest attribute wins over InklingConfig.manifest', async () => {
+test('a manifest attribute wins over HunchConfig.manifest', async () => {
   const context = await site.browser.newContext(DESKTOP);
   const page = await context.newPage();
   const requests: string[] = [];
   page.on('request', (request) => requests.push(new URL(request.url()).pathname));
   await page.goto(`${site.origin}/blog/rye-bread/`);
-  await ready(page, 'inkling-related');
+  await ready(page, 'hunch-related');
   await page.evaluate(() => {
     document.body.insertAdjacentHTML(
       'beforeend',
-      `<inkling-related id="other" manifest="/elsewhere/manifest.json" item="/blog/rye-bread/">
-        <ol><li data-inkling-slot><a href="/"><span data-inkling-title>Fallback</span></a></li></ol>
-      </inkling-related>`,
+      `<hunch-related id="other" manifest="/elsewhere/manifest.json" item="/blog/rye-bread/">
+        <ol><li data-hunch-slot><a href="/"><span data-hunch-title>Fallback</span></a></li></ol>
+      </hunch-related>`,
     );
   });
-  await page.waitForSelector('#other[data-inkling-state="error"]', { timeout: 10_000 });
+  await page.waitForSelector('#other[data-hunch-state="error"]', { timeout: 10_000 });
   assert.ok(requests.includes('/elsewhere/manifest.json'), requests.join('\n'));
   // Its fallback stays.
-  assert.equal(await page.locator('#other [data-inkling-title]').textContent(), 'Fallback');
+  assert.equal(await page.locator('#other [data-hunch-title]').textContent(), 'Fallback');
   await context.close();
 });

@@ -87,10 +87,10 @@ time {
 }
 /* A brief fade when the ranked items arrive, unless the visitor prefers reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
-  inkling-related[data-inkling-state='ready'] li {
-    animation: inkling-in 200ms ease-out;
+  hunch-related[data-hunch-state='ready'] li {
+    animation: hunch-in 200ms ease-out;
   }
-  @keyframes inkling-in {
+  @keyframes hunch-in {
     from {
       opacity: 0.4;
     }
