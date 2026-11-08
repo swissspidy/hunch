@@ -86,13 +86,12 @@ try {
 		wp_insert_post(
 			array(
 				'post_type'    => 'page',
-				'post_title'   => 'Field Notes',
+				'post_title'   => 'Welcome',
 				'post_status'  => 'publish',
 				'post_content' => implode(
 					"\n\n",
 					array(
 						'<!-- wp:paragraph --><p>A demo of Hunch. Open any article: its related posts are ranked in your browser. Turn on personalization below, read a few articles, and come back: “For you” follows what you read. Nothing about you leaves your browser.</p><!-- /wp:paragraph -->',
-						'<!-- wp:heading --><h2 class="wp-block-heading">For you</h2><!-- /wp:heading -->',
 						'<!-- wp:hunch/for-you /-->',
 						'<!-- wp:heading --><h2 class="wp-block-heading">Your data</h2><!-- /wp:heading -->',
 						'<!-- wp:hunch/privacy-controls /-->',
@@ -113,9 +112,12 @@ try {
 foreach ( $hunch_existing as $hunch_id ) {
 	wp_delete_post( $hunch_id, true );
 }
+update_option( 'blogname', 'Field Notes' );
 update_option( 'show_on_front', 'page' );
 update_option( 'page_on_front', $hunch_home );
-update_option( 'permalink_structure', '/%postname%/' );
+// Through $wp_rewrite, not update_option(): the rules are flushed from its in-memory structure.
+global $wp_rewrite;
+$wp_rewrite->set_permalink_structure( '/%postname%/' );
 flush_rewrite_rules();
 
 // Now, not on WP-Cron, which Playground doesn't run by itself.
