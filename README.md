@@ -185,6 +185,12 @@ block with the visitor's controls, with the consent setting of your choice
 ([ADR 0007](docs/adr/0007-wordpress-plugin.md)). `npm run wordpress:build` bundles the client
 into the plugin and writes `wordpress/hunch.zip`.
 
+**Try it:** [in WordPress Playground](https://swissspidy.github.io/hunch/wordpress/playground.html),
+a demo site in your browser with the demo's articles already embedded, or
+[download the latest build](https://swissspidy.github.io/hunch/wordpress/hunch.zip) and upload it
+under Plugins → Add New. On your own site, **Build index** under Settings → Hunch embeds the posts
+you already have.
+
 ## The demo
 
 **Live:** [swissspidy.github.io/hunch/demo](https://swissspidy.github.io/hunch/demo/), next to

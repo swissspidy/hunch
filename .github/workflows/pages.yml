@@ -10,6 +10,9 @@ on:
       - 'src/**'
       - 'scripts/demo.ts'
       - 'scripts/site.ts'
+      - 'scripts/playground.ts'
+      - 'scripts/wordpress.ts'
+      - 'wordpress/**'
       - 'scripts/bundle.ts'
       - 'docs/api/**'
       - 'tsconfig.json'
@@ -44,15 +47,21 @@ jobs:
       - run: npm ci
       # TypeDoc and the TypeScript 6 it needs, apart from the package's TypeScript 7.
       - run: npm ci --prefix docs/api --ignore-scripts
-      # The front page at /, the demo at /demo/, into site/dist. The demo's vectors come from the
+      # The front page at /, the demo at /demo/ and the WordPress plugin with its Playground demo
+      # at /wordpress/, into site/dist, then the API reference into site/dist/api (it fails on
+      # an undocumented export or a broken link; its links to the front page and the demo follow
+      # the site's path). A <owner>.github.io repository is a user site, published at the root;
+      # any other is a project site under /<repository>/. The demos' vectors come from the
       # committed embedding cache: this fails rather than downloading the model if the feed
       # changed without the cache (run `npm run demo` locally and commit demo/hunch-cache).
-      - run: node scripts/site.ts --base "/${GITHUB_REPOSITORY#*/}/"
-      # Into site/dist/api: fails on an undocumented export or a broken link. Its links to the
-      # front page and the demo follow the site's base path.
-      - run: npm run api
+      - run: |
+          path=/
+          if [ "${REPOSITORY,,}" != "${OWNER,,}.github.io" ]; then path="/$REPOSITORY/"; fi
+          node scripts/site.ts --url "https://${OWNER,,}.github.io$path"
+          HUNCH_SITE_BASE="$path" npm run api
         env:
-          HUNCH_SITE_BASE: /${{ github.event.repository.name }}/
+          OWNER: ${{ github.repository_owner }}
+          REPOSITORY: ${{ github.event.repository.name }}
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         if: github.event_name != 'pull_request'
         with:

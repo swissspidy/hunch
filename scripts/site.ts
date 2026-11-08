@@ -1,11 +1,13 @@
 /**
  * `npm run site`: the GitHub Pages site in site/dist: the front page (site/), the demo under
- * demo/, and room for the API reference under api/ (`npm run api`, after this).
+ * demo/, the WordPress plugin and its Playground demo under wordpress/ (scripts/playground.ts),
+ * and room for the API reference under api/ (`npm run api`, after this).
  *
- *   node scripts/site.ts [--base /]
+ *   node scripts/site.ts [--url http://127.0.0.1:4173/]
  *
- * `--base` is the site's path on its host (`/hunch/` on GitHub Pages); the front page links
- * relatively, and the demo is built for `<base>demo/`.
+ * `--url` is where the site is published (`https://<owner>.github.io/<repository>/` on GitHub
+ * Pages). The front page links relatively; the demo is built for its path plus `demo/`, and the
+ * Playground blueprint needs absolute URLs.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -14,18 +16,21 @@ import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 
 const OUT = 'site/dist';
-const { values } = parseArgs({ options: { base: { type: 'string', default: '/' } } });
-const base = values.base.endsWith('/') ? values.base : `${values.base}/`;
+const { values } = parseArgs({
+  options: { url: { type: 'string', default: 'http://127.0.0.1:4173/' } },
+});
+const url = new URL(values.url.endsWith('/') ? values.url : `${values.url}/`);
 
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 for (const file of ['index.html', 'site.css', 'hunch.svg']) {
   await cp(join('site', file), join(OUT, file));
 }
-const demo = spawnSync(
-  process.execPath,
-  ['scripts/demo.ts', '--base', `${base}demo/`, '--out', join(OUT, 'demo')],
-  { stdio: 'inherit' },
-);
-if (demo.status !== 0) process.exit(demo.status ?? 1);
-console.error(`${OUT}: the front page, and the demo for ${base}demo/`);
+run('scripts/demo.ts', '--base', `${url.pathname}demo/`, '--out', join(OUT, 'demo'));
+run('scripts/playground.ts', '--url', url.href, '--out', join(OUT, 'wordpress'));
+console.error(`${OUT}: the front page, the demo and the WordPress plugin for ${url.href}`);
+
+function run(script: string, ...args: string[]): void {
+  const child = spawnSync(process.execPath, [script, ...args], { stdio: 'inherit' });
+  if (child.status !== 0) process.exit(child.status ?? 1);
+}
