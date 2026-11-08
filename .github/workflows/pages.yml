@@ -48,8 +48,11 @@ jobs:
       # committed embedding cache: this fails rather than downloading the model if the feed
       # changed without the cache (run `npm run demo` locally and commit demo/hunch-cache).
       - run: node scripts/site.ts --base "/${GITHUB_REPOSITORY#*/}/"
-      # Into site/dist/api: fails on an undocumented export or a broken link.
+      # Into site/dist/api: fails on an undocumented export or a broken link. Its links to the
+      # front page and the demo follow the site's base path.
       - run: npm run api
+        env:
+          HUNCH_SITE_BASE: /${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         if: github.event_name != 'pull_request'
         with:
