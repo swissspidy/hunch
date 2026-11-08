@@ -8,6 +8,9 @@ embeds the query with the catalog's own model, and the digest summary uses the b
 built-in Summarizer. There is no server-side profile, and nothing about the visitor
 leaves the device.
 
+**Website:** [swissspidy.github.io/hunch](https://swissspidy.github.io/hunch/), with the
+[demo](https://swissspidy.github.io/hunch/demo/).
+
 **Status: milestones 1–5.** The CLI builds a manifest and vector
 shards from a feed. The client ranks related items, and, with the site's consent, "for you"
 and "since your last visit" from signals kept on the device, with `explain()` and the
@@ -23,7 +26,7 @@ the signals and the ranking function are specified in
    [EmbeddingGemma](https://ai.google.dev/gemma/docs/embeddinggemma) through Transformers.js. It
    writes `manifest.json` and one small binary shard per section: 256-dimensional int8 vectors,
    about 260 KB gzipped per 1,000 items.
-2. **In the browser**, the client (9.7 KB gzipped, no dependencies) fetches the manifest and
+2. **In the browser**, the client (9.3 KB gzipped, no dependencies) fetches the manifest and
    the shards it needs. It ranks by cosine similarity, a small recency boost and diversity (MMR),
    with a small WebAssembly SIMD kernel (a JavaScript one where WebAssembly can't run, such as
    under a Content Security Policy without `'wasm-unsafe-eval'`). 100,000 items rank in about
@@ -184,9 +187,11 @@ into the plugin and writes `wordpress/hunch.zip`.
 
 ## The demo
 
-**Live:** [swissspidy.github.io/hunch](https://swissspidy.github.io/hunch/), with the
+**Live:** [swissspidy.github.io/hunch/demo](https://swissspidy.github.io/hunch/demo/), next to
+the [front page](https://swissspidy.github.io/hunch/) and the
 [API reference](https://swissspidy.github.io/hunch/api/), deployed from `main` by
-[`pages.yml`](.github/workflows/pages.yml). To run it locally:
+[`pages.yml`](.github/workflows/pages.yml) (`npm run site` builds the front page from
+[`site/`](site/) and the demo into `site/dist`). To run the demo locally:
 
 ```sh
 npm ci

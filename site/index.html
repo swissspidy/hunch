@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hunch: on-device recommendations for websites</title>
+    <meta
+      name="description"
+      content="Hunch ranks related posts, “for you” lists and “since your last visit” digests in the visitor’s browser. No server-side profile, no third parties."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="hunch.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="site.css" />
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="bar">
+      <a class="brand" href="./" aria-label="Hunch home">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="16" cy="16" r="15" fill="none" stroke="currentColor" stroke-width="2" />
+          <circle cx="11" cy="20" r="3" fill="currentColor" />
+          <circle cx="21" cy="11" r="3" fill="currentColor" />
+          <path d="M13 18 19 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        Hunch
+      </a>
+      <nav aria-label="Main">
+        <ul>
+          <li><a href="demo/">Demo</a></li>
+          <li><a href="https://github.com/swissspidy/hunch#quick-start">Docs</a></li>
+          <li><a href="api/">API</a></li>
+          <li><a href="https://github.com/swissspidy/hunch">GitHub</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero" aria-labelledby="title">
+        <p class="kicker">On-device personalization for websites</p>
+        <h1 id="title">Recommendations that stay on the reader’s device.</h1>
+        <p class="lede">
+          Hunch ranks related posts, “for you” lists and “since your last visit” digests in the
+          visitor’s browser. Your build publishes a vector for every item; the browser does the
+          arithmetic. There is no server-side profile, no third party, and nothing about the visitor
+          leaves the device.
+        </p>
+        <p class="actions">
+          <a class="button primary" href="demo/">Try the demo</a>
+          <a class="button" href="https://github.com/swissspidy/hunch#quick-start">Get started</a>
+        </p>
+        <p class="note">
+          Hunch is pre-release: the first version, 0.1.0, is on its way to npm and the WordPress
+          plugin directory. Until then, try the demo or build it from
+          <a href="https://github.com/swissspidy/hunch">the source</a>.
+        </p>
+      </section>
+
+      <section aria-labelledby="how">
+        <h2 id="how">How it works</h2>
+        <ol class="steps">
+          <li>
+            <h3>Build</h3>
+            <p>
+              <code>hunch build</code> reads your feed, JSON, sitemap or your own loader, and embeds
+              every item with a pinned open model,
+              <a href="https://ai.google.dev/gemma/docs/embeddinggemma">EmbeddingGemma</a> by
+              default. Rebuilds embed only what changed.
+            </p>
+          </li>
+          <li>
+            <h3>Publish</h3>
+            <p>
+              It writes a small <code>manifest.json</code> and one binary shard per section: static
+              files next to your site, about 260 KB gzipped per 1,000 items. Any host or CDN will
+              do.
+            </p>
+          </li>
+          <li>
+            <h3>Rank in the browser</h3>
+            <p>
+              Web components take your server-rendered lists and swap their entries, slot for slot,
+              for the items closest to what the reader is reading, or has read. Nothing moves on the
+              page.
+            </p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="split" aria-labelledby="private">
+        <div>
+          <h2 id="private">Private by design</h2>
+          <p>
+            Personalization is built from what the visitor reads on your site, and that history
+            stays in your site’s own storage in their browser.
+          </p>
+        </div>
+        <ul class="checks">
+          <li>
+            <strong>Nothing without consent.</strong> Until your consent hook says yes, nothing is
+            stored, not even an empty database.
+          </li>
+          <li>
+            <strong>No profile in any request.</strong> Pages fetch the manifest and shards, the
+            same files for everyone. The browser tests check it.
+          </li>
+          <li>
+            <strong>No profile at rest.</strong> Only the signals are kept; the profile is derived
+            on each page, so a new model needs no migration.
+          </li>
+          <li>
+            <strong>The visitor decides.</strong> Pause, export and forget, built in, with a block
+            for your page.
+          </li>
+        </ul>
+      </section>
+
+      <section class="split" aria-labelledby="fast">
+        <div>
+          <h2 id="fast">Small, fast and still</h2>
+          <p>
+            The ranking runs no model: cosine similarity over int8 vectors, a recency boost and
+            diversity, on a WebAssembly SIMD kernel with a JavaScript fallback.
+          </p>
+        </div>
+        <dl class="figures">
+          <div>
+            <dt>9.3 KB</dt>
+            <dd>the client, gzipped, with no dependencies</dd>
+          </div>
+          <div>
+            <dt>11 ms</dt>
+            <dd>to rank 100,000 items for <code>related()</code>, in Node</dd>
+          </div>
+          <div>
+            <dt>0</dt>
+            <dd>layout shift: slots have a fixed size and swap in place</dd>
+          </div>
+          <div>
+            <dt>No long tasks</dt>
+            <dd>loading and ranking run in slices, between the reader’s input</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section aria-labelledby="stack">
+        <h2 id="stack">Fits your stack</h2>
+        <div class="cards">
+          <article>
+            <h3>Any site</h3>
+            <p>Build the vectors from your feed, then wrap the list you already render.</p>
+            <pre tabindex="0"><code>npx hunch build \
+  --source https://example.com/feed.xml \
+  --out public/hunch</code></pre>
+            <pre tabindex="0"><code>&lt;hunch-related manifest="/hunch/manifest.json"
+               item="sourdough-starter"&gt;
+  &lt;ol&gt;
+    &lt;li data-hunch-slot&gt;…&lt;/li&gt;
+  &lt;/ol&gt;
+&lt;/hunch-related&gt;</code></pre>
+          </article>
+          <article>
+            <h3>Astro</h3>
+            <p>
+              The integration embeds the pages <code>astro build</code> wrote and loads the
+              components.
+            </p>
+            <pre tabindex="0"><code>import hunch from '@swissspidy/hunch/astro';
+
+export default defineConfig({
+  integrations: [hunch({ include: ['/blog/*'] })],
+});</code></pre>
+          </article>
+          <article>
+            <h3>WordPress</h3>
+            <p>
+              No Node on the server and no CI: posts are embedded in the editor’s browser on
+              publish, and PHP writes the same files as the CLI. Related posts, a “For you” block
+              and the visitor’s controls.
+            </p>
+            <p>
+              <a href="https://github.com/swissspidy/hunch/blob/main/wordpress/hunch/readme.txt"
+                >The plugin’s readme</a
+              >
+            </p>
+          </article>
+          <article>
+            <h3>JavaScript</h3>
+            <p>Or call the client yourself.</p>
+            <pre tabindex="0"><code>import { Hunch } from '@swissspidy/hunch';
+
+const hunch = await Hunch.load({
+  manifest: '/hunch/manifest.json',
+  consent: () =&gt; myConsent.allows('personalization'),
+});
+await hunch.recommend({ n: 4 });</code></pre>
+          </article>
+        </div>
+      </section>
+
+      <section class="cta" aria-labelledby="see">
+        <h2 id="see">See it work</h2>
+        <p>
+          The demo is a small publication. Open an article: its “Related” list is ranked in your
+          browser. Turn on personalization, read a few articles, and “For you” follows.
+        </p>
+        <p class="actions">
+          <a class="button primary" href="demo/">Open the demo</a>
+          <a class="button" href="https://github.com/swissspidy/hunch/tree/main/docs/adr"
+            >Read the design decisions</a
+          >
+        </p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>
+        Hunch is open source under the Apache 2.0 license.
+        <a href="https://github.com/swissspidy/hunch">Source</a> ·
+        <a href="api/">API reference</a> ·
+        <a href="https://github.com/swissspidy/hunch/blob/main/docs/evaluation.md">Evaluation</a> ·
+        <a href="https://github.com/swissspidy/hunch/blob/main/SECURITY.md">Security</a>
+      </p>
+      <p>This page loads nothing from anyone else and stores nothing.</p>
+    </footer>
+  </body>
+</html>

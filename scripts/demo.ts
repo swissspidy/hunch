@@ -1,7 +1,7 @@
 /**
  * `npm run demo`: builds the demo site in demo/dist from demo/feed.xml.
  *
- *   node scripts/demo.ts [--base /] [--provider transformers|hash] [--serve [port]]
+ *   node scripts/demo.ts [--base /] [--out demo/dist] [--provider transformers|hash] [--serve [port]]
  *
  * The site is static HTML. Each article page server-renders a "Related" list of the latest
  * articles in its section; `<hunch-related>` rewrites those slots in place with the items
@@ -21,18 +21,19 @@ import { loadSource } from '../src/node/sources/index.ts';
 import type { CatalogItem } from '../src/node/types.ts';
 import { bundleEsm, bundleGlobal } from './bundle.ts';
 
-const OUT = 'demo/dist';
 const SLOTS = 4;
 
 const { values } = parseArgs({
   options: {
     base: { type: 'string', default: '/' },
+    out: { type: 'string', default: 'demo/dist' },
     provider: { type: 'string', default: 'transformers' },
     serve: { type: 'boolean', default: false },
     port: { type: 'string', default: '4173' },
   },
 });
 const base = values.base.endsWith('/') ? values.base : `${values.base}/`;
+const OUT = values.out;
 
 const feed = await loadSource('demo/feed.xml');
 const items: CatalogItem[] = feed.map((item) => ({ ...item, url: `${base}items/${item.id}.html` }));
@@ -71,7 +72,7 @@ for (const item of items) {
   await writeFile(join(OUT, 'items', `${item.id}.html`), page(item.title, articleBody(item)));
 }
 console.error(
-  `demo/dist: ${items.length} articles, ${result.manifest.shards.length} shards, ` +
+  `${OUT}: ${items.length} articles, ${result.manifest.shards.length} shards, ` +
     `${(result.bytes / 1024).toFixed(1)} KB of vectors (${result.manifest.model.id})`,
 );
 
