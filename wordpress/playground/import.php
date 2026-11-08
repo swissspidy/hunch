@@ -74,6 +74,11 @@ try {
 		$hunch_post      = get_post( $hunch_id );
 		$hunch_vector    = hunch_demo_check( Hunch_Catalog::check_vector( $hunch_item['vector'] ) );
 		Hunch_Catalog::store( $hunch_post, Hunch_Catalog::input( $hunch_post )['hash'], $hunch_vector );
+		// store() doesn't report a failed write (update_post_meta() also returns false for an
+		// unchanged value), so read the vector back.
+		if ( get_post_meta( $hunch_id, Hunch_Catalog::META_VECTOR, true ) !== base64_encode( $hunch_vector ) ) { // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- binary vector data.
+			throw new RuntimeException( 'Hunch demo: a vector was not stored' );
+		}
 	}//end foreach
 
 	// The front page: "For you", and the controls that turn personalization on.
