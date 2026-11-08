@@ -45,7 +45,7 @@ test('the front page loads only its own files and stores nothing', async () => {
   await context.close();
 });
 
-test('the front page fits a phone screen and links to the demo and the API reference', async () => {
+test('the front page fits a phone screen and links to the demos, the plugin and the API reference', async () => {
   const context = await site.browser.newContext(PHONE);
   const page = await context.newPage();
   await page.goto(`${site.origin}/`);
@@ -55,7 +55,13 @@ test('the front page fits a phone screen and links to the demo and the API refer
   ]);
   assert.ok(scrollWidth <= width, `${scrollWidth} > ${width}`);
   const hrefs = await page.$$eval('a', (as) => as.map((a) => a.getAttribute('href')));
-  for (const href of ['demo/', 'api/', 'https://github.com/swissspidy/hunch']) {
+  for (const href of [
+    'demo/',
+    'api/',
+    'wordpress/hunch.zip',
+    'wordpress/playground.html',
+    'https://github.com/swissspidy/hunch',
+  ]) {
     assert.ok(hrefs.includes(href), href);
   }
   await context.close();
