@@ -161,11 +161,12 @@ test('splits large sections and checks its input', async () => {
     maxShardItems: 2,
     quantization: 'float32',
   });
-  assert.deepEqual(
-    result.manifest.shards.map((s) => s.count),
-    [2, 2, 1],
+  // Spread over buckets of at most two items, each named by its bucket.
+  assert.equal(
+    result.manifest.shards.reduce((sum, s) => sum + s.count, 0),
+    5,
   );
-  assert.match(result.manifest.shards[2]!.url, /^shards\/s-3\./);
+  assert.ok(result.manifest.shards.every((s) => s.count <= 2 && /^shards\/s-\d+\./.test(s.url)));
   await assert.rejects(
     build({ items, outDir: out, provider: countingProvider(), cacheDir: false, maxShardItems: 0 }),
     /maxShardItems must be a positive integer/,
@@ -196,6 +197,68 @@ test('splits large sections and checks its input', async () => {
   );
 });
 
+test('an edit or a new item at the top rewrites one shard, not all of them', async () => {
+  const out = await tempDir();
+  const posts: CatalogItem[] = Array.from({ length: 40 }, (_, i) => ({
+    id: `post-${i}`,
+    url: `/${i}`,
+    title: `Post ${i}`,
+    text: `Text ${i}`,
+    section: 'News',
+  }));
+  const files = async () => new Set(await readdir(join(out, 'shards')));
+  const options = { outDir: out, cacheDir: false as const, dims: 8, maxShardItems: 10 };
+  const first = await build({ ...options, items: posts, provider: countingProvider(8) });
+  assert.ok(first.manifest.shards.length >= 4, String(first.manifest.shards.length));
+  const before = new Set(first.manifest.shards.map((s) => s.url));
+
+  // One post's text changes: only its shard is new.
+  const edited = posts.map((p, i) => (i === 17 ? { ...p, text: 'Rewritten' } : p));
+  const second = await build({ ...options, items: edited, provider: countingProvider(8) });
+  assert.equal(second.manifest.shards.filter((s) => !before.has(s.url)).length, 1);
+
+  // A new post at the top (the catalog's newest first): no other post's prior moves, so only
+  // the new post's shard is new.
+  const after = new Set(second.manifest.shards.map((s) => s.url));
+  const added = [{ ...posts[0]!, id: 'post-new', url: '/new', title: 'New' }, ...edited];
+  const third = await build({ ...options, items: added, provider: countingProvider(8) });
+  assert.equal(third.manifest.shards.filter((s) => !after.has(s.url)).length, 1);
+  assert.ok((await files()).size >= third.manifest.shards.length);
+});
+
+test('ids sharing a hash prefix that no number of buckets can split are an error', async () => {
+  const out = await tempDir();
+  // The first 32 bits of these ids' SHA-256 are the same (803ec55a).
+  const pair: CatalogItem[] = ['item-11991', 'item-34378'].map((id) => ({
+    id,
+    url: `/${id}`,
+    title: id,
+    text: id,
+    section: 'S',
+  }));
+  await assert.rejects(
+    build({
+      items: pair,
+      outDir: out,
+      provider: countingProvider(8),
+      dims: 8,
+      cacheDir: false,
+      maxShardItems: 1,
+    }),
+    /maxShardItems 1 is too small: 2 ids share the same hash prefix/,
+  );
+  // With room for both, they share a bucket.
+  const ok = await build({
+    items: pair,
+    outDir: out,
+    provider: countingProvider(8),
+    dims: 8,
+    cacheDir: false,
+    maxShardItems: 2,
+  });
+  assert.equal(ok.manifest.shards.length, 1);
+});
+
 test('priors follow popularity, then catalog order', () => {
   const base = { url: '/', title: '', text: '' };
   assert.deepEqual(
@@ -207,6 +270,15 @@ test('priors follow popularity, then catalog order', () => {
     ]),
     [0.5, 0.75, 1, 0.25],
   );
+  // Over the next power of two: three items share the scale of four, so a fourth at the top
+  // leaves the first three where they were.
+  const three = [
+    { ...base, id: 'a' },
+    { ...base, id: 'b' },
+    { ...base, id: 'c' },
+  ];
+  assert.deepEqual(computePriors(three), [0.75, 0.5, 0.25]);
+  assert.deepEqual(computePriors([{ ...base, id: 'new' }, ...three]), [1, 0.75, 0.5, 0.25]);
 });
 
 test('a corrupt cache is reported, not silently used', async () => {

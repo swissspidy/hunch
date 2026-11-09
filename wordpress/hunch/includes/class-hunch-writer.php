@@ -27,12 +27,12 @@ final class Hunch_Writer {
 	 *     @type int      $dims            Published dimensions.
 	 *     @type string   $quantization    `int8` (default) or `float32`.
 	 *     @type string   $shard_by        `section` (default) or `none`.
-	 *     @type int      $max_shard_items Split shards larger than this (default 2000).
+	 *     @type int      $max_shard_items Most items in a shard (default 2000); see buckets().
 	 *     @type string   $now             ISO 8601 build time, kept when nothing changed.
 	 * }
 	 * @return array{manifest: array, removed: string[]}
 	 * @throws LengthException          When the catalog is empty.
-	 * @throws InvalidArgumentException When `max_shard_items` is not positive.
+	 * @throws InvalidArgumentException When `max_shard_items` is not positive, or too small for ids that share a hash prefix.
 	 * @throws RuntimeException         When a file cannot be written.
 	 */
 	public static function write( array $args ) {
@@ -78,9 +78,15 @@ final class Hunch_Writer {
 		foreach ( $groups as $group ) {
 			$members = $group['members'];
 			$section = $group['section'];
-			$total   = count( $members );
-			for ( $start = 0, $part = 1; $start < $total; $start += $max_items, $part++ ) {
-				$chunk       = array_slice( $members, $start, $max_items );
+			$ids     = array();
+			foreach ( $members as $i ) {
+				$ids[] = (string) $items[ $i ]['id'];
+			}
+			foreach ( self::buckets( $ids, $max_items ) as $bucket ) {
+				$chunk = array();
+				foreach ( $bucket['members'] as $position ) {
+					$chunk[] = $members[ $position ];
+				}
 				$shard_items = array();
 				$shard_rows  = array();
 				foreach ( $chunk as $i ) {
@@ -90,8 +96,8 @@ final class Hunch_Writer {
 				$bytes  = Hunch_Shard::encode( $space, $shard_items, $shard_rows, $dims, $quantization );
 				$sha256 = hash( 'sha256', $bytes );
 				$base   = null === $section ? 'all' : Hunch_Format::slug( $section );
-				if ( $total > $max_items ) {
-					$base .= '-' . $part;
+				if ( null !== $bucket['bucket'] ) {
+					$base .= '-' . ( $bucket['bucket'] + 1 );
 				}
 				while ( isset( $names[ $base ] ) ) {
 					$base .= '_';
@@ -106,7 +112,7 @@ final class Hunch_Writer {
 					'bytes'   => strlen( $bytes ),
 					'sha256'  => $sha256,
 				);
-			}//end for
+			}//end foreach
 		}//end foreach
 
 		$manifest_path = $dir . '/manifest.json';
@@ -175,8 +181,65 @@ final class Hunch_Writer {
 	}
 
 	/**
+	 * A group's shards, as build.ts's bucketsOf(): the members spread over a power of two of
+	 * buckets by the first 32 bits of the SHA-256 of their id, in order within each, so an item
+	 * stays in its bucket as others come and go. The fewest buckets that average at most half of
+	 * `$max` and leave none over it.
+	 *
+	 * @param string[] $ids The members' ids, in catalog order.
+	 * @param int      $max Most members in a bucket.
+	 * @return array[] Each `bucket` (its number, or null for a single bucket) and `members` (positions in `$ids`), empty buckets left out.
+	 * @throws InvalidArgumentException When more than `$max` ids share a hash prefix.
+	 */
+	public static function buckets( array $ids, $max ) {
+		$hashes = array();
+		$same   = array();
+		foreach ( $ids as $id ) {
+			$prefix = substr( hash( 'sha256', $id ), 0, 8 );
+			// Ids sharing all 32 bits share every bucket: more of them than $max never split.
+			$same[ $prefix ] = isset( $same[ $prefix ] ) ? $same[ $prefix ] + 1 : 1;
+			if ( $same[ $prefix ] > $max ) {
+				throw new InvalidArgumentException( 'Hunch: max_shard_items is too small: ' . (int) $same[ $prefix ] . ' ids share the same hash prefix' );
+			}
+			$hashes[] = hexdec( $prefix );
+		}
+		$total = count( $ids );
+		$count = 1;
+		while ( $total > $count * $max / 2 ) {
+			$count *= 2;
+		}
+		while ( true ) {
+			$buckets = array_fill( 0, $count, array() );
+			foreach ( $hashes as $position => $hash ) {
+				$buckets[ (int) fmod( $hash, $count ) ][] = $position;
+			}
+			$fits = true;
+			foreach ( $buckets as $members ) {
+				if ( count( $members ) > $max ) {
+					$fits = false;
+					break;
+				}
+			}
+			if ( $fits ) {
+				$out = array();
+				foreach ( $buckets as $number => $members ) {
+					if ( $members ) {
+						$out[] = array(
+							'bucket'  => 1 === $count ? null : $number,
+							'members' => $members,
+						);
+					}
+				}
+				return $out;
+			}
+			$count *= 2;
+		}//end while
+	}
+
+	/**
 	 * Cold-start priors in (0, 1] (`computePriors()`): by `popularity` (highest first) where
-	 * items have one, then in catalog order. The first item gets 1, the last 1/n.
+	 * items have one, then in catalog order. Rank r (0 first) of n gets (n - r) / s, s the
+	 * smallest power of two >= n: the first gets n / s (0.75 for three items), the last 1 / s.
 	 *
 	 * @param array[] $items Items in catalog order.
 	 * @return float[]
@@ -201,10 +264,16 @@ final class Hunch_Writer {
 				return $a - $b;
 			}
 		);
-		$n      = count( $items );
+		// Counted from the end and over a power of two: a new item at the top changes no other
+		// item's prior until the catalog doubles (build.ts's computePriors()).
+		$n     = count( $items );
+		$scale = 1;
+		while ( $scale < $n ) {
+			$scale *= 2;
+		}
 		$priors = array();
 		foreach ( $order as $rank => $index ) {
-			$priors[ $index ] = ( $n - $rank ) / $n;
+			$priors[ $index ] = ( $n - $rank ) / $scale;
 		}
 		return $priors;
 	}

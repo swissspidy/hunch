@@ -76,7 +76,8 @@ the CLI would write, and a catalog built by either can replace the other.
 [ADR 0011](0011-shard-columns.md), with dates read as `Date.parse` reads ISO 8601), float32
 rounding of the renormalized vector, int8 quantization with JavaScript's `Math.round`, the JSON as
 `JSON.stringify` writes it (no escaped slashes or Unicode, `1` not `1.0`), one shard per section
-in catalog order split at 2,000 items, content-hashed file names, the manifest's `version`,
+spread over buckets by a hash of each item's id, and priors counted from the end of the order
+([ADR 0012](0012-stable-shards.md)), content-hashed file names, the manifest's `version`,
 keeping `generatedAt` when nothing changed, and deleting shards neither the new nor the previous
 manifest names. These classes don't need WordPress.
 
