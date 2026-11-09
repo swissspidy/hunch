@@ -226,6 +226,39 @@ test('an edit or a new item at the top rewrites one shard, not all of them', asy
   assert.ok((await files()).size >= third.manifest.shards.length);
 });
 
+test('ids sharing a hash prefix that no number of buckets can split are an error', async () => {
+  const out = await tempDir();
+  // The first 32 bits of these ids' SHA-256 are the same (803ec55a).
+  const pair: CatalogItem[] = ['item-11991', 'item-34378'].map((id) => ({
+    id,
+    url: `/${id}`,
+    title: id,
+    text: id,
+    section: 'S',
+  }));
+  await assert.rejects(
+    build({
+      items: pair,
+      outDir: out,
+      provider: countingProvider(8),
+      dims: 8,
+      cacheDir: false,
+      maxShardItems: 1,
+    }),
+    /maxShardItems 1 is too small: 2 ids share the same hash prefix/,
+  );
+  // With room for both, they share a bucket.
+  const ok = await build({
+    items: pair,
+    outDir: out,
+    provider: countingProvider(8),
+    dims: 8,
+    cacheDir: false,
+    maxShardItems: 2,
+  });
+  assert.equal(ok.manifest.shards.length, 1);
+});
+
 test('priors follow popularity, then catalog order', () => {
   const base = { url: '/', title: '', text: '' };
   assert.deepEqual(

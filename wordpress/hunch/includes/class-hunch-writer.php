@@ -32,7 +32,7 @@ final class Hunch_Writer {
 	 * }
 	 * @return array{manifest: array, removed: string[]}
 	 * @throws LengthException          When the catalog is empty.
-	 * @throws InvalidArgumentException When `max_shard_items` is not positive.
+	 * @throws InvalidArgumentException When `max_shard_items` is not positive, or too small for ids that share a hash prefix.
 	 * @throws RuntimeException         When a file cannot be written.
 	 */
 	public static function write( array $args ) {
@@ -189,11 +189,19 @@ final class Hunch_Writer {
 	 * @param string[] $ids The members' ids, in catalog order.
 	 * @param int      $max Most members in a bucket.
 	 * @return array[] Each `bucket` (its number, or null for a single bucket) and `members` (positions in `$ids`), empty buckets left out.
+	 * @throws InvalidArgumentException When more than `$max` ids share a hash prefix.
 	 */
 	public static function buckets( array $ids, $max ) {
 		$hashes = array();
+		$same   = array();
 		foreach ( $ids as $id ) {
-			$hashes[] = hexdec( substr( hash( 'sha256', $id ), 0, 8 ) );
+			$prefix = substr( hash( 'sha256', $id ), 0, 8 );
+			// Ids sharing all 32 bits share every bucket: more of them than $max never split.
+			$same[ $prefix ] = isset( $same[ $prefix ] ) ? $same[ $prefix ] + 1 : 1;
+			if ( $same[ $prefix ] > $max ) {
+				throw new InvalidArgumentException( 'Hunch: max_shard_items is too small: ' . (int) $same[ $prefix ] . ' ids share the same hash prefix' );
+			}
+			$hashes[] = hexdec( $prefix );
 		}
 		$total = count( $ids );
 		$count = 1;
@@ -230,7 +238,8 @@ final class Hunch_Writer {
 
 	/**
 	 * Cold-start priors in (0, 1] (`computePriors()`): by `popularity` (highest first) where
-	 * items have one, then in catalog order. The first item gets 1, the last 1/n.
+	 * items have one, then in catalog order. Rank r (0 first) of n gets (n - r) / s, s the
+	 * smallest power of two >= n: the first gets n / s (0.75 for three items), the last 1 / s.
 	 *
 	 * @param array[] $items Items in catalog order.
 	 * @return float[]

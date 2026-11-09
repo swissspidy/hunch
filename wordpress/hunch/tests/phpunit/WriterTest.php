@@ -175,6 +175,14 @@ final class WriterTest extends TestCase {
 		$this->assertSame( array( null ), array_column( Hunch_Writer::buckets( array( 'a', 'b' ), 10 ), 'bucket' ) );
 	}
 
+	public function test_ids_sharing_a_hash_prefix_beyond_the_limit_are_an_error() {
+		// The first 32 bits of these ids' SHA-256 are the same (803ec55a).
+		$buckets = Hunch_Writer::buckets( array( 'item-11991', 'item-34378' ), 2 );
+		$this->assertSame( array( array( 0, 1 ) ), array_column( $buckets, 'members' ) );
+		$this->expectException( InvalidArgumentException::class );
+		Hunch_Writer::buckets( array( 'item-11991', 'item-34378' ), 1 );
+	}
+
 	public function test_an_empty_catalog_is_an_error() {
 		$this->expectException( LengthException::class );
 		$this->write( array() );

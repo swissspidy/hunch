@@ -110,8 +110,9 @@ The binary layout (little-endian, [`shard.ts`](../../src/format/shard.ts)):
 `ShardItem` is `{ id, url, title, section?, tags?, date?, image?, prior }`: what a component
 needs to render a recommendation without another request. The item's text is embedded but
 never published. `prior` is the site's cold-start order in (0, 1]: by `popularity` where items
-have one, then by catalog order (the site's editorial order), so the first item is 1 and the
-last is 1/n.
+have one, then by catalog order (the site's editorial order). It was `(n − rank) / n`, the first
+item 1 and the last 1/n; [ADR 0012](0012-stable-shards.md) divides by the smallest power of two
+≥ n instead, so the first item gets between 0.5 and 1.
 
 - **One file per shard, header and vectors together.** One request, and the metadata can't
   disagree with the vectors. A JSON header keeps the format extensible without a schema

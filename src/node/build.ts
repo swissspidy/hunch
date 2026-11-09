@@ -228,7 +228,9 @@ function checkItems(items: readonly CatalogItem[]): readonly CatalogItem[] {
 
 /**
  * Cold-start priors in (0, 1]: by `popularity` (highest first) where items have one, then in
- * catalog order (the site's editorial order). The first item gets 1, the last 1/n.
+ * catalog order (the site's editorial order). The item at rank r (0 first) of n gets
+ * (n − r) / s, s the smallest power of two ≥ n (ADR 0012): the first gets n / s, between 0.5
+ * and 1 (0.75 for three items), the last 1 / s.
  */
 export function computePriors(items: readonly CatalogItem[]): number[] {
   const order = items.map((_, i) => i);
@@ -262,6 +264,15 @@ function bucketsOf<T>(
   max: number,
 ): [number | null, T[]][] {
   const hashes = members.map((m) => createHash('sha256').update(idOf(m)).digest().readUInt32BE(0));
+  // Members sharing all 32 bits share every bucket: more of them than `max` can never be split.
+  const same = new Map<number, number>();
+  for (const h of hashes) {
+    const n = (same.get(h) ?? 0) + 1;
+    if (n > max) {
+      throw new Error(`maxShardItems ${max} is too small: ${n} ids share the same hash prefix`);
+    }
+    same.set(h, n);
+  }
   let count = 1;
   while (members.length > (count * max) / 2) count *= 2;
   for (;;) {

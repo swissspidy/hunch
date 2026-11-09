@@ -99,8 +99,9 @@ export interface ShardItem {
   /** URL of the item's image. */
   image?: string;
   /**
-   * Site-provided cold-start prior in [0, 1] (popularity or editorial order); 1 is the item
-   * the site would show first.
+   * Site-provided cold-start prior in (0, 1] (popularity or editorial order); the item the
+   * site would show first has the highest. `hunch build` gives the item at rank r of n
+   * (n − r) / s, s the smallest power of two ≥ n, so the highest is between 0.5 and 1.
    */
   prior: number;
 }
