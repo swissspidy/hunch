@@ -106,6 +106,9 @@ test('views shape "for you": same topic first, seen items left out, with reasons
     ['rail-1', 'rail-0'],
   );
   assert.ok(Math.abs(recs[0]!.why.because.reduce((sum, b) => sum + b.share, 0) - 1) < 1e-9);
+  // Each item's own similarity to the recommendation: rails are close to rails.
+  for (const b of recs[0]!.why.because)
+    assert.ok(b.similarity > 0.5 && b.similarity <= 1, String(b.similarity));
   const withSeen = await ink.recommend({ n: 2, includeSeen: true, diversity: 0 });
   assert.ok(withSeen.some((r) => r.id === 'rail-1'));
 });

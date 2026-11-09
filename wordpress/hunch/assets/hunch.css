@@ -41,6 +41,52 @@
 .hunch-slot__meta [data-hunch-section]:not(:empty)::after {
   content: ' · ';
 }
+/* "For you": one more fixed line ("because you read …") and the hide button in a corner. */
+.hunch-list--personal .hunch-slot {
+  position: relative;
+  height: 6.3em;
+  padding-inline-end: 2.2em;
+}
+.hunch-slot__because {
+  display: block;
+  height: 1.3em;
+  font-size: 0.85em;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hunch-slot__hide {
+  position: absolute;
+  top: 0.3em;
+  inset-inline-end: 0;
+  width: 1.8em;
+  height: 1.8em;
+  padding: 0;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.hunch-slot__hide[hidden] {
+  display: none;
+}
+.hunch-slot__hide:hover,
+.hunch-slot__hide:focus-visible {
+  opacity: 1;
+}
+.hunch-list__announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .hunch-controls__buttons button {
   margin-inline-end: 0.5em;
 }

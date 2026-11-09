@@ -174,9 +174,9 @@ final class Hunch_Front {
 	 * @return string
 	 */
 	public static function render_for_you_block( $attributes ) {
-		$count    = max( 1, min( 12, empty( $attributes['count'] ) ? 4 : (int) $attributes['count'] ) );
-		$heading  = empty( $attributes['heading'] ) ? __( 'For you', 'hunch' ) : (string) $attributes['heading'];
-		$fallback = get_posts(
+		$count      = max( 1, min( 12, empty( $attributes['count'] ) ? 4 : (int) $attributes['count'] ) );
+		$heading    = empty( $attributes['heading'] ) ? __( 'For you', 'hunch' ) : (string) $attributes['heading'];
+		$fallback   = get_posts(
 			array(
 				'post_type'           => (array) Hunch_Settings::get( 'post_types' ),
 				'post_status'         => 'publish',
@@ -185,8 +185,16 @@ final class Hunch_Front {
 				'ignore_sticky_posts' => true,
 			)
 		);
-		$manifest = 'off' === Hunch_Settings::get( 'consent' ) ? null : Hunch_Catalog::manifest_url();
-		return self::list_markup( 'hunch-for-you', $manifest ? array( 'manifest' => $manifest ) : null, $heading, $fallback, true );
+		$manifest   = 'off' === Hunch_Settings::get( 'consent' ) ? null : Hunch_Catalog::manifest_url();
+		$attributes = null;
+		if ( $manifest ) {
+			$attributes = array(
+				'manifest' => $manifest,
+				/* translators: {title} is a post's title; keep it as it is. */
+				'because'  => __( 'Because you read {title}', 'hunch' ),
+			);
+		}
+		return self::list_markup( 'hunch-for-you', $attributes, $heading, $fallback, true );
 	}
 
 	/**
@@ -325,20 +333,37 @@ final class Hunch_Front {
 			$open .= '>';
 			$close = '</' . $element . '>';
 		}
-		$slots = '';
+		// "For you" also says why a post is there and lets the visitor hide it; the component fills
+		// the line and shows the button (only with consent, see for-you.ts).
+		$personal = null !== $attributes && 'hunch-for-you' === $element;
+		$slots    = '';
 		foreach ( $posts as $post ) {
 			$section = Hunch_Catalog::section( $post );
-			$slots  .= sprintf(
-				'<li class="hunch-slot" data-hunch-slot data-hunch-id="%1$s"><a class="hunch-slot__link" href="%2$s"><span class="hunch-slot__title" data-hunch-title>%3$s</span></a><span class="hunch-slot__meta"><span data-hunch-section>%4$s</span> <time data-hunch-date datetime="%5$s">%6$s</time></span></li>',
+			$title   = Hunch_Format::html_to_text( get_the_title( $post ) );
+			$extra   = '';
+			if ( $personal ) {
+				$extra = sprintf(
+					'<span class="hunch-slot__because" data-hunch-because></span><button type="button" class="hunch-slot__hide" data-hunch-hide hidden aria-label="%1$s" title="%2$s">&times;</button>',
+					/* translators: %s: post title */
+					esc_attr( sprintf( __( 'Not interested: %s', 'hunch' ), $title ) ),
+					esc_attr__( 'Not interested', 'hunch' )
+				);
+			}
+			$slots .= sprintf(
+				'<li class="hunch-slot" data-hunch-slot data-hunch-id="%1$s"><a class="hunch-slot__link" href="%2$s"><span class="hunch-slot__title" data-hunch-title>%3$s</span></a><span class="hunch-slot__meta"><span data-hunch-section>%4$s</span> <time data-hunch-date datetime="%5$s">%6$s</time></span>%7$s</li>',
 				esc_attr( Hunch_Catalog::item_id( $post ) ),
 				esc_url( get_permalink( $post ) ),
-				esc_html( Hunch_Format::html_to_text( get_the_title( $post ) ) ),
+				esc_html( $title ),
 				esc_html( (string) $section ),
 				esc_attr( Hunch_Format::iso_time( (int) get_post_time( 'U', true, $post ) ) ),
-				esc_html( get_the_date( '', $post ) )
+				esc_html( get_the_date( '', $post ) ),
+				$extra
 			);
+		}//end foreach
+		if ( $personal ) {
+			$close = sprintf( '<span class="hunch-list__announce" data-hunch-announce aria-live="polite" data-message="%s"></span>', esc_attr__( 'Hidden. You will see fewer posts like it.', 'hunch' ) ) . $close;
 		}
-		$class   = 'hunch-list ' . ( 'hunch-related' === $element ? 'hunch-related' : 'hunch-for-you' );
+		$class   = 'hunch-list ' . ( 'hunch-related' === $element ? 'hunch-related' : 'hunch-for-you' ) . ( $personal ? ' hunch-list--personal' : '' );
 		$wrapper = $block && WP_Block_Supports::$block_to_render ? get_block_wrapper_attributes( array( 'class' => $class ) ) : 'class="' . esc_attr( $class ) . '"';
 		return sprintf(
 			'<section %1$s><h2 class="hunch-list__heading">%2$s</h2>%3$s<ol class="hunch-list__items">%4$s</ol>%5$s</section>',
