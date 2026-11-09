@@ -40,7 +40,10 @@ export interface BuildOptions {
   cacheDir?: string | false;
   /** One shard per section (default), or a single shard. */
   shardBy?: 'section' | 'none';
-  /** Split shards larger than this (default 2000 items). */
+  /**
+   * Most items in a shard (default 2000). A section's items are spread over buckets by a hash of
+   * their id, so an edit or a new item rewrites one of its shards, not all of them.
+   */
   maxShardItems?: number;
   /** Characters of item text embedded (default 4000). */
   maxTextChars?: number;
@@ -137,8 +140,8 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
   const shards: ShardRef[] = [];
   const names = new Set<string>();
   for (const [section, members] of groups) {
-    for (let start = 0, part = 1; start < members.length; start += maxItems, part++) {
-      const chunk = members.slice(start, start + maxItems);
+    const buckets = bucketsOf(members, (i) => items[i]!.id, maxItems);
+    for (const [bucket, chunk] of buckets) {
       const shardItems = chunk.map((i) => publishedItem(items[i]!, priors[i]!));
       const bytes = encodeShard(
         { space, items: shardItems },
@@ -148,7 +151,7 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
       );
       const sha256 = createHash('sha256').update(bytes).digest('hex');
       let base = section === null ? 'all' : slug(section);
-      if (members.length > maxItems) base += `-${part}`;
+      if (bucket !== null) base += `-${bucket + 1}`;
       while (names.has(base)) base += '_';
       names.add(base);
       const file = `${base}.${sha256.slice(0, 12)}.hunch`;
@@ -237,9 +240,40 @@ export function computePriors(items: readonly CatalogItem[]): number[] {
     if (pa === undefined && pb !== undefined) return 1;
     return a - b;
   });
+  // Counted from the end of the order and over a power of two, so an item added at the top (a
+  // new post) changes no other item's prior, and so no other shard, until the catalog doubles.
+  let scale = 1;
+  while (scale < items.length) scale *= 2;
   const priors = new Array<number>(items.length);
-  order.forEach((index, rank) => (priors[index] = (items.length - rank) / items.length));
+  order.forEach((index, rank) => (priors[index] = (items.length - rank) / scale));
   return priors;
+}
+
+/**
+ * A group's shards: its items spread over a power of two of buckets by the first 32 bits of the
+ * SHA-256 of their id, in catalog order within each. An item stays in its bucket as others come
+ * and go, so an edit rewrites one shard. The number of buckets is the smallest that leaves an
+ * average of at most half of `max` per bucket (one bucket for small groups) and no bucket over
+ * `max`. Returns [bucket number, or null for a single bucket; members], empty buckets left out.
+ */
+function bucketsOf<T>(
+  members: readonly T[],
+  idOf: (member: T) => string,
+  max: number,
+): [number | null, T[]][] {
+  const hashes = members.map((m) => createHash('sha256').update(idOf(m)).digest().readUInt32BE(0));
+  let count = 1;
+  while (members.length > (count * max) / 2) count *= 2;
+  for (;;) {
+    const buckets = Array.from({ length: count }, () => [] as T[]);
+    members.forEach((m, i) => buckets[hashes[i]! % count]!.push(m));
+    if (buckets.every((b) => b.length <= max)) {
+      return buckets
+        .map((b, i): [number | null, T[]] => [count === 1 ? null : i, b])
+        .filter(([, b]) => b.length > 0);
+    }
+    count *= 2;
+  }
 }
 
 function publishedItem(item: CatalogItem, prior: number): ShardItem {

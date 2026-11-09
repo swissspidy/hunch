@@ -147,7 +147,32 @@ final class WriterTest extends TestCase {
 
 		$manifest = $this->write( $this->items(), array( 'max_shard_items' => 1 ) )['manifest'];
 		$this->assertSame( 4, count( $manifest['shards'] ) );
-		$this->assertMatchesRegularExpression( '#^shards/food-2\.#', $manifest['shards'][1]['url'] );
+		$this->assertMatchesRegularExpression( '#^shards/food-\d+\.#', $manifest['shards'][1]['url'] );
+	}
+
+	public function test_items_stay_in_their_bucket_as_others_come_and_go() {
+		$ids    = array_map(
+			static function ( $i ) {
+				return 'post-' . $i;
+			},
+			range( 0, 39 )
+		);
+		$before = array();
+		foreach ( Hunch_Writer::buckets( $ids, 10 ) as $bucket ) {
+			foreach ( $bucket['members'] as $position ) {
+				$before[ $ids[ $position ] ] = $bucket['bucket'];
+			}
+			$this->assertLessThanOrEqual( 10, count( $bucket['members'] ) );
+		}
+		$after = array_merge( array( 'post-new' ), $ids );
+		foreach ( Hunch_Writer::buckets( $after, 10 ) as $bucket ) {
+			foreach ( $bucket['members'] as $position ) {
+				if ( 'post-new' !== $after[ $position ] ) {
+					$this->assertSame( $before[ $after[ $position ] ], $bucket['bucket'] );
+				}
+			}
+		}
+		$this->assertSame( array( null ), array_column( Hunch_Writer::buckets( array( 'a', 'b' ), 10 ), 'bucket' ) );
 	}
 
 	public function test_an_empty_catalog_is_an_error() {

@@ -88,7 +88,8 @@ can be cached forever.
 > per-item metadata. No release wrote the layout below.
 
 One shard per section (in catalog order), split at 2,000 items, plus one shard (`all`) for
-items without a section. A page that only needs related items from its own section loads one
+items without a section. (Large sections are now spread over buckets by a hash of each item's
+id, and priors are counted from the end of the order: [ADR 0012](0012-stable-shards.md).) A page that only needs related items from its own section loads one
 shard.
 
 The binary layout (little-endian, [`shard.ts`](../../src/format/shard.ts)):

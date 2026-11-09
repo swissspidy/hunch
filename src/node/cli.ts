@@ -31,7 +31,7 @@ hunch build --source <file|url> [--source …] --out <dir> [options]
   --dims <n>              Published dimensions (Matryoshka truncation; default 256)
   --quantization <q>      int8 (default) | float32
   --shard-by <how>        section (default) | none
-  --max-shard-items <n>   Split larger shards (default 2000)
+  --max-shard-items <n>   Most items in a shard (default 2000)
   --cache-dir <dir>       Embedding cache (default: .hunch-cache)
   --no-cache              Embed everything, keep nothing
   --quiet                 Print nothing but errors
