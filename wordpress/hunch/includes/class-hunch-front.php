@@ -123,7 +123,10 @@ final class Hunch_Front {
 				$name = wp_json_encode( array_pop( $path ) );
 				return '() => { const o = ' . wp_json_encode( $path ) . '.reduce((o, k) => o?.[k], window); const f = o?.[' . $name . ']; return typeof f === "function" ? f.call(o) : false; }';
 			case 'wp-consent-api':
-				return '() => typeof window.wp_has_consent === "function" && window.wp_has_consent("preferences")';
+				// With no consent type (no consent manager), the API reports consent for everyone.
+				// Hunch is stricter then: only the visitor's own "allow" (the privacy controls
+				// block sets it) counts.
+				return '() => { const w = window; if (typeof w.wp_has_consent !== "function") return false; if (w.wp_consent_type || w.wp_fallback_consent_type) return w.wp_has_consent("preferences"); return document.cookie.split(/;\s*/).includes((w.consent_api?.cookie_prefix || "wp_consent") + "_preferences=allow"); }';
 			default:
 				// The visitor's own switch in the privacy controls block, kept in this browser.
 				return '() => { try { return localStorage.getItem("hunch-consent") === "yes"; } catch { return false; } }';

@@ -35,7 +35,7 @@ Storing a reading history on the visitor's device may need their consent (in the
 * **The visitor turns it on** in the personalization controls block (the default).
 * **A cookie** your consent manager sets, such as `hunch_consent=yes`.
 * **A JavaScript function** your consent manager provides, returning true or a promise of true.
-* **WP Consent API** (recommended when a consent manager supports it): the "preferences" category. The privacy controls block then sets that category in your consent manager, so the block and the cookie banner agree, and withdrawing it deletes what was stored. Hunch registers with the API and describes what it stores, so your consent manager can list it in its cookie policy. Without a consent manager that sets a consent type, the API reports consent for every visitor; the settings screen warns about that.
+* **WP Consent API** (recommended when a consent manager supports it): the "preferences" category. The privacy controls block then sets that category in your consent manager, so the block and the cookie banner agree, and withdrawing it deletes what was stored. Hunch registers with the API and describes what it stores, so your consent manager can list it in its cookie policy. Without a consent manager that sets a consent type, the API reports consent for every visitor; Hunch then waits for the visitor's own "allow" from the privacy controls block instead, and the settings screen says so.
 * **Always on**, where no consent is needed, or **off** (related posts only).
 
 The plugin asks before every read or write. Related posts use no visitor data and work without consent.

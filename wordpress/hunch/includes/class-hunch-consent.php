@@ -52,10 +52,12 @@ final class Hunch_Consent {
 			'Hunch',
 			self::CATEGORY,
 			__( '180 days', 'hunch' ),
-			__( 'Remembers which posts you read, followed or hid on this site, to rank the "for you" list in your browser. It is never sent to this site or anyone else.', 'hunch' ),
+			__( 'Remembers which posts you read, followed or hid on this site, to rank the "for you" list in your browser. Kept in your browser\'s IndexedDB storage and never sent to this site or anyone else.', 'hunch' ),
 			__( 'Reading history on this site, on this device only', 'hunch' ),
 			false,
 			false,
+			// The API's types are HTTP, LOCALSTORAGE and API: the closest to IndexedDB, which the
+			// description names.
 			'LOCALSTORAGE'
 		);
 		if ( 'optin' === $consent ) {
@@ -87,11 +89,12 @@ final class Hunch_Consent {
 					'message' => __( 'The WP Consent API plugin is not active, so no visitor can consent and personalization stays off. Install and activate it, or choose another setting.', 'hunch' ),
 				);
 			}
-			if ( function_exists( 'wp_get_consent_type' ) && '' === wp_get_consent_type() ) {
+			if ( function_exists( 'wp_get_consent_type' ) && ! wp_get_consent_type() ) {
 				// The API's own rule: with no consent type, wp_has_consent() is true for everyone.
+				// Hunch doesn't follow it (see Hunch_Front::consent_js()).
 				return array(
 					'type'    => 'warning',
-					'message' => __( 'No consent manager on this site sets a consent type, so the WP Consent API treats every visitor as consenting and personalization is on for everyone. Activate a consent manager that supports the WP Consent API.', 'hunch' ),
+					'message' => __( 'No consent manager on this site sets a consent type. The WP Consent API then reports consent for every visitor, so Hunch waits instead for each visitor to turn personalization on in the privacy controls block. Add that block to a page, or activate a consent manager that supports the WP Consent API.', 'hunch' ),
 				);
 			}
 			return null;

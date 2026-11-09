@@ -46,7 +46,8 @@
     typeof window.wp_set_consent === 'function';
 
   function storedConsent(root) {
-    if (consentApi(root)) return window.wp_has_consent(CATEGORY);
+    // The consent hook the page runs on (Hunch_Front::consent_js()), which reads the API.
+    if (consentApi(root)) return window.HunchConfig.consent() === true;
     try {
       return localStorage.getItem(CONSENT_KEY) === 'yes';
     } catch {
@@ -89,6 +90,12 @@
     updaters.push(update);
 
     on(consent, async () => {
+      if (root.dataset.consent === 'wp-consent-api' && !consentApi(root)) {
+        // The API's script did not load: its choice can't be stored, and a local one is ignored.
+        consent.checked = false;
+        status.value = 'Your choice could not be saved, so personalization stays off.';
+        return;
+      }
       if (consentApi(root)) {
         // The consent manager stores the choice and tells every listener, Hunch's included
         // (withdrawing deletes what was stored, see consent_cleanup()).
@@ -147,9 +154,9 @@
     syncAll();
     refreshLists();
   });
-  // Consent given or withdrawn in the consent manager's banner.
+  // Consent given or withdrawn in the consent manager's banner (only the API's mode reads it).
   document.addEventListener('wp_listen_for_consent_change', (event) => {
-    if (event.detail?.[CATEGORY] === undefined) return;
+    if (event.detail?.[CATEGORY] === undefined || !roots.some(consentApi)) return;
     syncAll();
     refreshLists();
   });
