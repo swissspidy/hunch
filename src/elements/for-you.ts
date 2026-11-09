@@ -42,6 +42,7 @@ import { SlotsElement } from './slots.ts';
  */
 export class HunchForYouElement extends SlotsElement {
   private consented = false;
+  private personalized = 'false';
   /** Items whose hide is being stored, those stored since the list was last filled, and the
    * number of hide clicks so far. */
   private hiding = new Set<string>();
@@ -84,8 +85,9 @@ export class HunchForYouElement extends SlotsElement {
       diversity: this.number('diversity'),
     });
     const personalized = recommendations.some((r) => r.why.confidence > 0);
-    // Only the newest run describes the list that will show: a stale one is dropped.
-    if (run === this.run) this.dataset.hunchPersonalized = String(personalized);
+    // Set on the element when this run's list replaces the slots (decorate()): until then a
+    // click is on the list still showing. A stale run's value is never used.
+    if (run === this.run) this.personalized = String(personalized);
     if (personalized) return recommendations;
     // No profile yet, but an item the visitor hid must not stay in the fallback: show the
     // site's own order without it instead.
@@ -94,6 +96,7 @@ export class HunchForYouElement extends SlotsElement {
   }
 
   protected decorate(slot: HTMLElement, rec: Recommendation | undefined): void {
+    this.dataset.hunchPersonalized = this.personalized;
     for (const button of slot.querySelectorAll<HTMLElement>('[data-hunch-hide]'))
       button.hidden = !this.consented || !slot.dataset.hunchId;
     const because = slot.querySelector('[data-hunch-because]');
