@@ -239,6 +239,10 @@ final class Hunch_Admin {
 				</table>
 
 				<h2><?php esc_html_e( 'Personalization', 'hunch' ); ?></h2>
+				<?php $consent_status = Hunch_Consent::status( $s['consent'] ); ?>
+				<?php if ( $consent_status ) : ?>
+					<div class="notice notice-<?php echo esc_attr( $consent_status['type'] ); ?> inline"><p><?php echo esc_html( $consent_status['message'] ); ?></p></div>
+				<?php endif; ?>
 				<table class="form-table" role="presentation">
 					<?php
 					self::select(
