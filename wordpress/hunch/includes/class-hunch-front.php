@@ -234,14 +234,15 @@ final class Hunch_Front {
 
 	/**
 	 * With the WP Consent API, withdrawing the "preferences" category deletes what Hunch
-	 * stored, on every page (not only where a list or the controls are).
+	 * stored, on every page (not only where a list or the controls are), and granting it ranks
+	 * the "for you" lists again (which then show their hide buttons).
 	 */
 	public static function consent_cleanup() {
 		if ( 'wp-consent-api' !== Hunch_Settings::get( 'consent' ) ) {
 			return;
 		}
 		wp_print_inline_script_tag(
-			'document.addEventListener("wp_listen_for_consent_change", (e) => { if (e.detail?.preferences !== "deny") return; try { indexedDB.deleteDatabase("hunch").onsuccess = () => document.dispatchEvent(new Event("hunch:forgotten")); } catch {} });'
+			'document.addEventListener("wp_listen_for_consent_change", (e) => { const v = e.detail?.preferences; if (v === "allow") document.querySelectorAll("hunch-for-you").forEach((l) => l.refresh?.()); if (v !== "deny") return; try { indexedDB.deleteDatabase("hunch").onsuccess = () => document.dispatchEvent(new Event("hunch:forgotten")); } catch {} });'
 		);
 	}
 

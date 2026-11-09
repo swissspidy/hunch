@@ -311,3 +311,29 @@ test('without consent the × buttons stay hidden', async () => {
   );
   await ctx.close();
 });
+
+test('a double click on × records one hide', async () => {
+  const ctx = await context(true);
+  const page = await ctx.newPage();
+  for (const id of FOOD) await read(site, page, id);
+  await home(page);
+  const first = (await slots(page, 'hunch-for-you'))[0]!.id;
+  await page
+    .locator('hunch-for-you [data-hunch-slot]')
+    .first()
+    .locator('[data-hunch-hide]')
+    .dblclick();
+  await page.waitForFunction(
+    (id) =>
+      document.querySelector<HTMLElement>('hunch-for-you [data-hunch-slot]')?.dataset.hunchId !==
+      id,
+    first,
+  );
+  await ready(page, 'hunch-for-you');
+  const hides = (await storedSignals(page)).filter((s) => s.kind === 'hide');
+  assert.deepEqual(
+    hides.map((s) => s.itemId),
+    [first],
+  );
+  await ctx.close();
+});

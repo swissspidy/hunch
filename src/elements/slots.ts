@@ -108,17 +108,23 @@ export abstract class SlotsElement extends Base {
     // Every refresh starts from the server's markup, not from an earlier ranking's.
     this.original ??= slots.map((slot) => slot.cloneNode(true) as HTMLElement);
     const original = this.original;
+    // This run's focus request: dropped if the run fails, handed on if a newer run replaces it.
+    const focus = this.focusAfter;
+    this.focusAfter = undefined;
+    const stale = (): boolean => {
+      if (run === this.run) return false;
+      this.focusAfter ??= focus;
+      return true;
+    };
     try {
       if (slots.length === 0) throw new Error(`<${this.localName}> has no [data-hunch-slot]`);
       const fallback = original.map((slot) => slot.dataset.hunchId ?? '').filter(Boolean);
       const recommendations = await this.recommend(await this.hunch(), slots.length, fallback, run);
-      if (run !== this.run) return;
+      if (stale()) return;
       // Replacing the slot that holds focus would drop focus to the page: wait until it leaves,
       // unless the replacement moves focus itself.
-      const focus = this.focusAfter;
-      this.focusAfter = undefined;
       if (focus === undefined) await this.blurred();
-      if (run !== this.run) return;
+      if (stale()) return;
       const copies = slots.map((slot, i) => {
         const copy = original[i]!.cloneNode(true) as HTMLElement;
         const rec = recommendations?.[i];

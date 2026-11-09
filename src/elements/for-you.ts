@@ -42,6 +42,9 @@ import { SlotsElement } from './slots.ts';
  */
 export class HunchForYouElement extends SlotsElement {
   private consented = false;
+  /** Items whose hide is being recorded, and the number of hide clicks so far. */
+  private hiding = new Set<string>();
+  private clicks = 0;
 
   /** @internal Custom element lifecycle, called by the browser. */
   static get observedAttributes(): string[] {
@@ -102,17 +105,22 @@ export class HunchForYouElement extends SlotsElement {
   protected onSlotClick(target: Element, slot: HTMLElement, index: number): boolean {
     const id = slot.dataset.hunchId;
     if (!target.closest('[data-hunch-hide]') || !id) return false;
+    // A double click hides once; of quick clicks on several slots, the last one sets the focus.
+    if (this.hiding.has(id)) return true;
+    this.hiding.add(id);
+    const click = ++this.clicks;
     void this.hunch()
       .then((hunch) => hunch.record('hide', id))
       .then((recorded) => {
         if (!recorded) return;
-        this.focusAfter = index;
+        if (click === this.clicks) this.focusAfter = index;
         this.refresh();
         const announce = this.querySelector<HTMLElement>('[data-hunch-announce]');
         if (announce) announce.textContent = announce.dataset.message ?? '';
         this.dispatchEvent(new CustomEvent('hunch:hide', { detail: { id } }));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => this.hiding.delete(id));
     return true;
   }
 }
