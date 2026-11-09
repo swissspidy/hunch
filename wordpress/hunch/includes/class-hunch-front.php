@@ -130,7 +130,7 @@ final class Hunch_Front {
 			default:
 				// The visitor's own switch in the privacy controls block, kept in this browser.
 				return '() => { try { return localStorage.getItem("hunch-consent") === "yes"; } catch { return false; } }';
-		}
+		}//end switch
 	}
 
 	/**
