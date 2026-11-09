@@ -42,16 +42,18 @@ import { SlotsElement } from './slots.ts';
  */
 export class HunchForYouElement extends SlotsElement {
   private consented = false;
-  /** Items hidden here, or being hidden, and the number of hide clicks so far. */
+  /** Items whose hide is being stored, those stored since the list was last filled, and the
+   * number of hide clicks so far. */
   private hiding = new Set<string>();
+  private stored = new Set<string>();
   private clicks = 0;
 
   /** @internal Created by the browser for each `<hunch-for-you>`. */
   constructor() {
     super();
     // Once the list is filled again, the hidden items' buttons are gone, and after a forget()
-    // an item may come back to be hidden again.
-    this.addEventListener('hunch:ready', () => this.hiding.clear());
+    // an item may come back to be hidden again. Hides still being stored stay claimed.
+    this.addEventListener('hunch:ready', () => this.stored.clear());
   }
 
   /** @internal Custom element lifecycle, called by the browser. */
@@ -71,6 +73,7 @@ export class HunchForYouElement extends SlotsElement {
     hunch: Hunch,
     n: number,
     fallback: readonly string[],
+    run: number,
   ): Promise<Recommendation[] | null> {
     this.consented = await hunch.consented();
     const recommendations = await hunch.recommend({
@@ -81,7 +84,8 @@ export class HunchForYouElement extends SlotsElement {
       diversity: this.number('diversity'),
     });
     const personalized = recommendations.some((r) => r.why.confidence > 0);
-    this.dataset.hunchPersonalized = String(personalized);
+    // Only the newest run describes the list that will show: a stale one is dropped.
+    if (run === this.run) this.dataset.hunchPersonalized = String(personalized);
     if (personalized) return recommendations;
     // No profile yet, but an item the visitor hid must not stay in the fallback: show the
     // site's own order without it instead.
@@ -115,13 +119,20 @@ export class HunchForYouElement extends SlotsElement {
     if (!target.closest('[data-hunch-hide]') || !id) return false;
     // A double click hides once; of quick clicks on several slots, the last one sets the focus.
     if (this.hiding.has(id)) return true;
+    if (this.stored.has(id)) {
+      // Stored, but the list still shows it (its refresh failed): rank again, store nothing.
+      if (this.dataset.hunchState !== 'loading') this.refresh();
+      return true;
+    }
     this.hiding.add(id);
     const click = ++this.clicks;
     void this.hunch()
       .then((hunch) => hunch.record('hide', id))
       .then((recorded) => {
-        // Hidden: later clicks on its button, until the list replaces it, do nothing.
-        if (!recorded) return this.hiding.delete(id);
+        this.hiding.delete(id);
+        if (!recorded) return;
+        // Later clicks on its button, until the list replaces it, only rank again.
+        this.stored.add(id);
         if (click === this.clicks) this.focusAfter = index;
         this.refresh();
         const announce = this.querySelector<HTMLElement>('[data-hunch-announce]');

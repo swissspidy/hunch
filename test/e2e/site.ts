@@ -193,11 +193,24 @@ export async function waitUntil<A>(
   timeout = 10_000,
 ): Promise<void> {
   const end = Date.now() + timeout;
-  for (;;) {
-    // The argument is plain JSON here, which Playwright's Unboxed<A> type can't see.
-    if (await page.evaluate(check as (arg: unknown) => Promise<boolean>, arg as unknown)) return;
-    if (Date.now() > end) throw new Error(`waitUntil: still false after ${timeout} ms`);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+  const late = (): Error => new Error(`waitUntil: still false after ${timeout} ms`);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // One deadline for the whole wait, a check that never settles included.
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(late()), timeout);
+  });
+  try {
+    for (;;) {
+      // The argument is plain JSON here, which Playwright's Unboxed<A> type can't see.
+      const evaluated = page.evaluate(check as (arg: unknown) => Promise<boolean>, arg as unknown);
+      evaluated.catch(() => {}); // Settled after the deadline: nobody awaits it any more.
+      const result = await Promise.race([evaluated, deadline]);
+      if (Date.now() >= end) throw late();
+      if (result) return;
+      await Promise.race([new Promise((resolve) => setTimeout(resolve, 50)), deadline]);
+    }
+  } finally {
+    clearTimeout(timer);
   }
 }
 

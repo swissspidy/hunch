@@ -62,7 +62,7 @@ On an article page, render the fallback list as you would anyway, and wrap it:
 
 <hunch-related manifest="/hunch/manifest.json" item="sourdough-starter" section="Food">
   <ol>
-    <li data-hunch-slot>
+    <li data-hunch-slot data-hunch-id="rye-bread">
       <a href="/food/rye-bread/"><span data-hunch-title>Dense, dark rye bread</span></a>
       <span data-hunch-section>Food</span> · <time data-hunch-date>Oct 9, 2026</time>
     </li>
@@ -193,7 +193,11 @@ document.addEventListener('hunch:click', ({ detail }) => {
 ```
 
 Send the list, the position and whether it was personalized, not the visitor's history: that
-is what tells you whether the recommendations work.
+is what tells you whether the recommendations work. Give the server-rendered slots their
+items' `data-hunch-id` (as in the examples above): when a list keeps its fallback (no manifest,
+no consent, no profile yet), `detail.recommendations` is empty and the slots' own ids are what
+is shown and clicked. Count those impressions from the slots
+(`list.querySelectorAll('[data-hunch-slot]:not([hidden])')`) rather than from the array.
 
 ## WordPress
 

@@ -342,3 +342,37 @@ test('a double click on × records one hide', async () => {
   );
   await ctx.close();
 });
+
+test('a click in a personalized "for you" list reports personalized: true', async () => {
+  const ctx = await context(true);
+  const page = await ctx.newPage();
+  for (const id of FOOD) await read(site, page, id);
+  await home(page);
+  assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'true');
+  const first = (await slots(page, 'hunch-for-you'))[0]!.id;
+  await page.evaluate(() => {
+    document.addEventListener('click', (event) => event.preventDefault());
+    document.addEventListener('hunch:click', (event) => {
+      (window as unknown as { clicked: unknown }).clicked = (event as CustomEvent).detail;
+    });
+  });
+  await page.locator('hunch-for-you [data-hunch-slot] a').first().click();
+  const detail = (await page.evaluate(
+    () => (window as unknown as { clicked: unknown }).clicked,
+  )) as {
+    id: string;
+    list: string;
+    position: number;
+    personalized: boolean;
+  };
+  assert.deepEqual(
+    {
+      id: detail.id,
+      list: detail.list,
+      position: detail.position,
+      personalized: detail.personalized,
+    },
+    { id: first, list: 'hunch-for-you', position: 1, personalized: true },
+  );
+  await ctx.close();
+});
