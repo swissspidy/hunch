@@ -46,6 +46,7 @@ export class HunchForYouElement extends SlotsElement {
   private hiding = new Set<string>();
   private clicks = 0;
 
+  /** @internal Created by the browser for each `<hunch-for-you>`. */
   constructor() {
     super();
     // Once the list is filled again, the hidden items' buttons are gone, and after a forget()
