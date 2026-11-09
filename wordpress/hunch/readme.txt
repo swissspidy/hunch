@@ -59,6 +59,10 @@ The manifest should be served with a short cache lifetime and the shards with a 
 
 No. The plugin makes no external requests from PHP. In wp-admin, your browser loads Transformers.js (from jsDelivr by default; you can host it yourself and change the URL in the settings) and the model's weights from the Hugging Face Hub. Those requests carry no post text.
 
+= Can I see whether visitors click the recommendations? =
+
+Hunch sends nothing, so it can't count clicks itself. The lists fire a `hunch:click` event in the page when a visitor clicks a post, with the list (`hunch-related` or `hunch-for-you`), the post's position and whether the list was personalized. Forward it to the analytics you already use, for example with a small script in your theme: `document.addEventListener('hunch:click', ({ detail }) => plausible('Recommendation click', { props: { list: detail.list, position: detail.position } }));`. The `hunch:ready` event marks a list as shown.
+
 = What does the visitor's browser download? =
 
 Hunch's script, `manifest.json` and the shards it needs, all from your site. About 260 KB per 1,000 posts, gzipped, at the default 256 dimensions.

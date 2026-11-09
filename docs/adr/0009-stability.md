@@ -76,7 +76,7 @@ counts as breaking, and what is not promised at all.
   `./digest`, `./query`, `./format`, `./build`, `./astro`, `./hunch.global.js`) and their TypeScript
   types, as the [API reference](https://swissspidy.github.io/hunch/api/) lists them;
   `window.HunchConfig`; the elements' names, attributes, events (`hunch:ready`,
-  `hunch:error`, `hunch:summary`) and the `data-hunch-*` attributes they read and set
+  `hunch:error`, `hunch:summary`, `hunch:click` and its `detail`) and the `data-hunch-*` attributes they read and set
   (`data-hunch-slot`, `-id`, `-title`, `-section`, `-date`, `-image`, `-href`, `-summary`,
   `-state` and its values, `-personalized`, `-new`, `-summarized`); the CLI's commands, options
   and exit codes; and the manifest, shard and export formats above.

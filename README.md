@@ -175,6 +175,26 @@ Every result has `why`: `similarity`, `relevance`, `recency`, `prior`, `redundan
 `confidence`, `similarityShare` (how much of the score the profile accounts for: low means an
 editors' pick) and `because` (the visitor's items it leans on).
 
+### Measuring clicks
+
+Hunch never sends anything, so it can't tell you whether readers click its recommendations.
+Its components tell your page instead: `hunch:ready` fires when a list is filled (an
+impression, with `detail.recommendations`), and `hunch:click` bubbles from a clicked slot
+with `detail` `{ id, url, position, list, personalized }`. Send them to the analytics you
+already use, without any profile:
+
+```js
+document.addEventListener('hunch:click', ({ detail }) => {
+  // Plausible, for example; position counts from 1, list is the element's name.
+  plausible('Recommendation click', {
+    props: { list: detail.list, position: detail.position, personalized: detail.personalized },
+  });
+});
+```
+
+Send the list, the position and whether it was personalized, not the visitor's history: that
+is what tells you whether the recommendations work.
+
 ## WordPress
 
 The [WordPress plugin](wordpress/hunch/readme.txt) needs no Node on the server and no CI.
