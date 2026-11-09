@@ -17,6 +17,7 @@ import {
   ready,
   serveDemo,
   slots,
+  waitUntil,
 } from './site.ts';
 
 const site = serveDemo();
@@ -199,16 +200,20 @@ test('staying on an article records dwell time', async () => {
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await page.waitForFunction(async () => {
-    const hunch = await (
-      window as unknown as {
-        Hunch: {
-          shared(m: string): Promise<{ export(): Promise<{ signals: { kind: string }[] }> }>;
-        };
-      }
-    ).Hunch.shared(document.body.dataset.manifest!);
-    return (await hunch.export()).signals.some((s) => s.kind === 'dwell');
-  });
+  await waitUntil(
+    page,
+    async () => {
+      const hunch = await (
+        window as unknown as {
+          Hunch: {
+            shared(m: string): Promise<{ export(): Promise<{ signals: { kind: string }[] }> }>;
+          };
+        }
+      ).Hunch.shared(document.body.dataset.manifest!);
+      return (await hunch.export()).signals.some((s) => s.kind === 'dwell');
+    },
+    undefined,
+  );
   const dwell = (await storedSignals(page)).find((s) => s.kind === 'dwell') as unknown as {
     weight: number;
   };
@@ -334,6 +339,40 @@ test('a double click on × records one hide', async () => {
   assert.deepEqual(
     hides.map((s) => s.itemId),
     [first],
+  );
+  await ctx.close();
+});
+
+test('a click in a personalized "for you" list reports personalized: true', async () => {
+  const ctx = await context(true);
+  const page = await ctx.newPage();
+  for (const id of FOOD) await read(site, page, id);
+  await home(page);
+  assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'true');
+  const first = (await slots(page, 'hunch-for-you'))[0]!.id;
+  await page.evaluate(() => {
+    document.addEventListener('click', (event) => event.preventDefault());
+    document.addEventListener('hunch:click', (event) => {
+      (window as unknown as { clicked: unknown }).clicked = (event as CustomEvent).detail;
+    });
+  });
+  await page.locator('hunch-for-you [data-hunch-slot] a').first().click();
+  const detail = (await page.evaluate(
+    () => (window as unknown as { clicked: unknown }).clicked,
+  )) as {
+    id: string;
+    list: string;
+    position: number;
+    personalized: boolean;
+  };
+  assert.deepEqual(
+    {
+      id: detail.id,
+      list: detail.list,
+      position: detail.position,
+      personalized: detail.personalized,
+    },
+    { id: first, list: 'hunch-for-you', position: 1, personalized: true },
   );
   await ctx.close();
 });

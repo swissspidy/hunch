@@ -17,7 +17,11 @@
  *
  * State: `data-hunch-state` is `loading`, `ready` or `error`. Events: `hunch:ready` (detail:
  * `{ recommendations }`) and `hunch:error` (detail: `{ error }`). A click on a slot whose
- * `data-hunch-id` is set records a `click` signal (with consent).
+ * `data-hunch-id` is set records a `click` signal (with consent) and fires `hunch:click`, which
+ * bubbles (detail: `{ id, url, position, list, personalized }`: `position` counts from 1,
+ * `list` is the element's name, `personalized` is true when "for you" used a profile). Hunch
+ * sends neither event anywhere: listen to them to count impressions and clicks in your own
+ * analytics, without any profile.
  */
 
 import { Hunch, type Recommendation } from '../client/index.ts';
@@ -191,12 +195,25 @@ export abstract class SlotsElement extends Base {
       return;
     }
     const id = slot.dataset.hunchId;
+    if (!id) return;
+    // For the site's own analytics: which list, which item, at which position. Nothing is sent.
+    this.dispatchEvent(
+      new CustomEvent('hunch:click', {
+        bubbles: true,
+        detail: {
+          id,
+          url: (slot.matches('a') ? slot : slot.querySelector('a'))?.href ?? '',
+          position: slots.indexOf(slot) + 1,
+          list: this.localName,
+          personalized: this.dataset.hunchPersonalized === 'true',
+        },
+      }),
+    );
     // Best effort: the page may be gone before the write lands (its view is recorded next).
-    if (id)
-      void this.hunch().then(
-        (hunch) => hunch.record('click', id),
-        () => {},
-      );
+    void this.hunch().then(
+      (hunch) => hunch.record('click', id),
+      () => {},
+    );
   }
 }
 

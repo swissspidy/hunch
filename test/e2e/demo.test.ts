@@ -226,3 +226,28 @@ test('on a plain-HTTP site (no SubtleCrypto), fetch checks the shards’ hashes'
   await page.waitForSelector('hunch-related[data-hunch-state="error"]');
   await context.close();
 });
+
+test('a click on a slot fires hunch:click for the site’s analytics, and sends nothing', async () => {
+  const { page, requests, close } = await open('/items/sourdough-starter.html');
+  await ready(page);
+  const ranked = await slots(page);
+  await page.evaluate(() => {
+    // Keep the page: stop the link, after the component has seen the click.
+    document.addEventListener('click', (event) => event.preventDefault());
+    document.addEventListener('hunch:click', (event) => {
+      (window as unknown as { clicked: unknown }).clicked = (event as CustomEvent).detail;
+    });
+  });
+  const before = requests.length;
+  await page.locator('hunch-related [data-hunch-slot] a').nth(1).click();
+  const detail = await page.evaluate(() => (window as unknown as { clicked: unknown }).clicked);
+  assert.deepEqual(detail, {
+    id: ranked[1]!.id,
+    url: new URL(ranked[1]!.href, site.origin).href,
+    position: 2,
+    list: 'hunch-related',
+    personalized: false,
+  });
+  assert.deepEqual(requests.slice(before), []);
+  await close();
+});
