@@ -47,7 +47,9 @@
 
   function storedConsent(root) {
     // The consent hook the page runs on (Hunch_Front::consent_js()), which reads the API.
-    if (consentApi(root)) return window.HunchConfig.consent() === true;
+    if (root.dataset.consent === 'wp-consent-api') {
+      return consentApi(root) && window.HunchConfig.consent() === true;
+    }
     try {
       return localStorage.getItem(CONSENT_KEY) === 'yes';
     } catch {
