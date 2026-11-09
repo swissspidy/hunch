@@ -181,11 +181,32 @@ export async function ready(page: Page, element: string): Promise<void> {
  * Visits an article and waits until its view is stored. Leaving a page aborts its pending
  * IndexedDB writes, and Firefox can still be opening the database when the list is ready.
  */
+/**
+ * Waits until `check`, which may be async, returns true in the page. Not page.waitForFunction:
+ * it doesn't wait for a returned promise, which counts as true at once, so an async check never
+ * waited for anything.
+ */
+export async function waitUntil<A>(
+  page: Page,
+  check: (arg: A) => boolean | Promise<boolean>,
+  arg: A,
+  timeout = 10_000,
+): Promise<void> {
+  const end = Date.now() + timeout;
+  for (;;) {
+    // The argument is plain JSON here, which Playwright's Unboxed<A> type can't see.
+    if (await page.evaluate(check as (arg: unknown) => Promise<boolean>, arg as unknown)) return;
+    if (Date.now() > end) throw new Error(`waitUntil: still false after ${timeout} ms`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
 export async function read(site: Site, page: Page, id: string): Promise<void> {
   const since = Date.now();
   await page.goto(`${site.origin}/items/${id}.html`);
   await ready(page, 'hunch-related');
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async (item) => {
       const hunch = await (
         window as unknown as {

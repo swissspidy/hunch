@@ -17,6 +17,7 @@ import {
   ready,
   serveDemo,
   slots,
+  waitUntil,
 } from './site.ts';
 
 const site = serveDemo();
@@ -199,16 +200,20 @@ test('staying on an article records dwell time', async () => {
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await page.waitForFunction(async () => {
-    const hunch = await (
-      window as unknown as {
-        Hunch: {
-          shared(m: string): Promise<{ export(): Promise<{ signals: { kind: string }[] }> }>;
-        };
-      }
-    ).Hunch.shared(document.body.dataset.manifest!);
-    return (await hunch.export()).signals.some((s) => s.kind === 'dwell');
-  });
+  await waitUntil(
+    page,
+    async () => {
+      const hunch = await (
+        window as unknown as {
+          Hunch: {
+            shared(m: string): Promise<{ export(): Promise<{ signals: { kind: string }[] }> }>;
+          };
+        }
+      ).Hunch.shared(document.body.dataset.manifest!);
+      return (await hunch.export()).signals.some((s) => s.kind === 'dwell');
+    },
+    undefined,
+  );
   const dwell = (await storedSignals(page)).find((s) => s.kind === 'dwell') as unknown as {
     weight: number;
   };

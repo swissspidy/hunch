@@ -15,6 +15,7 @@ import {
   ready,
   serveDir,
   slots,
+  waitUntil,
 } from './site.ts';
 
 const site = serveDir(async () => {
@@ -72,7 +73,8 @@ test('the site’s HunchConfig keeps its consent hook and gets the manifest', as
   await page.goto(`${site.origin}/blog/rye-bread/`);
   await ready(page, 'hunch-related');
   // <hunch-page> has no manifest attribute either: it recorded the view, with consent.
-  await page.waitForFunction(
+  await waitUntil(
+    page,
     async () => {
       if (!(await indexedDB.databases()).some((db) => db.name === 'hunch')) return false;
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -93,7 +95,7 @@ test('the site’s HunchConfig keeps its consent hook and gets the manifest', as
       }
     },
     undefined,
-    { timeout: 5000, polling: 100 },
+    5000,
   );
   assert.equal(
     await page.evaluate(

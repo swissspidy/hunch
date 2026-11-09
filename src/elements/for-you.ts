@@ -42,9 +42,16 @@ import { SlotsElement } from './slots.ts';
  */
 export class HunchForYouElement extends SlotsElement {
   private consented = false;
-  /** Items whose hide is being recorded, and the number of hide clicks so far. */
+  /** Items hidden here, or being hidden, and the number of hide clicks so far. */
   private hiding = new Set<string>();
   private clicks = 0;
+
+  constructor() {
+    super();
+    // Once the list is filled again, the hidden items' buttons are gone, and after a forget()
+    // an item may come back to be hidden again.
+    this.addEventListener('hunch:ready', () => this.hiding.clear());
+  }
 
   /** @internal Custom element lifecycle, called by the browser. */
   static get observedAttributes(): string[] {
@@ -112,15 +119,15 @@ export class HunchForYouElement extends SlotsElement {
     void this.hunch()
       .then((hunch) => hunch.record('hide', id))
       .then((recorded) => {
-        if (!recorded) return;
+        // Hidden: later clicks on its button, until the list replaces it, do nothing.
+        if (!recorded) return this.hiding.delete(id);
         if (click === this.clicks) this.focusAfter = index;
         this.refresh();
         const announce = this.querySelector<HTMLElement>('[data-hunch-announce]');
         if (announce) announce.textContent = announce.dataset.message ?? '';
         this.dispatchEvent(new CustomEvent('hunch:hide', { detail: { id } }));
       })
-      .catch(() => {})
-      .finally(() => this.hiding.delete(id));
+      .catch(() => this.hiding.delete(id));
     return true;
   }
 }
