@@ -123,11 +123,14 @@ final class Hunch_Front {
 				$name = wp_json_encode( array_pop( $path ) );
 				return '() => { const o = ' . wp_json_encode( $path ) . '.reduce((o, k) => o?.[k], window); const f = o?.[' . $name . ']; return typeof f === "function" ? f.call(o) : false; }';
 			case 'wp-consent-api':
-				return '() => typeof window.wp_has_consent === "function" && window.wp_has_consent("preferences")';
+				// With no consent type (no consent manager), the API reports consent for everyone.
+				// Hunch is stricter then: only the visitor's own "allow" (the privacy controls
+				// block sets it) counts.
+				return '() => { const w = window; if (typeof w.wp_has_consent !== "function") return false; if (w.wp_consent_type || w.wp_fallback_consent_type) return w.wp_has_consent("preferences"); return document.cookie.split(/;\s*/).includes((w.consent_api?.cookie_prefix || "wp_consent") + "_preferences=allow"); }';
 			default:
 				// The visitor's own switch in the privacy controls block, kept in this browser.
 				return '() => { try { return localStorage.getItem("hunch-consent") === "yes"; } catch { return false; } }';
-		}
+		}//end switch
 	}
 
 	/**
@@ -213,7 +216,7 @@ final class Hunch_Front {
 		?>
 		<div <?php echo get_block_wrapper_attributes( array( 'class' => 'hunch-controls' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by core. ?> data-hunch-controls data-manifest="<?php echo esc_url( (string) $manifest ); ?>" data-consent="<?php echo esc_attr( $consent ); ?>">
 			<p class="hunch-controls__intro"><?php esc_html_e( 'Recommendations on this site are ranked in your browser. With your consent, it keeps a list of what you read here, on this device only.', 'hunch' ); ?></p>
-			<?php if ( 'optin' === $consent && $manifest ) : ?>
+			<?php if ( $manifest && ( 'optin' === $consent || ( 'wp-consent-api' === $consent && function_exists( 'wp_set_consent' ) ) ) ) : ?>
 				<p><label><input type="checkbox" data-hunch-consent disabled> <?php esc_html_e( 'Personalize recommendations', 'hunch' ); ?></label></p>
 			<?php endif; ?>
 			<p class="hunch-controls__buttons">

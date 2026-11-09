@@ -24,12 +24,14 @@ require_once __DIR__ . '/includes/class-hunch-format.php';
 require_once __DIR__ . '/includes/class-hunch-shard.php';
 require_once __DIR__ . '/includes/class-hunch-writer.php';
 require_once __DIR__ . '/includes/class-hunch-settings.php';
+require_once __DIR__ . '/includes/class-hunch-consent.php';
 require_once __DIR__ . '/includes/class-hunch-catalog.php';
 require_once __DIR__ . '/includes/class-hunch-rest.php';
 require_once __DIR__ . '/includes/class-hunch-admin.php';
 require_once __DIR__ . '/includes/class-hunch-front.php';
 
 Hunch_Catalog::init();
+Hunch_Consent::init();
 Hunch_Rest::init();
 Hunch_Admin::init();
 Hunch_Front::init();
