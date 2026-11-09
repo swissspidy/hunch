@@ -123,11 +123,14 @@ final class Hunch_Front {
 				$name = wp_json_encode( array_pop( $path ) );
 				return '() => { const o = ' . wp_json_encode( $path ) . '.reduce((o, k) => o?.[k], window); const f = o?.[' . $name . ']; return typeof f === "function" ? f.call(o) : false; }';
 			case 'wp-consent-api':
-				return '() => typeof window.wp_has_consent === "function" && window.wp_has_consent("preferences")';
+				// With no consent type (no consent manager), the API reports consent for everyone.
+				// Hunch is stricter then: only the visitor's own "allow" (the privacy controls
+				// block sets it) counts.
+				return '() => { const w = window; if (typeof w.wp_has_consent !== "function") return false; if (w.wp_consent_type || w.wp_fallback_consent_type) return w.wp_has_consent("preferences"); return document.cookie.split(/;\s*/).includes((w.consent_api?.cookie_prefix || "wp_consent") + "_preferences=allow"); }';
 			default:
 				// The visitor's own switch in the privacy controls block, kept in this browser.
 				return '() => { try { return localStorage.getItem("hunch-consent") === "yes"; } catch { return false; } }';
-		}
+		}//end switch
 	}
 
 	/**
@@ -174,9 +177,9 @@ final class Hunch_Front {
 	 * @return string
 	 */
 	public static function render_for_you_block( $attributes ) {
-		$count    = max( 1, min( 12, empty( $attributes['count'] ) ? 4 : (int) $attributes['count'] ) );
-		$heading  = empty( $attributes['heading'] ) ? __( 'For you', 'hunch' ) : (string) $attributes['heading'];
-		$fallback = get_posts(
+		$count      = max( 1, min( 12, empty( $attributes['count'] ) ? 4 : (int) $attributes['count'] ) );
+		$heading    = empty( $attributes['heading'] ) ? __( 'For you', 'hunch' ) : (string) $attributes['heading'];
+		$fallback   = get_posts(
 			array(
 				'post_type'           => (array) Hunch_Settings::get( 'post_types' ),
 				'post_status'         => 'publish',
@@ -185,8 +188,16 @@ final class Hunch_Front {
 				'ignore_sticky_posts' => true,
 			)
 		);
-		$manifest = 'off' === Hunch_Settings::get( 'consent' ) ? null : Hunch_Catalog::manifest_url();
-		return self::list_markup( 'hunch-for-you', $manifest ? array( 'manifest' => $manifest ) : null, $heading, $fallback, true );
+		$manifest   = 'off' === Hunch_Settings::get( 'consent' ) ? null : Hunch_Catalog::manifest_url();
+		$attributes = null;
+		if ( $manifest ) {
+			$attributes = array(
+				'manifest' => $manifest,
+				/* translators: {title} is a post's title; keep it as it is. */
+				'because'  => __( 'Because you read {title}', 'hunch' ),
+			);
+		}
+		return self::list_markup( 'hunch-for-you', $attributes, $heading, $fallback, true );
 	}
 
 	/**
@@ -205,7 +216,7 @@ final class Hunch_Front {
 		?>
 		<div <?php echo get_block_wrapper_attributes( array( 'class' => 'hunch-controls' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by core. ?> data-hunch-controls data-manifest="<?php echo esc_url( (string) $manifest ); ?>" data-consent="<?php echo esc_attr( $consent ); ?>">
 			<p class="hunch-controls__intro"><?php esc_html_e( 'Recommendations on this site are ranked in your browser. With your consent, it keeps a list of what you read here, on this device only.', 'hunch' ); ?></p>
-			<?php if ( 'optin' === $consent && $manifest ) : ?>
+			<?php if ( $manifest && ( 'optin' === $consent || ( 'wp-consent-api' === $consent && function_exists( 'wp_set_consent' ) ) ) ) : ?>
 				<p><label><input type="checkbox" data-hunch-consent disabled> <?php esc_html_e( 'Personalize recommendations', 'hunch' ); ?></label></p>
 			<?php endif; ?>
 			<p class="hunch-controls__buttons">
@@ -223,14 +234,15 @@ final class Hunch_Front {
 
 	/**
 	 * With the WP Consent API, withdrawing the "preferences" category deletes what Hunch
-	 * stored, on every page (not only where a list or the controls are).
+	 * stored, on every page (not only where a list or the controls are), and granting it ranks
+	 * the "for you" lists again (which then show their hide buttons).
 	 */
 	public static function consent_cleanup() {
 		if ( 'wp-consent-api' !== Hunch_Settings::get( 'consent' ) ) {
 			return;
 		}
 		wp_print_inline_script_tag(
-			'document.addEventListener("wp_listen_for_consent_change", (e) => { if (e.detail?.preferences !== "deny") return; try { indexedDB.deleteDatabase("hunch").onsuccess = () => document.dispatchEvent(new Event("hunch:forgotten")); } catch {} });'
+			'document.addEventListener("wp_listen_for_consent_change", (e) => { const v = e.detail?.preferences; if (v === "allow") document.querySelectorAll("hunch-for-you").forEach((l) => l.refresh?.()); if (v !== "deny") return; try { indexedDB.deleteDatabase("hunch").onsuccess = () => document.dispatchEvent(new Event("hunch:forgotten")); } catch {} });'
 		);
 	}
 
@@ -325,20 +337,37 @@ final class Hunch_Front {
 			$open .= '>';
 			$close = '</' . $element . '>';
 		}
-		$slots = '';
+		// "For you" also says why a post is there and lets the visitor hide it; the component fills
+		// the line and shows the button (only with consent, see for-you.ts).
+		$personal = null !== $attributes && 'hunch-for-you' === $element;
+		$slots    = '';
 		foreach ( $posts as $post ) {
 			$section = Hunch_Catalog::section( $post );
-			$slots  .= sprintf(
-				'<li class="hunch-slot" data-hunch-slot data-hunch-id="%1$s"><a class="hunch-slot__link" href="%2$s"><span class="hunch-slot__title" data-hunch-title>%3$s</span></a><span class="hunch-slot__meta"><span data-hunch-section>%4$s</span> <time data-hunch-date datetime="%5$s">%6$s</time></span></li>',
+			$title   = Hunch_Format::html_to_text( get_the_title( $post ) );
+			$extra   = '';
+			if ( $personal ) {
+				$extra = sprintf(
+					'<span class="hunch-slot__because" data-hunch-because></span><button type="button" class="hunch-slot__hide" data-hunch-hide hidden aria-label="%1$s" title="%2$s">&times;</button>',
+					/* translators: %s: post title */
+					esc_attr( sprintf( __( 'Not interested: %s', 'hunch' ), $title ) ),
+					esc_attr__( 'Not interested', 'hunch' )
+				);
+			}
+			$slots .= sprintf(
+				'<li class="hunch-slot" data-hunch-slot data-hunch-id="%1$s"><a class="hunch-slot__link" href="%2$s"><span class="hunch-slot__title" data-hunch-title>%3$s</span></a><span class="hunch-slot__meta"><span data-hunch-section>%4$s</span> <time data-hunch-date datetime="%5$s">%6$s</time></span>%7$s</li>',
 				esc_attr( Hunch_Catalog::item_id( $post ) ),
 				esc_url( get_permalink( $post ) ),
-				esc_html( Hunch_Format::html_to_text( get_the_title( $post ) ) ),
+				esc_html( $title ),
 				esc_html( (string) $section ),
 				esc_attr( Hunch_Format::iso_time( (int) get_post_time( 'U', true, $post ) ) ),
-				esc_html( get_the_date( '', $post ) )
+				esc_html( get_the_date( '', $post ) ),
+				$extra
 			);
+		}//end foreach
+		if ( $personal ) {
+			$close = sprintf( '<span class="hunch-list__announce" data-hunch-announce aria-live="polite" data-message="%s"></span>', esc_attr__( 'Hidden. You will see fewer posts like it.', 'hunch' ) ) . $close;
 		}
-		$class   = 'hunch-list ' . ( 'hunch-related' === $element ? 'hunch-related' : 'hunch-for-you' );
+		$class   = 'hunch-list ' . ( 'hunch-related' === $element ? 'hunch-related' : 'hunch-for-you' ) . ( $personal ? ' hunch-list--personal' : '' );
 		$wrapper = $block && WP_Block_Supports::$block_to_render ? get_block_wrapper_attributes( array( 'class' => $class ) ) : 'class="' . esc_attr( $class ) . '"';
 		return sprintf(
 			'<section %1$s><h2 class="hunch-list__heading">%2$s</h2>%3$s<ol class="hunch-list__items">%4$s</ol>%5$s</section>',

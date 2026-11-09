@@ -85,6 +85,52 @@ time {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* "For you" slots: one more fixed line ("because you read …") and the hide button in a corner. */
+.related.personal li {
+  position: relative;
+  height: 6.25rem;
+  padding-right: 2.5rem;
+}
+.related .because {
+  display: block;
+  height: 1.3em;
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.related .hide {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+.related .hide[hidden] {
+  display: none;
+}
+.related .hide:hover,
+.related .hide:focus-visible {
+  color: inherit;
+  border-color: currentColor;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 /* A brief fade when the ranked items arrive, unless the visitor prefers reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
   hunch-related[data-hunch-state='ready'] li {

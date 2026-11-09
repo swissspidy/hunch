@@ -131,6 +131,17 @@ manifest names. These classes don't need WordPress.
   and then deletes the IndexedDB database directly, since something may have been stored
   earlier. With the WP Consent API, every front-end page listens for the "preferences" category
   being withdrawn and deletes the database.
+- **The WP Consent API** (amended after 0.1.0's first build). The plugin registers with the API
+  (`wp_consent_api_registered_hunch/hunch.php`) and describes what it stores with
+  `wp_add_cookie_info()`: the reading history (`preferences`, IndexedDB, described as
+  `LOCALSTORAGE`, the API's closest type) and, with the visitor's own switch, that switch
+  (`functional`). In API mode the controls block shows the switch too and sets the category
+  with `wp_set_consent()`, so the block and the consent manager's banner agree. With no consent
+  type (no consent manager), the API's `wp_has_consent()` is true for every visitor; Hunch does
+  not follow it there and requires the visitor's own `<prefix>_preferences=allow` cookie, which
+  the switch sets. Otherwise a site that activated the API without a consent manager would
+  personalize everyone, and the switch couldn't turn it off. The settings screen says which
+  case applies.
 
 ### 4. Security
 

@@ -241,3 +241,99 @@ test('an item hidden before there is a profile leaves the fallback', async () =>
   );
   await ctx.close();
 });
+
+test('"For you" says why, and its × button hides an item in place', async (t) => {
+  const ctx = await context(true);
+  const page = await ctx.newPage();
+  for (const id of FOOD) await read(site, page, id);
+  await observeLayoutShifts(page);
+  await home(page);
+  assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'true');
+  // "Because you read …" names one of the articles read, on the items the profile placed.
+  const because = await page.$$eval('hunch-for-you [data-hunch-because]', (els) =>
+    els.map((el) => el.textContent ?? ''),
+  );
+  assert.ok(
+    because.some((text) => text !== ''),
+    because.join(' | '),
+  );
+  const titles = new Map((await loadSource('demo/feed.xml')).map((item) => [item.id, item.title]));
+  for (const text of because.filter(Boolean)) {
+    assert.ok(
+      FOOD.some((id) => text === `Because you read ${titles.get(id)}`),
+      text,
+    );
+  }
+
+  const before = (await slots(page, 'hunch-for-you')).map((s) => s.id);
+  const button = page
+    .locator('hunch-for-you [data-hunch-slot]')
+    .first()
+    .locator('[data-hunch-hide]');
+  assert.ok(await button.isVisible());
+  assert.match((await button.getAttribute('aria-label')) ?? '', /^Not interested: /);
+  await button.click();
+  await page.waitForFunction(
+    (first) =>
+      document.querySelector<HTMLElement>('hunch-for-you [data-hunch-slot]')?.dataset.hunchId !==
+      first,
+    before[0],
+  );
+  await ready(page, 'hunch-for-you');
+  const after = (await slots(page, 'hunch-for-you')).map((s) => s.id);
+  assert.ok(!after.includes(before[0]!), after.join(', '));
+  // Focus moved to the first slot's link, and the change was announced.
+  assert.equal(
+    await page.evaluate(() =>
+      document.activeElement?.closest('[data-hunch-slot]') ===
+      document.querySelector('hunch-for-you [data-hunch-slot]')
+        ? document.activeElement?.localName
+        : null,
+    ),
+    'a',
+  );
+  assert.match((await page.locator('[data-hunch-announce]').textContent()) ?? '', /^Hidden/);
+  assert.ok((await storedSignals(page)).some((s) => s.kind === 'hide' && s.itemId === before[0]));
+  await assertNoLayoutShift(t, page);
+  await ctx.close();
+});
+
+test('without consent the × buttons stay hidden', async () => {
+  const ctx = await context(false);
+  const page = await ctx.newPage();
+  await home(page);
+  assert.equal(await page.locator('hunch-for-you [data-hunch-hide]:visible').count(), 0);
+  assert.deepEqual(
+    await page.$$eval('hunch-for-you [data-hunch-because]', (els) =>
+      els.map((el) => el.textContent),
+    ),
+    ['', '', '', ''],
+  );
+  await ctx.close();
+});
+
+test('a double click on × records one hide', async () => {
+  const ctx = await context(true);
+  const page = await ctx.newPage();
+  for (const id of FOOD) await read(site, page, id);
+  await home(page);
+  const first = (await slots(page, 'hunch-for-you'))[0]!.id;
+  await page
+    .locator('hunch-for-you [data-hunch-slot]')
+    .first()
+    .locator('[data-hunch-hide]')
+    .dblclick();
+  await page.waitForFunction(
+    (id) =>
+      document.querySelector<HTMLElement>('hunch-for-you [data-hunch-slot]')?.dataset.hunchId !==
+      id,
+    first,
+  );
+  await ready(page, 'hunch-for-you');
+  const hides = (await storedSignals(page)).filter((s) => s.kind === 'hide');
+  assert.deepEqual(
+    hides.map((s) => s.itemId),
+    [first],
+  );
+  await ctx.close();
+});

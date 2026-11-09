@@ -126,6 +126,8 @@ export interface Because {
   url: string;
   /** Share of the recommendation's profile similarity this item accounts for, in [0, 1]. */
   share: number;
+  /** Cosine similarity between this item and the recommended one. */
+  similarity: number;
 }
 
 /** Why an item was ranked where it was: the ranking function's terms. */
@@ -719,19 +721,19 @@ export class Hunch {
 
   /** The profile items with the largest score × similarity to `row`, top three. */
   private because(profile: Profile, row: number): Because[] {
-    const parts = profile.contributors.map((c) => ({
-      c,
-      part: c.score * Math.max(0, this.catalog.cosine(c.vector, row)),
-    }));
+    const parts = profile.contributors.map((c) => {
+      const similarity = this.catalog.cosine(c.vector, row);
+      return { c, similarity, part: c.score * Math.max(0, similarity) };
+    });
     const total = parts.reduce((sum, p) => sum + p.part, 0);
     if (total <= 0) return [];
     return parts
       .filter((p) => p.part > 0)
       .sort((a, b) => b.part - a.part)
       .slice(0, 3)
-      .map(({ c, part }) => {
+      .map(({ c, similarity, part }) => {
         const item = this.catalog.item(this.catalog.get(c.itemId)!);
-        return { id: item.id, title: item.title, url: item.url, share: part / total };
+        return { id: item.id, title: item.title, url: item.url, share: part / total, similarity };
       });
   }
 
