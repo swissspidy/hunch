@@ -33,6 +33,8 @@ export abstract class SlotsElement extends Base {
   private listening = false;
   /** Copies of the server-rendered slots, taken before the first replacement. */
   private original: HTMLElement[] | undefined;
+  /** The slot to focus after the next replacement (a button in it removed its item). */
+  protected focusAfter: number | undefined;
 
   /**
    * Ranks `n` items, or returns `null` to show the server-rendered fallback (whose item ids
@@ -62,6 +64,14 @@ export abstract class SlotsElement extends Base {
   /** Ranks again (after a signal changed, for example). */
   refresh(): void {
     this.schedule();
+  }
+
+  /** Adjusts a slot's copy after it was filled with `rec` (undefined: the fallback item). */
+  protected decorate(_slot: HTMLElement, _rec: Recommendation | undefined): void {}
+
+  /** A click inside a slot: a button the subclass handles, or a link (recorded as `click`). */
+  protected onSlotClick(_target: Element, _slot: HTMLElement, _index: number): boolean {
+    return false;
   }
 
   protected hunch(): Promise<Hunch> {
@@ -98,24 +108,41 @@ export abstract class SlotsElement extends Base {
     // Every refresh starts from the server's markup, not from an earlier ranking's.
     this.original ??= slots.map((slot) => slot.cloneNode(true) as HTMLElement);
     const original = this.original;
+    // This run's focus request: dropped if the run fails, handed on if a newer run replaces it.
+    const focus = this.focusAfter;
+    this.focusAfter = undefined;
+    const stale = (): boolean => {
+      if (run === this.run) return false;
+      this.focusAfter ??= focus;
+      return true;
+    };
     try {
       if (slots.length === 0) throw new Error(`<${this.localName}> has no [data-hunch-slot]`);
       const fallback = original.map((slot) => slot.dataset.hunchId ?? '').filter(Boolean);
       const recommendations = await this.recommend(await this.hunch(), slots.length, fallback, run);
-      if (run !== this.run) return;
-      // Replacing the slot that holds focus would drop focus to the page: wait until it leaves.
-      await this.blurred();
-      if (run !== this.run) return;
-      slots.forEach((slot, i) => {
+      if (stale()) return;
+      // Replacing the slot that holds focus would drop focus to the page: wait until it leaves,
+      // unless the replacement moves focus itself.
+      if (focus === undefined) await this.blurred();
+      if (stale()) return;
+      const copies = slots.map((slot, i) => {
         const copy = original[i]!.cloneNode(true) as HTMLElement;
-        if (recommendations) {
-          const rec = recommendations[i];
-          if (rec) fill(copy, rec);
-          // Fewer results than slots: an unfilled slot would show a stale or repeated item.
-          else copy.hidden = true;
-        }
+        const rec = recommendations?.[i];
+        if (rec) fill(copy, rec);
+        // Fewer results than slots: an unfilled slot would show a stale or repeated item.
+        else if (recommendations) copy.hidden = true;
+        this.decorate(copy, rec);
         slot.replaceWith(copy);
+        return copy;
       });
+      if (focus !== undefined) {
+        // The same slot's link, or the nearest shown one's.
+        const order = copies
+          .map((_, i) => i)
+          .sort((a, b) => Math.abs(a - focus) - Math.abs(b - focus));
+        const target = order.map((i) => copies[i]!).find((copy) => !copy.hidden);
+        (target?.matches('a') ? target : target?.querySelector('a'))?.focus();
+      }
       this.dataset.hunchState = 'ready';
       this.dispatchEvent(
         new CustomEvent('hunch:ready', { detail: { recommendations: recommendations ?? [] } }),
@@ -155,8 +182,15 @@ export abstract class SlotsElement extends Base {
   }
 
   private onClick(event: Event): void {
-    const slot = (event.target as Element | null)?.closest<HTMLElement>('[data-hunch-slot]');
-    const id = slot?.dataset.hunchId;
+    const target = event.target as Element | null;
+    const slot = target?.closest<HTMLElement>('[data-hunch-slot]');
+    if (!slot || !target) return;
+    const slots = [...this.querySelectorAll('[data-hunch-slot]')];
+    if (this.onSlotClick(target, slot, slots.indexOf(slot))) {
+      event.preventDefault();
+      return;
+    }
+    const id = slot.dataset.hunchId;
     // Best effort: the page may be gone before the write lands (its view is recorded next).
     if (id)
       void this.hunch().then(

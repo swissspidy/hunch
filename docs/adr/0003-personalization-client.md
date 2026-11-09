@@ -78,6 +78,18 @@ what the components need from the page.
   consent never sees the list change.
 - `<hunch-related>` and `<hunch-for-you>` record a `click` when a slot with a
   `data-hunch-id` is clicked. This is best effort: the next page's view is recorded either way.
+- **"Because you read …" and "Not interested" in the slots** (amended after milestone 2). A
+  `<hunch-for-you>` slot may hold a `[data-hunch-because]` line and a `[data-hunch-hide]`
+  button. The line names a read item only when the profile placed the recommendation
+  (`similarityShare ≥ 0.5`) and the named item is close to it: each `because` entry carries its
+  own cosine `similarity` to the recommendation, and the line takes the largest-share entry at
+  or above `because-min` (default 0.35). The share alone isn't enough: shares always sum to 1,
+  so the top one names something even when nothing read is close. After a hide lowered every
+  similarity, an unrelated article was named. With EmbeddingGemma at 256 dimensions, unrelated
+  demo articles reach 0.33 at the 90th percentile, so 0.35 is the default. The button is shown
+  only with consent, since the signal can't be stored without it. After a hide the list ranks
+  again at once, moving focus to the same slot's link instead of waiting for focus to leave as
+  a refresh otherwise does, and a `[data-hunch-announce]` live region says what happened.
 - `<hunch-page item>` calls `observe(item)` and renders nothing.
 - `refresh()` ranks a list again, for example after a consent change.
 
