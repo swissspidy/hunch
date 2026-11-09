@@ -78,10 +78,16 @@ console.error(
 
 if (values.serve) await serve(Number(values.port));
 
-function slot(item: CatalogItem, indent: string): string {
+function slot(item: CatalogItem, indent: string, personal = false): string {
+  // "For you" slots also say why an item is there, and let the reader hide it.
+  const extra = personal
+    ? `
+${indent}  <span class="because" data-hunch-because></span>
+${indent}  <button type="button" class="hide" data-hunch-hide hidden aria-label="Not interested: ${esc(item.title)}" title="Not interested">×</button>`
+    : '';
   return `${indent}<li data-hunch-slot data-hunch-id="${esc(item.id)}">
 ${indent}  <a href="${esc(item.url)}"><span class="title" data-hunch-title>${esc(item.title)}</span></a>
-${indent}  <span class="meta"><span data-hunch-section>${esc(item.section ?? '')}</span> · <time data-hunch-date datetime="${esc(item.date ?? '')}">${fmt(item.date)}</time></span>
+${indent}  <span class="meta"><span data-hunch-section>${esc(item.section ?? '')}</span> · <time data-hunch-date datetime="${esc(item.date ?? '')}">${fmt(item.date)}</time></span>${extra}
 ${indent}</li>`;
 }
 
@@ -105,7 +111,7 @@ ${list.map((item) => `    <li><a href="${esc(item.url)}">${esc(item.title)}</a> 
     .join('\n');
   const editorial = items
     .slice(0, SLOTS)
-    .map((item) => slot(item, '      '))
+    .map((item) => slot(item, '      ', true))
     .join('\n');
   return `<header><h1>Field Notes</h1><p class="lede">A demo publication for <a href="https://github.com/swissspidy/hunch">Hunch</a>. Recommendations are ranked in your browser from precomputed vectors, with no model. Search embeds your query with a model in your browser. There is no server-side profile and no tracking.</p></header>
 <main>
@@ -130,9 +136,10 @@ ${latest}
   <section aria-labelledby="for-you-heading">
     <h2 id="for-you-heading">For you</h2>
     <hunch-for-you manifest="${base}hunch/manifest.json">
-      <ol class="related" role="list">
+      <ol class="related personal" role="list">
 ${editorial}
       </ol>
+      <p class="visually-hidden" data-hunch-announce data-message="Hidden. You will see fewer articles like it." aria-live="polite"></p>
     </hunch-for-you>
     <details class="why">
       <summary>Why these?</summary>
