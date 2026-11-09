@@ -1,12 +1,14 @@
 /**
  * The personalization controls block, as on the demo's home page: the visitor's consent switch
- * (when the site leaves consent to the visitor), pause or resume, export and forget. Withdrawing
- * consent deletes what was stored. Forget works even without an index (no manifest): it then
+ * (when the site leaves consent to the visitor, or to the WP Consent API, whose "preferences"
+ * category the switch then sets), pause or resume, export and forget. Withdrawing consent deletes
+ * what was stored. Forget works even without an index (no manifest): it then
  * deletes the database directly.
  */
 (function () {
   'use strict';
   const CONSENT_KEY = 'hunch-consent';
+  const CATEGORY = 'preferences';
   const DATABASE = 'hunch';
   const roots = [...document.querySelectorAll('[data-hunch-controls]')];
   const updaters = [];
@@ -37,7 +39,14 @@
     });
   }
 
-  function storedConsent() {
+  /** With the WP Consent API, its functions are the consent manager's. */
+  const consentApi = (root) =>
+    root.dataset.consent === 'wp-consent-api' &&
+    typeof window.wp_has_consent === 'function' &&
+    typeof window.wp_set_consent === 'function';
+
+  function storedConsent(root) {
+    if (consentApi(root)) return window.wp_has_consent(CATEGORY);
     try {
       return localStorage.getItem(CONSENT_KEY) === 'yes';
     } catch {
@@ -60,7 +69,7 @@
       });
 
     async function update() {
-      if (consent) consent.checked = storedConsent();
+      if (consent) consent.checked = storedConsent(root);
       if (!manifest) {
         status.value = 'Personalization is off. Forget deletes anything stored earlier.';
         return;
@@ -80,7 +89,12 @@
     updaters.push(update);
 
     on(consent, async () => {
-      if (consent.checked) {
+      if (consentApi(root)) {
+        // The consent manager stores the choice and tells every listener, Hunch's included
+        // (withdrawing deletes what was stored, see consent_cleanup()).
+        window.wp_set_consent(CATEGORY, consent.checked ? 'allow' : 'deny');
+        if (!consent.checked) await forget(manifest);
+      } else if (consent.checked) {
         try {
           localStorage.setItem(CONSENT_KEY, 'yes');
         } catch {
@@ -130,6 +144,12 @@
 
   // Deleted elsewhere on the page (the WP Consent API's withdrawal, see consent_cleanup()).
   document.addEventListener('hunch:forgotten', () => {
+    syncAll();
+    refreshLists();
+  });
+  // Consent given or withdrawn in the consent manager's banner.
+  document.addEventListener('wp_listen_for_consent_change', (event) => {
+    if (event.detail?.[CATEGORY] === undefined) return;
     syncAll();
     refreshLists();
   });
