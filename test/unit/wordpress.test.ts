@@ -241,6 +241,12 @@ test(
       '<p>  a   </p>\t<div>b &#65; &#0; &#xD800; &bogus; &QUOT;</div>　',
       'plain\r\n\r\ntext\v\fwith  spaces <br/>end',
       '<style>p{}</style><svg><path/></svg>x<SCRIPT >y</script >z',
+      // Spans that never close stay; the nearest closing ends one; names match in any case.
+      'a<!-->b<!--->c<!---->d<!-- e --> f --> g <!-- never closed',
+      'a<script>b<svg>c</svg>d<style>e</STYLE>f</template>g<script</script>h<scripts>i</script>j',
+      'a<svg>b</svg >c</svg>d<noscript>e<template>f</template>g',
+      // Longer than PCRE's backtrack limit allows a lazy pattern to cross.
+      `Intro<!-- ${'x'.repeat(1_100_000)} --><p>end</p><svg>${'<path/>'.repeat(160_000)}</svg>.`,
     ];
     const long = `${'a'.repeat(3999)}🥐 and more`;
     const inputs = [

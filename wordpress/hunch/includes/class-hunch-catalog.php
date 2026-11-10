@@ -38,7 +38,10 @@ final class Hunch_Catalog {
 		add_action( self::HOOK, array( __CLASS__, 'scheduled_regenerate' ) );
 		add_action( 'transition_post_status', array( __CLASS__, 'on_transition' ), 10, 3 );
 		add_action( 'wp_update_comment_count', array( __CLASS__, 'on_comment_count' ) );
+		add_action( 'deleted_post', array( __CLASS__, 'on_delete' ), 10, 2 );
 		add_action( 'update_option_' . Hunch_Settings::OPTION, array( __CLASS__, 'schedule' ) );
+		// The first save creates the option, which is no update.
+		add_action( 'add_option_' . Hunch_Settings::OPTION, array( __CLASS__, 'schedule' ) );
 	}
 
 	/**
@@ -208,7 +211,7 @@ final class Hunch_Catalog {
 			if ( ! self::is_current( $post, $input['hash'] ) ) {
 				$posts[] = array(
 					'id'    => $post->ID,
-					'title' => get_the_title( $post ),
+					'title' => Hunch_Format::html_to_text( get_the_title( $post ) ),
 					'input' => $input['input'],
 					'hash'  => $input['hash'],
 				);
@@ -277,6 +280,18 @@ final class Hunch_Catalog {
 		if ( ( 'publish' === $new_status || 'publish' === $old_status )
 			&& in_array( $post->post_type, (array) Hunch_Settings::get( 'post_types' ), true ) ) {
 			self::schedule();
+		}
+	}
+
+	/**
+	 * A published post was deleted for good (not trashed first): no status transition says so.
+	 *
+	 * @param int     $post_id The post's ID.
+	 * @param WP_Post $post    The post.
+	 */
+	public static function on_delete( $post_id, $post ) {
+		if ( $post instanceof WP_Post ) {
+			self::on_transition( 'deleted', $post->post_status, $post );
 		}
 	}
 

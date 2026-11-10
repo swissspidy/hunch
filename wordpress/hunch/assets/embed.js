@@ -1,6 +1,6 @@
 /**
  * Embeds posts in the editor's browser with the catalog's pinned model (EmbeddingGemma through
- * Transformers.js, q8 weights), as the Node build does, and stores the vectors on the site
+ * Transformers.js, the weights the settings name), as the Node build does, and stores the vectors on the site
  * (ADR 0007). The post's text comes from the site and goes nowhere else; the model's weights
  * come from the Hugging Face Hub (or wherever Transformers.js is configured to load them) and
  * stay in the browser's cache.

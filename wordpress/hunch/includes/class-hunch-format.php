@@ -109,8 +109,8 @@ final class Hunch_Format {
 	 */
 	public static function html_to_text( $html ) {
 		$html = self::valid_utf8( $html );
-		$html = (string) preg_replace( '/<!--[\s\S]*?-->/', ' ', $html );
-		$html = (string) preg_replace( '/<(script|style|noscript|template|svg)\b[\s\S]*?<\/\1\s*>/i', ' ', $html );
+		$html = self::strip_spans( $html, '/<!--/', null );
+		$html = self::strip_spans( $html, '/<(script|style|noscript|template|svg)\b/i', '/<\/%s\s*>/i' );
 		$html = (string) preg_replace( '/<\/?(p|div|br|li|h[1-6]|section|article|blockquote|tr)\b[^>]*>/i', "\n", $html );
 		$html = (string) preg_replace( '/<[^>]+>/', ' ', $html );
 		$text = self::decode_entities( $html );
@@ -118,6 +118,44 @@ final class Hunch_Format {
 		$text = (string) preg_replace( '/[ \t\f\x0b\r]+/u', ' ', $text );
 		$text = (string) preg_replace( '/[' . self::JS_SPACE . ']*\n[' . self::JS_SPACE . ']*/u', "\n", $text );
 		return (string) preg_replace( '/^[' . self::JS_SPACE . ']+|[' . self::JS_SPACE . ']+$/u', '', $text );
+	}
+
+	/**
+	 * Replaces each span from an opening match to the nearest closing one with a space, as
+	 * JavaScript's `open[\s\S]*?close` does. Found with two searches rather than one lazy
+	 * pattern: on a span of about a megabyte that one runs into `pcre.backtrack_limit`, and
+	 * preg_replace() then returns null.
+	 *
+	 * @param string      $html  HTML.
+	 * @param string      $open  Pattern of the opening; its first group, if any, is the name.
+	 * @param string|null $close Pattern of the closing, `%s` the name; null for `-->`.
+	 * @return string
+	 */
+	private static function strip_spans( $html, $open, $close ) {
+		$out    = '';
+		$copied = 0;
+		$offset = 0;
+		while ( preg_match( $open, $html, $start, PREG_OFFSET_CAPTURE, $offset ) ) {
+			$from  = $start[0][1];
+			$after = $from + strlen( $start[0][0] );
+			if ( null === $close ) {
+				$at  = strpos( $html, '-->', $after );
+				$end = false === $at ? false : $at + 3;
+			} elseif ( preg_match( sprintf( $close, preg_quote( $start[1][0], '/' ) ), $html, $stop, PREG_OFFSET_CAPTURE, $after ) ) {
+				$end = $stop[0][1] + strlen( $stop[0][0] );
+			} else {
+				$end = false;
+			}
+			if ( false === $end ) {
+				// Never closed: it stays, and a later opening may still close.
+				$offset = $from + 1;
+				continue;
+			}
+			$out   .= substr( $html, $copied, $from - $copied ) . ' ';
+			$copied = $end;
+			$offset = $end;
+		}
+		return $out . substr( $html, $copied );
 	}
 
 	/**

@@ -302,8 +302,7 @@ final class Hunch_Writer {
 				$out[ $key ] = (string) $item[ $key ];
 			}
 		}
-		// JSON.stringify writes 1, not 1.0.
-		$out['prior'] = ( floor( $prior ) === (float) $prior ) ? (int) $prior : $prior;
+		$out['prior'] = $prior;
 		return $out;
 	}
 

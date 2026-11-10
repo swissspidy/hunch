@@ -200,6 +200,10 @@ final class Hunch_Rest {
 	public static function post_regenerate() {
 		wp_clear_scheduled_hook( Hunch_Catalog::HOOK );
 		$state = Hunch_Catalog::regenerate();
+		if ( ! is_wp_error( $state ) ) {
+			// A fresh start for the scheduled runs' retries, as after a scheduled run that worked.
+			delete_option( Hunch_Catalog::RETRIES );
+		}
 		return is_wp_error( $state ) ? $state : rest_ensure_response( $state );
 	}
 }
