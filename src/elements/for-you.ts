@@ -110,9 +110,10 @@ export class HunchForYouElement extends SlotsElement {
         ? why.because.find((b) => b.similarity >= min)
         : undefined;
     because.textContent = source
-      ? (this.getAttribute('because') ?? 'Because you read {title}').replace(
+      ? // A function: in a replacement string, a `$&` or `$$` in a title would be a pattern.
+        (this.getAttribute('because') ?? 'Because you read {title}').replace(
           '{title}',
-          source.title,
+          () => source.title,
         )
       : '';
   }

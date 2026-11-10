@@ -77,18 +77,22 @@ async function sitemapUrls(
  * article meta tags, text from `<article>`, `<main>` or `<body>`. The id is the URL.
  */
 export function parsePage(url: string, html: string, lastmod?: string): CatalogItem {
+  // A quoted attribute value: it ends at its own kind of quote (`content="Don't panic"`).
+  const quoted = `(?:"([^"]*)"|'([^']*)')`;
   const meta = (name: string): string | undefined => {
     const re = new RegExp(
-      `<meta\\s[^>]*(?:property|name)=["']${name}["'][^>]*content=["']([^"']*)["']|<meta\\s[^>]*content=["']([^"']*)["'][^>]*(?:property|name)=["']${name}["']`,
+      `<meta\\s[^>]*(?:property|name)=["']${name}["'][^>]*content=${quoted}|<meta\\s[^>]*content=${quoted}[^>]*(?:property|name)=["']${name}["']`,
       'i',
     );
     const m = re.exec(html);
-    const value = m?.[1] ?? m?.[2];
+    const value = m?.[1] ?? m?.[2] ?? m?.[3] ?? m?.[4];
     return value === undefined ? undefined : decodeEntities(value);
   };
   const tags = [
-    ...html.matchAll(/<meta\s[^>]*property=["']article:tag["'][^>]*content=["']([^"']*)["']/gi),
-  ].map((m) => decodeEntities(m[1]!));
+    ...html.matchAll(
+      new RegExp(`<meta\\s[^>]*property=["']article:tag["'][^>]*content=${quoted}`, 'gi'),
+    ),
+  ].map((m) => decodeEntities((m[1] ?? m[2])!));
   const title =
     meta('og:title') ?? htmlToText(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? '');
   const body =

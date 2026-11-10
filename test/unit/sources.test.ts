@@ -109,6 +109,15 @@ test('pages from a sitemap use their article meta tags', async () => {
     { id: 'https://e.com/b', url: 'https://e.com/b', title: 'B', text: 'Main text' },
   ]);
   assert.equal(parsePage('https://e.com/c', '<p>x</p>').title, 'https://e.com/c');
+  // A value ends at its own kind of quote, whichever attribute comes first.
+  const quotes = parsePage(
+    'https://e.com/d',
+    `<meta property="og:title" content="Don't panic"><meta content='Say "hi"' name="article:section">
+     <meta property="article:tag" content="rock 'n' roll"><meta property="article:tag" content='7"'>`,
+  );
+  assert.equal(quotes.title, "Don't panic");
+  assert.equal(quotes.section, 'Say "hi"');
+  assert.deepEqual(quotes.tags, ["rock 'n' roll", '7"']);
 });
 
 test('htmlToText drops markup and scripts', () => {

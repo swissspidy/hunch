@@ -17,5 +17,6 @@ export interface EmbeddingProvider {
 
 /** Fills a model's document prompt with an item's title and text. */
 export function documentInput(prompt: string, title: string, text: string): string {
-  return prompt.replaceAll('{title}', title || 'none').replaceAll('{text}', text);
+  // Functions: in a replacement string, a `$&` or `$$` in a title or text would be a pattern.
+  return prompt.replaceAll('{title}', () => title || 'none').replaceAll('{text}', () => text);
 }

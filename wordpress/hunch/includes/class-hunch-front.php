@@ -312,7 +312,7 @@ final class Hunch_Front {
 	}
 
 	/**
-	 * A list of posts in slots, wrapped in an Hunch component when there is a manifest.
+	 * A list of posts in slots, wrapped in a Hunch component when there is a manifest.
 	 *
 	 * @param string     $element    `hunch-related` or `hunch-for-you`.
 	 * @param array|null $attributes The component's attributes, or null for the list alone.

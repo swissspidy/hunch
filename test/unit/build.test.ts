@@ -287,7 +287,7 @@ test('a corrupt cache is reported, not silently used', async () => {
   await writeFile(join(out, `${provider.model.id.replace('/', '_')}@1.vec`), 'garbage');
   await assert.rejects(
     build({ items, outDir: out, provider, cacheDir: out }),
-    /not an Hunch embedding cache/,
+    /not a Hunch embedding cache/,
   );
 });
 

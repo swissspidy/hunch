@@ -19,7 +19,7 @@
 
 import type { Manifest } from '../format/manifest.ts';
 import { hashEmbed } from '../rank/hash.ts';
-import { normalize } from '../rank/vector.ts';
+import { truncate } from '../rank/vector.ts';
 
 /** Files of q4 weights that browsers can run, per model (see `EMBEDDING_GEMMA.files`). */
 const Q4_FILES: Record<string, string | undefined> = {
@@ -158,9 +158,7 @@ export async function createQueryEmbedder(
       let vector = cache.get(text);
       if (!vector) {
         // Matryoshka truncation to the catalog's dimensions, renormalized: the build's own step.
-        vector = embedFull(text).then((full) =>
-          normalize(Array.prototype.slice.call(full, 0, dims) as number[]),
-        );
+        vector = embedFull(text).then((full) => truncate(full, dims));
         const pending = vector;
         pending.catch(() => {
           if (cache.get(text) === pending) cache.delete(text);

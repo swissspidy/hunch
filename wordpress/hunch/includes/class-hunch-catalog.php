@@ -1,6 +1,6 @@
 <?php
 /**
- * Published posts as an Hunch catalog: their model input, the vectors the editors' browsers
+ * Published posts as a Hunch catalog: their model input, the vectors the editors' browsers
  * sent, and the manifest and shards in `uploads/hunch/` (ADR 0007).
  *
  * @package Hunch

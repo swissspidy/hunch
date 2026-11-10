@@ -142,7 +142,7 @@ export interface Explanation {
   prior: number;
   /** Highest similarity to an item ranked above it (the diversity penalty's input). */
   redundancy: number;
-  /** Trust in the profile, in [0, 1): 1 for related items, 0 without signals. */
+  /** Trust in the query: 1 for related items and search; for "for you" the profile's, in [0, 1), 0 without signals. */
   confidence: number;
   /**
    * Share of the score that similarity contributes, in [0, 1]; the rest is the site's order

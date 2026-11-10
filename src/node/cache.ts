@@ -92,7 +92,7 @@ export class EmbeddingCache {
     }
     const dims = this.model.nativeDims;
     if (data.length < HEADER || data.readUInt32LE(0) !== MAGIC || data.readUInt32LE(4) !== 1) {
-      throw new Error(`${file} is not an Hunch embedding cache`);
+      throw new Error(`${file} is not a Hunch embedding cache`);
     }
     if (data.readUInt32LE(8) !== dims) return; // A different model shape: start over.
     const count = data.readUInt32LE(12);

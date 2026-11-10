@@ -248,6 +248,8 @@ test(
       { title: '', text: 'No title, {title} and {text} in the text.' },
       { title: 'Long', text: long },
       { title: 'Long 2', text: `${'é'.repeat(4100)}` },
+      // Not replacement patterns: PHP's str_replace() has none.
+      { title: 'Make $$$ fast, $& all', text: "From $1 to $' and $`." },
     ];
     const result = runPhp(
       await tempDir(),
