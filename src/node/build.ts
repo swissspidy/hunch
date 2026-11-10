@@ -130,7 +130,8 @@ export async function build(options: BuildOptions): Promise<BuildResult> {
   const priors = computePriors(items);
   const groups = new Map<string | null, number[]>();
   items.forEach((item, i) => {
-    const section = options.shardBy === 'none' ? null : (item.section ?? null);
+    // An empty section is no section, as in the published item.
+    const section = options.shardBy === 'none' ? null : item.section || null;
     let group = groups.get(section);
     if (!group) groups.set(section, (group = []));
     group.push(i);
@@ -287,15 +288,16 @@ export function bucketsOf<T>(
   }
 }
 
+/** An item as published: an empty section, date or image is left out, like a missing one. */
 function publishedItem(item: CatalogItem, prior: number): ShardItem {
   return compact({
     id: item.id,
     url: item.url,
     title: item.title,
-    section: item.section,
+    section: item.section || undefined,
     tags: item.tags?.length ? item.tags : undefined,
-    date: item.date,
-    image: item.image,
+    date: item.date || undefined,
+    image: item.image || undefined,
     prior,
   });
 }

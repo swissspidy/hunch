@@ -5,12 +5,14 @@
  * come from the Hugging Face Hub (or wherever Transformers.js is configured to load them) and
  * stay in the browser's cache.
  *
+ * window.hunchEmbed.load() → loads the model ("Build index" does, to say so first)
+ * window.hunchEmbed.store({ id, input, hash }) → embeds the input and stores the vector
  * window.hunchEmbed.embedPost(id) → { stored, skipped }
- * window.hunchEmbed.embed(input) → Float32Array (the model's full output)
  */
 (function () {
   'use strict';
   const config = window.hunchEmbedConfig;
+  const { __, sprintf } = wp.i18n;
   let loaded;
 
   function load() {
@@ -43,7 +45,10 @@
     const tensor = result.sentence_embedding;
     const dims = config.model.nativeDims;
     if (!tensor || tensor.dims[1] !== dims) {
-      throw new Error(`Hunch: ${config.model.id} did not return ${dims} dims`);
+      throw new Error(
+        /* translators: 1: the model's name, 2: a number of dimensions */
+        sprintf(__('%1$s did not return %2$d dimensions', 'hunch'), config.model.id, dims),
+      );
     }
     return Float32Array.from(tensor.data.subarray(0, dims));
   }
@@ -78,5 +83,5 @@
     return { stored: true, skipped: false };
   }
 
-  window.hunchEmbed = { embed, embedPost, store, encode, load };
+  window.hunchEmbed = { embedPost, store, load };
 })();

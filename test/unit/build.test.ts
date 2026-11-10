@@ -83,6 +83,36 @@ test('writes a manifest and one shard per section', async () => {
   assert.doesNotMatch(await readFile(join(out, manifest.shards[0]!.url), 'latin1'), /starter/);
 });
 
+test('an empty section, date or image is left out, like a missing one', async () => {
+  const out = await tempDir();
+  const { manifest } = await build({
+    items: [
+      { id: 'a', url: '/a', title: 'A', text: 'a', section: '', date: '', image: '' },
+      { id: 'b', url: '/b', title: 'B', text: 'b' },
+      { id: 'c', url: '/c', title: 'C', text: 'c', section: 'Food' },
+    ],
+    outDir: out,
+    provider: countingProvider(),
+    dims: 64,
+    cacheDir: false,
+    now: new Date(0),
+  });
+  // No shard and no section of its own for the empty name.
+  assert.deepEqual(manifest.sections, ['Food']);
+  assert.deepEqual(
+    manifest.shards.map((s) => [s.section, s.count]),
+    [
+      [null, 2],
+      ['Food', 1],
+    ],
+  );
+  const shard = decodeShard(
+    new Uint8Array(await readFile(join(out, manifest.shards[0]!.url))).buffer,
+  );
+  assert.deepEqual(shard.items[0], { id: 'a', url: '/a', title: 'A', prior: 0.75 });
+  assert.ok(Number.isNaN(shard.time[0]));
+});
+
 test('rebuilds embed only new or changed items, and are reproducible', async () => {
   const out = await tempDir();
   const cacheDir = join(out, 'cache');

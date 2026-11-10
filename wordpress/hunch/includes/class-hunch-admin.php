@@ -22,7 +22,8 @@ final class Hunch_Admin {
 		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
 		add_action( 'admin_init', array( __CLASS__, 'privacy_policy' ) );
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
-		add_action( 'init', array( __CLASS__, 'register_scripts' ) );
+		// wp-admin only: the block editor and the settings screen are the scripts' only users.
+		add_action( 'admin_init', array( __CLASS__, 'register_scripts' ) );
 		add_action( 'enqueue_block_editor_assets', array( __CLASS__, 'editor_assets' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( HUNCH_FILE ), array( __CLASS__, 'action_links' ) );
 	}
@@ -78,7 +79,8 @@ final class Hunch_Admin {
 	 */
 	public static function register_scripts() {
 		$model = Hunch_Catalog::model();
-		wp_register_script( 'hunch-embed', plugins_url( 'assets/embed.js', HUNCH_FILE ), array( 'wp-api-fetch' ), HUNCH_VERSION, true );
+		wp_register_script( 'hunch-embed', plugins_url( 'assets/embed.js', HUNCH_FILE ), array( 'wp-api-fetch', 'wp-i18n' ), HUNCH_VERSION, true );
+		wp_set_script_translations( 'hunch-embed', 'hunch' );
 		wp_add_inline_script(
 			'hunch-embed',
 			'window.hunchEmbedConfig = ' . wp_json_encode(
@@ -111,7 +113,49 @@ final class Hunch_Admin {
 		if ( ! $screen || ! in_array( $screen->post_type, (array) Hunch_Settings::get( 'post_types' ), true ) ) {
 			return;
 		}
-		wp_enqueue_script( 'hunch-editor', plugins_url( 'assets/editor.js', HUNCH_FILE ), array( 'hunch-embed', 'wp-data', 'wp-notices' ), HUNCH_VERSION, true );
+		wp_enqueue_script( 'hunch-editor', plugins_url( 'assets/editor.js', HUNCH_FILE ), array( 'hunch-embed', 'wp-data', 'wp-i18n', 'wp-notices' ), HUNCH_VERSION, true );
+		wp_set_script_translations( 'hunch-editor', 'hunch' );
+	}
+
+	/**
+	 * The line above "Build index": how many posts have a vector, the published index and
+	 * what was left out of it. Also sent by the status route, for the screen to show after a
+	 * build.
+	 *
+	 * @param array $status From `Hunch_Catalog::status()`.
+	 * @return string Plain text.
+	 */
+	public static function summary( array $status ) {
+		$state = $status['state'];
+		$parts = array(
+			sprintf(
+				/* translators: 1: posts with a vector, 2: published posts */
+				__( '%1$d of %2$d published posts have a vector. A post edited since it was embedded keeps its vector until the next Build index.', 'hunch' ),
+				(int) $status['embedded'],
+				(int) $status['total']
+			),
+		);
+		if ( ! empty( $state['version'] ) ) {
+			$parts[] = sprintf(
+				/* translators: 1: number of posts, 2: build time */
+				__( 'The published index has %1$d posts (built %2$s).', 'hunch' ),
+				(int) $state['count'],
+				(string) $state['generatedAt']
+			);
+		}
+		if ( ! empty( $state['duplicates'] ) ) {
+			$parts[] = sprintf(
+				/* translators: %d: number of posts */
+				_n(
+					'%d post is left out: it has the same ID (its GUID) as a newer post.',
+					'%d posts are left out: each has the same ID (its GUID) as a newer post.',
+					(int) $state['duplicates'],
+					'hunch'
+				),
+				(int) $state['duplicates']
+			);
+		}
+		return implode( ' ', $parts );
 	}
 
 	/**
@@ -121,7 +165,8 @@ final class Hunch_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		wp_enqueue_script( 'hunch-index', plugins_url( 'assets/index.js', HUNCH_FILE ), array( 'hunch-embed' ), HUNCH_VERSION, true );
+		wp_enqueue_script( 'hunch-index', plugins_url( 'assets/index.js', HUNCH_FILE ), array( 'hunch-embed', 'wp-i18n' ), HUNCH_VERSION, true );
+		wp_set_script_translations( 'hunch-index', 'hunch' );
 		$s      = Hunch_Settings::get();
 		$name   = Hunch_Settings::OPTION;
 		$status = Hunch_Catalog::status();
@@ -134,27 +179,9 @@ final class Hunch_Admin {
 			<h2><?php esc_html_e( 'Index', 'hunch' ); ?></h2>
 			<p><?php esc_html_e( 'Each post is embedded with EmbeddingGemma in your browser, on this screen or when you publish in the block editor. Only the resulting vector is stored on the site; the post\'s text is not sent anywhere else. The first time, the browser downloads the model (about 300 MB with q8 weights, 200 MB with q4) and keeps it in its cache.', 'hunch' ); ?></p>
 			<div id="hunch-index" data-total="<?php echo esc_attr( (string) $status['total'] ); ?>">
-				<p>
-					<?php
-					printf(
-						/* translators: 1: posts with a vector, 2: published posts */
-						esc_html__( '%1$d of %2$d published posts have a vector.', 'hunch' ),
-						(int) $status['embedded'],
-						(int) $status['total']
-					);
-					if ( ! empty( $status['state']['version'] ) ) {
-						echo ' ';
-						printf(
-							/* translators: 1: number of posts, 2: build time */
-							esc_html__( 'The published index has %1$d posts (built %2$s).', 'hunch' ),
-							(int) $status['state']['count'],
-							esc_html( (string) $status['state']['generatedAt'] )
-						);
-					}
-					?>
-				</p>
+				<p data-hunch-summary><?php echo esc_html( self::summary( $status ) ); ?></p>
 				<?php if ( ! empty( $status['state']['error'] ) ) : ?>
-					<div class="notice notice-error inline"><p>
+					<div class="notice notice-error inline" data-hunch-error><p>
 						<?php
 						/* translators: %s: error message */
 						printf( esc_html__( 'The last build failed: %s', 'hunch' ), esc_html( (string) $status['state']['error'] ) );
@@ -275,7 +302,8 @@ final class Hunch_Admin {
 				<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><?php esc_html_e( 'After the content', 'hunch' ); ?></th>
-						<td><label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[related_auto]" value="1" <?php checked( $s['related_auto'] ); ?>> <?php esc_html_e( 'Show related posts after each post (or place the Related posts block yourself)', 'hunch' ); ?></label></td>
+						<td><label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[related_auto]" value="1" <?php checked( $s['related_auto'] ); ?>> <?php esc_html_e( 'Show related posts after each post (or place the Related posts block yourself)', 'hunch' ); ?></label>
+						<p class="description"><?php esc_html_e( 'Not added to a post whose content already holds the Related posts block, nor where the theme\'s template does.', 'hunch' ); ?></p></td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="hunch-count"><?php esc_html_e( 'Number of posts', 'hunch' ); ?></label></th>

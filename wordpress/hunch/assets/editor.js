@@ -5,6 +5,7 @@
 (function () {
   'use strict';
   const { select, dispatch, subscribe } = wp.data;
+  const { __ } = wp.i18n;
   const NOTICE = 'hunch-embed';
   let wasSaving = false;
   let running;
@@ -21,16 +22,19 @@
   async function embedCurrent(id) {
     try {
       const slow = setTimeout(
-        () => notice('info', 'Hunch: embedding this post in your browser…'),
+        () => notice('info', __('Hunch: embedding this post in your browser…', 'hunch')),
         1500,
       );
       const result = await window.hunchEmbed.embedPost(id).finally(() => clearTimeout(slow));
-      if (result.stored) notice('success', 'Hunch: this post is in the index.');
+      if (result.stored) notice('success', __('Hunch: this post is in the index.', 'hunch'));
     } catch (error) {
       console.error(error);
       notice(
         'warning',
-        'Hunch could not embed this post here. "Build index" under Settings → Hunch will retry.',
+        __(
+          'Hunch could not embed this post here. "Build index" under Settings → Hunch will retry.',
+          'hunch',
+        ),
       );
     }
   }

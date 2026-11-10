@@ -32,7 +32,7 @@ final class Hunch_Writer {
 	 * }
 	 * @return array{manifest: array, removed: string[]}
 	 * @throws LengthException          When the catalog is empty.
-	 * @throws InvalidArgumentException When `max_shard_items` is not positive, or too small for ids that share a hash prefix.
+	 * @throws InvalidArgumentException When two items share an id, or `max_shard_items` is not positive or too small for ids that share a hash prefix.
 	 * @throws RuntimeException         When a file cannot be written.
 	 */
 	public static function write( array $args ) {
@@ -50,6 +50,15 @@ final class Hunch_Writer {
 		}
 		if ( $max_items < 1 ) {
 			throw new InvalidArgumentException( 'Hunch: max_shard_items must be positive' );
+		}
+		$seen = array();
+		foreach ( $items as $item ) {
+			// Keyed with a prefix, so a numeric id stays a string key.
+			$key = 'i:' . $item['id'];
+			if ( isset( $seen[ $key ] ) ) {
+				throw new InvalidArgumentException( 'Hunch: duplicate item id ' . Hunch_Format::json( (string) $item['id'] ) );
+			}
+			$seen[ $key ] = true;
 		}
 		$space  = Hunch_Format::space_key( $model, $dims );
 		$priors = self::priors( $items );
@@ -104,7 +113,13 @@ final class Hunch_Writer {
 				}
 				$names[ $base ] = true;
 				$file           = $base . '.' . substr( $sha256, 0, 12 ) . '.hunch';
-				self::put( $shard_dir . '/' . $file, $bytes );
+				// The name holds a hash of the bytes: a file of that name and size is this shard
+				// already (most are, on a rebuild), and is left as it is. The Node build writes
+				// it again, with the same bytes.
+				clearstatcache( true, $shard_dir . '/' . $file );
+				if ( ! is_file( $shard_dir . '/' . $file ) || filesize( $shard_dir . '/' . $file ) !== strlen( $bytes ) ) {
+					self::put( $shard_dir . '/' . $file, $bytes );
+				}
 				$shards[] = array(
 					'url'     => 'shards/' . $file,
 					'section' => $section,

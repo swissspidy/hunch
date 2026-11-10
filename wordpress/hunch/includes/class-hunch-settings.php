@@ -5,7 +5,7 @@
  * @package Hunch
  */
 
-defined( 'ABSPATH' ) || exit;
+defined( 'ABSPATH' ) || defined( 'HUNCH_STANDALONE' ) || exit;
 
 /**
  * Settings: defaults, reading and sanitizing.
@@ -25,6 +25,12 @@ final class Hunch_Settings {
 		'weights'      => array( 'q8', 'q4' ),
 		'consent'      => array( 'optin', 'always', 'cookie', 'function', 'wp-consent-api', 'off' ),
 	);
+
+	/**
+	 * The settings the published files depend on: changing one rewrites them (and `weights`
+	 * also makes every vector stale). The others only change what the pages and wp-admin do.
+	 */
+	const CATALOG = array( 'post_types', 'sections', 'priors', 'dims', 'quantization', 'weights' );
 
 	/**
 	 * The defaults.
@@ -59,6 +65,26 @@ final class Hunch_Settings {
 		$stored   = get_option( self::OPTION, array() );
 		$settings = array_merge( self::defaults(), is_array( $stored ) ? $stored : array() );
 		return null === $key ? $settings : $settings[ $key ];
+	}
+
+	/**
+	 * Whether two stored values of the option differ in a setting the published files depend
+	 * on (see `CATALOG`), with the defaults for what either leaves out.
+	 *
+	 * @param mixed $old Stored settings.
+	 * @param mixed $now Stored settings.
+	 * @return bool
+	 */
+	public static function catalog_changed( $old, $now ) {
+		$old = array_merge( self::defaults(), is_array( $old ) ? $old : array() );
+		$now = array_merge( self::defaults(), is_array( $now ) ? $now : array() );
+		foreach ( self::CATALOG as $key ) {
+			// Loosely: a hand-stored "256" is the form's 256.
+			if ( $old[ $key ] != $now[ $key ] ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

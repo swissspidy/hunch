@@ -1,5 +1,6 @@
-# Dependency updates, weekly, grouped, after a week's cooldown: npm for the package and the
-# GitHub Actions the workflows and the local action use.
+# Dependency updates, weekly, grouped, after a week's cooldown: npm for the package, Composer
+# for the WordPress plugin's development tools, and the GitHub Actions the workflows and the
+# local action use.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -20,8 +21,8 @@ updates:
         dependency-type: development
         update-types: [minor, patch]
     ignore:
-      # Pinned to the version whose Chromium build the CI cache and the dev container hold;
-      # update it deliberately, with the browser.
+      # Pinned to the version whose Chromium build the CI cache holds; update it deliberately,
+      # with the browser.
       - dependency-name: playwright-core
         update-types: [version-update:semver-minor]
 
@@ -39,6 +40,18 @@ updates:
     ignore:
       - dependency-name: typescript
         update-types: [version-update:semver-major]
+
+  # The WordPress plugin's tests and coding standards (PHPUnit, PHPCS). The plugin itself has
+  # no Composer dependencies.
+  - package-ecosystem: composer
+    directory: /wordpress/hunch
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      wordpress:
+        patterns: ['*']
 
   - package-ecosystem: github-actions
     directories: ['/', '/.github/actions/*']

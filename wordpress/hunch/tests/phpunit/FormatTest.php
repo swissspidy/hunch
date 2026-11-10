@@ -47,6 +47,22 @@ final class FormatTest extends TestCase {
 		$this->assertSame( "A\u{3000}&bogus; &#0;", Hunch_Format::html_to_text( "&#65;\u{3000}&bogus; &#0;\u{a0}" ) );
 	}
 
+	public function test_a_closing_tag_may_hold_unicode_spaces() {
+		// JavaScript's \s: a no-break space, an ideographic space and a byte order mark.
+		$this->assertSame( 'a c e', Hunch_Format::html_to_text( "a<script>b</script\u{a0}>c<style>d</STYLE\u{3000}\u{feff} >e" ) );
+		// Not a space (U+200B), and no caseless match for U+017F: the span ends at the real closing.
+		$this->assertSame( 'a e', Hunch_Format::html_to_text( "a<script>b</script\u{200b}>c</\u{17f}cript>d</script>e" ) );
+	}
+
+	public function test_a_surrogate_pair_in_two_entities_is_one_character() {
+		$this->assertSame( "a\u{1f600}b", Hunch_Format::decode_entities( 'a&#xD83D;&#xDE00;b' ) );
+		$this->assertSame( "\u{1f950}", Hunch_Format::decode_entities( '&#55358;&#xDD50;' ) );
+		// Apart, in the wrong order, or after another high surrogate, each is U+FFFD.
+		$this->assertSame( "\u{fffd} \u{fffd}", Hunch_Format::decode_entities( '&#xD83D; &#xDE00;' ) );
+		$this->assertSame( "\u{fffd}\u{fffd}", Hunch_Format::decode_entities( '&#xDE00;&#xD83D;' ) );
+		$this->assertSame( "\u{fffd}\u{1f600}&\u{fffd}", Hunch_Format::decode_entities( '&#xD83D;&#xD83D;&#xDE00;&amp;&#xDE00;' ) );
+	}
+
 	public function test_json_writes_what_javascript_writes() {
 		$this->assertSame(
 			'{"a":"/x/ é \u0001 ' . "\u{2028}" . '","b":1,"c":0.5,"d":0.3333333333333333,"e":[]}',
@@ -61,6 +77,25 @@ final class FormatTest extends TestCase {
 			)
 		);
 		$this->assertSame( "{\n  \"a\": [\n    1\n  ]\n}", Hunch_Format::json( array( 'a' => array( 1 ) ), true ) );
+	}
+
+	public function test_json_writes_floats_as_javascript_does() {
+		// PHP's own forms are 1.0, 1.0e-7, 1.0e+21, 1.0e+15 and 1.234e-5.
+		$this->assertSame(
+			'[1,1e-7,1e+21,1000000000000000,0.00001234,0.000001,1.5e-7,-2.5e-10,1.2345e+22,0,100.5]',
+			Hunch_Format::json( array( 1.0, 1e-7, 1e21, 1e15, 0.00001234, 1e-6, 1.5e-7, -2.5e-10, 1.2345e22, -0.0, 100.5 ) )
+		);
+		// Numbers inside strings stay as they are.
+		$this->assertSame(
+			'{"a":"1.0e-7 \\"2.0\\" \\\\","1.0":1,"b":[0.5,"3.0e+25"]}',
+			Hunch_Format::json(
+				array(
+					'a'   => '1.0e-7 "2.0" \\',
+					'1.0' => 1.0,
+					'b'   => array( 0.5, '3.0e+25' ),
+				)
+			)
+		);
 	}
 
 	public function test_slug() {
@@ -82,6 +117,29 @@ final class FormatTest extends TestCase {
 		$this->assertSame( "ok \u{fffd} x", Hunch_Format::replace_invalid_utf8( "ok \xff x" ) );
 		$this->assertSame( "caf\u{e9} \u{1f950}", Hunch_Format::replace_invalid_utf8( "caf\xc3\xa9 \xf0\x9f\xa5\x90" ) );
 		$this->assertSame( "\u{fffd}\u{fffd}\u{fffd}", Hunch_Format::replace_invalid_utf8( "\xed\xa0\x80" ) );
+	}
+
+	public function test_a_character_cut_short_is_one_u_fffd_without_mbstring() {
+		// What Node's TextDecoder gives: one U+FFFD for each maximal part of a valid sequence.
+		$cases = array(
+			"\xe2\x82 b"           => "\u{fffd} b",
+			"\xf0\x9f\xa5"         => "\u{fffd}",
+			"\xf0\x9f x"           => "\u{fffd} x",
+			"a\xc3"                => "a\u{fffd}",
+			"\xf1\x80\x80\xc3\xa9" => "\u{fffd}\u{e9}",
+			"\xe0\xa0"             => "\u{fffd}",
+			// Not the beginning of anything valid: one for each byte.
+			"\xf4\x90\x80\x80"     => "\u{fffd}\u{fffd}\u{fffd}\u{fffd}",
+			"\xc0\x80"             => "\u{fffd}\u{fffd}",
+			"\xe0\x9f\x80"         => "\u{fffd}\u{fffd}\u{fffd}",
+			"\xf8\x88\x80\x80"     => "\u{fffd}\u{fffd}\u{fffd}\u{fffd}",
+		);
+		foreach ( $cases as $text => $expected ) {
+			$this->assertSame( $expected, Hunch_Format::replace_invalid_utf8( $text ), bin2hex( $text ) );
+			if ( function_exists( 'mb_convert_encoding' ) && PHP_VERSION_ID >= 80100 ) {
+				$this->assertSame( $expected, Hunch_Format::valid_utf8( $text ), bin2hex( $text ) );
+			}
+		}
 	}
 
 	public function test_iso_time() {

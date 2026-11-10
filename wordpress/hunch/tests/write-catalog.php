@@ -4,7 +4,7 @@
  * writes the catalog with the plugin's encoder, and prints the text helpers' results as JSON.
  *
  * Job: { dir, model, dims, quantization, shardBy?, maxShardItems?, now, items: [{ …, vector }],
- *        html: string[], inputs: [{ title, text }], weights? }
+ *        html: string[], inputs: [{ title, text }], numbers?: string[], weights? }
  *
  * With `weights`, also prints the model Hunch_Catalog::model() picks for that setting.
  *
@@ -66,5 +66,12 @@ echo Hunch_Format::json( // phpcs:ignore WordPress.Security.EscapeOutput.OutputN
 		'fnv1a'   => Hunch_Format::fnv1a( $job['model']['documentPrompt'] ),
 		'space'   => Hunch_Format::space_key( $job['model'], $job['dims'] ),
 		'model'   => isset( $job['weights'] ) ? Hunch_Catalog::model() : null,
+		'numbers' => array_map(
+			static function ( $number ) {
+				// As a float, however it is written: 1e21 and 1 alike.
+				return Hunch_Format::json( (float) $number );
+			},
+			isset( $job['numbers'] ) ? $job['numbers'] : array()
+		),
 	)
 );

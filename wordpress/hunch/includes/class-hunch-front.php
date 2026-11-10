@@ -50,7 +50,8 @@ final class Hunch_Front {
 			)
 		);
 		wp_register_style( 'hunch', plugins_url( 'assets/hunch.css', HUNCH_FILE ), array(), HUNCH_VERSION );
-		wp_register_script( 'hunch-blocks', plugins_url( 'assets/blocks.js', HUNCH_FILE ), array( 'wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-server-side-render' ), HUNCH_VERSION, true );
+		wp_register_script( 'hunch-blocks', plugins_url( 'assets/blocks.js', HUNCH_FILE ), array( 'wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-i18n', 'wp-server-side-render' ), HUNCH_VERSION, true );
+		wp_set_script_translations( 'hunch-blocks', 'hunch' );
 
 		$common = array(
 			'api_version'           => 3,
@@ -144,12 +145,80 @@ final class Hunch_Front {
 			return $content;
 		}
 		$post = get_post();
-		// A related list already in the content (the block, also inside a synced pattern or a
-		// template part) is not repeated.
-		if ( ! $post || ! Hunch_Catalog::is_indexed( $post ) || preg_match( '/class="[^"]*\bhunch-related\b/', $content ) ) {
+		// A related list already in the content (the block, also inside a synced pattern there:
+		// blocks are rendered by now) is not repeated; nor is one the block theme's template
+		// holds outside the content.
+		if ( ! $post || ! Hunch_Catalog::is_indexed( $post ) || preg_match( '/class="[^"]*\bhunch-related\b/', $content ) || self::template_has_related() ) {
 			return $content;
 		}
 		return $content . self::related( $post, (int) Hunch_Settings::get( 'related_count' ), '', false );
+	}
+
+	/**
+	 * Whether the block template rendering this page (a block theme's) holds the related posts
+	 * block: in the template itself or in a template part, pattern or synced pattern it uses.
+	 * That block renders outside the post's content, before or after it, so the content alone
+	 * can't tell. With a classic theme there is no such template.
+	 *
+	 * @return bool
+	 */
+	private static function template_has_related() {
+		global $_wp_current_template_content;
+		static $found = null;
+		if ( null === $found ) {
+			$found = is_string( $_wp_current_template_content ) && self::blocks_have_related( $_wp_current_template_content, 0 );
+		}
+		return $found;
+	}
+
+	/**
+	 * Whether block markup holds the related posts block, following the template parts,
+	 * patterns and synced patterns it refers to, a few levels deep.
+	 *
+	 * @param string $content Block markup.
+	 * @param int    $depth   How many references led here.
+	 * @return bool
+	 */
+	private static function blocks_have_related( $content, $depth ) {
+		if ( false !== strpos( $content, '<!-- wp:hunch/related' ) ) {
+			return true;
+		}
+		if ( $depth >= 4 || false === strpos( $content, '<!-- wp:' ) ) {
+			return false;
+		}
+		$blocks = parse_blocks( $content );
+		while ( $blocks ) {
+			$block = array_pop( $blocks );
+			if ( ! empty( $block['innerBlocks'] ) ) {
+				$blocks = array_merge( $blocks, $block['innerBlocks'] );
+			}
+			$attrs = isset( $block['attrs'] ) && is_array( $block['attrs'] ) ? $block['attrs'] : array();
+			$inner = '';
+			switch ( $block['blockName'] ) {
+				case 'core/template-part':
+					if ( ! empty( $attrs['slug'] ) ) {
+						$part  = get_block_template( ( empty( $attrs['theme'] ) ? get_stylesheet() : $attrs['theme'] ) . '//' . $attrs['slug'], 'wp_template_part' );
+						$inner = $part ? (string) $part->content : '';
+					}
+					break;
+				case 'core/pattern':
+					if ( ! empty( $attrs['slug'] ) ) {
+						$pattern = WP_Block_Patterns_Registry::get_instance()->get_registered( $attrs['slug'] );
+						$inner   = isset( $pattern['content'] ) ? (string) $pattern['content'] : '';
+					}
+					break;
+				case 'core/block':
+					if ( ! empty( $attrs['ref'] ) ) {
+						$synced = get_post( (int) $attrs['ref'] );
+						$inner  = $synced && 'wp_block' === $synced->post_type ? $synced->post_content : '';
+					}
+					break;
+			}
+			if ( '' !== $inner && self::blocks_have_related( $inner, $depth + 1 ) ) {
+				return true;
+			}
+		}//end while
+		return false;
 	}
 
 	/**
@@ -212,6 +281,7 @@ final class Hunch_Front {
 		$manifest = 'off' === $consent ? null : Hunch_Catalog::manifest_url();
 		wp_enqueue_script( 'hunch-controls' );
 		wp_enqueue_style( 'hunch' );
+		self::controls_strings();
 		ob_start();
 		?>
 		<div <?php echo get_block_wrapper_attributes( array( 'class' => 'hunch-controls' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by core. ?> data-hunch-controls data-manifest="<?php echo esc_url( (string) $manifest ); ?>" data-consent="<?php echo esc_attr( $consent ); ?>">
@@ -230,6 +300,35 @@ final class Hunch_Front {
 		</div>
 		<?php
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * The messages of the controls' script, translated here: the script runs on the front end
+	 * and loads nothing but Hunch's client (no `wp.i18n`). Once per page.
+	 */
+	private static function controls_strings() {
+		static $done = false;
+		if ( $done ) {
+			return;
+		}
+		$done = true;
+		wp_localize_script(
+			'hunch-controls',
+			'hunchControlsL10n',
+			array(
+				'failed'      => __( 'That did not work in this browser.', 'hunch' ),
+				'noIndex'     => __( 'Personalization is off. Forget deletes anything stored earlier.', 'hunch' ),
+				'off'         => __( 'Personalization is off: nothing new is recorded. Forget deletes anything stored earlier.', 'hunch' ),
+				'pause'       => __( 'Pause', 'hunch' ),
+				'resume'      => __( 'Resume', 'hunch' ),
+				/* translators: %d: number of items; keep it as it is. */
+				'remembered'  => __( 'Items remembered in this browser: %d.', 'hunch' ),
+				/* translators: %d: number of items; keep it as it is. */
+				'paused'      => __( 'Items remembered in this browser: %d (paused).', 'hunch' ),
+				'notSaved'    => __( 'Your choice could not be saved, so personalization stays off.', 'hunch' ),
+				'notSavedOwn' => __( 'This browser did not let the site save your choice, so personalization stays off.', 'hunch' ),
+			)
+		);
 	}
 
 	/**
@@ -284,7 +383,13 @@ final class Hunch_Front {
 			'ignore_sticky_posts' => true,
 		);
 		$section  = Hunch_Catalog::section( $post );
-		$category = 'category' === Hunch_Settings::get( 'sections' ) && $section ? get_cat_ID( $section ) : 0;
+		$category = 0;
+		if ( 'category' === Hunch_Settings::get( 'sections' ) && $section ) {
+			// The category the section is named after, not a look-up by name (two categories may
+			// share one). Only a section the `hunch_post_section` filter renamed is looked up.
+			$term     = Hunch_Catalog::section_term( $post );
+			$category = $term && html_entity_decode( $term->name, ENT_QUOTES, 'UTF-8' ) === $section ? (int) $term->term_id : get_cat_ID( $section );
+		}
 		$fallback = $category ? get_posts( $query + array( 'cat' => $category ) ) : array();
 		// With "same section only", the browser shows nothing from other sections, so neither does
 		// the fallback.

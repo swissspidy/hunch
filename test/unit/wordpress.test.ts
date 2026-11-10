@@ -18,6 +18,7 @@ import type { CatalogItem } from '../../src/node/types.ts';
 import { tempDir } from '../helpers.ts';
 
 const DRIVER = new URL('../../wordpress/hunch/tests/write-catalog.php', import.meta.url);
+const SHARD = new URL('../../wordpress/hunch/includes/class-hunch-shard.php', import.meta.url);
 const php = spawnSync('php', ['-r', 'echo class_exists("Normalizer") ? "intl" : "";'], {
   encoding: 'utf8',
 });
@@ -121,13 +122,20 @@ interface PhpResult {
   space: string;
   /** What Hunch_Catalog::model() picks for the job's `weights`. */
   model: unknown;
+  /** Hunch_Format::json() of each of the job's `numbers`. */
+  numbers: string[];
 }
 
 function runPhp(
   dir: string,
   catalog: readonly CatalogItem[],
   options: Options,
-  extra: { html?: string[]; inputs?: { title: string; text: string }[]; weights?: string } = {},
+  extra: {
+    html?: string[];
+    inputs?: { title: string; text: string }[];
+    weights?: string;
+    numbers?: number[];
+  } = {},
 ): PhpResult {
   const { dtype: _, ...rest } = options;
   const job = {
@@ -141,6 +149,8 @@ function runPhp(
     })),
     html: extra.html ?? [],
     inputs: extra.inputs ?? [],
+    // As strings: a float such as 1e21 must not become an integer on the way.
+    numbers: (extra.numbers ?? []).map(String),
     ...(extra.weights && { weights: extra.weights }),
   };
   const out = spawnSync('php', [fileURLToPath(DRIVER)], {
@@ -213,6 +223,86 @@ for (const options of [
   });
 }
 
+test('PHP and the Node build leave out an empty section, date or image', { skip }, async () => {
+  const empty: CatalogItem[] = [
+    { id: 'e1', url: '/e1/', title: 'Empty one', text: 'one', section: '', date: '', image: '' },
+    { id: 'e2', url: '/e2/', title: 'Empty two', text: 'two', section: 'Food', tags: [] },
+    { id: 'e3', url: '/e3/', title: 'Empty three', text: 'three' },
+  ];
+  empty.forEach((item, i) =>
+    vectors.set(documentInput(model.documentPrompt, item.title, item.text), vector(200 + i)),
+  );
+  for (const shardBy of ['section', 'none'] as const) {
+    const options: Options = { dims: 256, quantization: 'int8', shardBy };
+    const nodeDir = await tempDir();
+    const phpDir = await tempDir();
+    await runNode(nodeDir, empty, options);
+    runPhp(phpDir, empty, options);
+    const manifest = await assertSameOutput(nodeDir, phpDir);
+    // The empty section is no section: its item shares the shard of the item without one.
+    assert.deepEqual(manifest.sections, ['Food']);
+    assert.deepEqual(
+      manifest.shards.map((s) => [s.section, s.count]),
+      shardBy === 'none'
+        ? [[null, 3]]
+        : [
+            [null, 2],
+            ['Food', 1],
+          ],
+    );
+    const bytes = await readFile(join(phpDir, manifest.shards[0]!.url));
+    assert.deepEqual(decodeShard(new Uint8Array(bytes).buffer).items[0], {
+      id: 'e1',
+      url: '/e1/',
+      title: 'Empty one',
+      prior: 0.75,
+    });
+  }
+});
+
+test('PHP refuses duplicate ids as the Node build does', { skip }, async () => {
+  const options: Options = { dims: 256, quantization: 'int8' };
+  const twice = [...items, { ...items[4]!, id: items[0]!.id }];
+  const wanted = /duplicate item id "https:\/\/example\.com\/\?p=12"/i;
+  await assert.rejects(runNode(await tempDir(), twice, options), wanted);
+  const dir = await tempDir();
+  assert.throws(() => runPhp(dir, twice, options), wanted);
+  // Nothing was written.
+  assert.deepEqual(await readdir(dir), []);
+});
+
+test('PHP writes numbers in JSON as JSON.stringify does', { skip }, async () => {
+  const numbers = [
+    1e-7,
+    1e21,
+    1.5e-7,
+    1e-6,
+    9.999e-7,
+    0.00001234,
+    1e15,
+    1e20,
+    123e18,
+    1.2345e22,
+    -1e21,
+    -2.5e-10,
+    0.1,
+    1 / 3,
+    100.5,
+    4.35,
+    2 ** 53,
+    5e-324,
+    1.7976931348623157e308,
+    0,
+    1,
+    -3,
+  ];
+  const result = runPhp(await tempDir(), items, { dims: 256, quantization: 'int8' }, { numbers });
+  assert.deepEqual(
+    result.numbers,
+    numbers.map((n) => JSON.stringify(n)),
+  );
+});
+
 test('PHP keeps generatedAt and prunes shards as the Node build does', { skip }, async () => {
   const options: Options = { dims: 256, quantization: 'int8' };
   const nodeDir = await tempDir();
@@ -245,6 +335,12 @@ test(
       'a<!-->b<!--->c<!---->d<!-- e --> f --> g <!-- never closed',
       'a<script>b<svg>c</svg>d<style>e</STYLE>f</template>g<script</script>h<scripts>i</script>j',
       'a<svg>b</svg >c</svg>d<noscript>e<template>f</template>g',
+      // A surrogate pair written as two entities is one character; apart, or in the wrong
+      // order, each is a lone surrogate.
+      'a&#xD83D;&#xDE00;b &#55358;&#xdd50; &#xD83D; &#xDE00; &#xDE00;&#xD83D; &#xD83D;&#xD83D;&#xDE00;&amp;&#xD83D;x&#xD83D;<b>&#xDE00;</b>',
+      // JavaScript's \s before a closing tag's ">" includes Unicode spaces; its caseless match
+      // does not fold non-ASCII letters.
+      'a<script>b</script\u00a0>c<style>d</style\u3000\ufeff >e<svg>f</svg\u2028\n>g<template>h</template\u200b>i</template>j<script>k</\u017fcript>l</script>m',
       // Longer than PCRE's backtrack limit allows a lazy pattern to cross.
       `Intro<!-- ${'x'.repeat(1_100_000)} --><p>end</p><svg>${'<path/>'.repeat(160_000)}</svg>.`,
     ];
@@ -330,12 +426,24 @@ test('PHP reads dates as Date.parse reads them', { skip }, () => {
     '2026-01-01T10:00:00+24:00',
     '2026-01-01T10:00:00+05:60',
     '9999-12-31T23:59:59.999Z',
+    // The ends of a Date's range (±8.64e15 ms), and just past them.
+    '+275760-09-13T00:00:00.000Z',
+    '+275760-09-13T00:00:00.001Z',
+    '+275760-09-13T01:00:00+01:00',
+    '+275760-09-12T23:00:00-02:00',
+    '-271821-04-20T00:00:00Z',
+    '-271821-04-19T23:59:59.999Z',
+    '+999999-12-31',
+    '-999999-01-01',
     'yesterday',
     '',
   ];
-  const script = `define('HUNCH_STANDALONE', true); require 'wordpress/hunch/includes/class-hunch-shard.php';
+  const script = `define('HUNCH_STANDALONE', true); require $argv[1];
 foreach (json_decode(stream_get_contents(STDIN)) as $d) echo bin2hex(Hunch_Shard::time($d)), "\\n";`;
-  const run = spawnSync('php', ['-r', script], { input: JSON.stringify(dates), encoding: 'utf8' });
+  const run = spawnSync('php', ['-r', script, '--', fileURLToPath(SHARD)], {
+    input: JSON.stringify(dates),
+    encoding: 'utf8',
+  });
   assert.equal(run.status, 0, run.stderr);
   const got = run.stdout.trim().split('\n');
   dates.forEach((date, i) => {

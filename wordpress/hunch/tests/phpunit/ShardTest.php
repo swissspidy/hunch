@@ -93,6 +93,15 @@ final class ShardTest extends TestCase {
 		}
 	}
 
+	public function test_a_date_outside_javascripts_range_has_no_time() {
+		// 8.64e15 ms either side of the epoch are the last times a Date holds.
+		$this->assertSame( pack( 'e', 8.64e15 ), Hunch_Shard::time( '+275760-09-13T00:00:00.000Z' ) );
+		$this->assertSame( pack( 'e', -8.64e15 ), Hunch_Shard::time( '-271821-04-20T00:00:00Z' ) );
+		foreach ( array( '+275760-09-13T00:00:00.001Z', '+275760-09-12T23:00:00-02:00', '-271821-04-19T23:59:59.999Z', '+999999-12-31' ) as $date ) {
+			$this->assertSame( '000000000000f87f', bin2hex( Hunch_Shard::time( $date ) ), $date );
+		}
+	}
+
 	public function test_int8_rows_round_halves_up_like_javascript() {
 		// The largest component maps to 127, and ±2/4 to ±63.5 exactly: Math.round gives -63
 		// and 64 (PHP's round() would give -64). Node's encodeShard() writes these bytes.

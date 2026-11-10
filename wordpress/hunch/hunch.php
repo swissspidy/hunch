@@ -36,4 +36,5 @@ Hunch_Rest::init();
 Hunch_Admin::init();
 Hunch_Front::init();
 
+register_activation_hook( __FILE__, array( 'Hunch_Catalog', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'Hunch_Catalog', 'deactivate' ) );

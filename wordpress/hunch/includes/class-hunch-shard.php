@@ -142,7 +142,8 @@ final class Hunch_Shard {
 	 * `YYYY`, `YYYY-MM` or `YYYY-MM-DD` (or a six-digit signed year), optionally followed by
 	 * `THH:MM[:SS[.sss]]` and `Z` or an offset. A day past the month's end rolls over into the
 	 * next month and `24:00` is the next midnight, as in JavaScript. Anything else is NaN, as is
-	 * no date, and so is a time without an offset (JavaScript reads it in the local time zone).
+	 * no date, a time outside a JavaScript Date's range (about 270,000 years either side of
+	 * 1970), and a time without an offset (JavaScript reads it in the local time zone).
 	 *
 	 * @param string $date The item's date.
 	 * @return string 8 bytes.
@@ -175,7 +176,9 @@ final class Hunch_Shard {
 			return $nan;
 		}
 		$ms += ( ( $hour * 60 + $minute ) * 60 + $second ) * 1000;
-		return pack( 'e', (float) ( self::days( $year, $month, $day ) * 86400000 + $ms - $offset ) );
+		$ms += self::days( $year, $month, $day ) * 86400000 - $offset;
+		// A JavaScript Date holds 100,000,000 days either side of the epoch.
+		return abs( $ms ) > 8.64e15 ? $nan : pack( 'e', (float) $ms );
 	}
 
 	/**

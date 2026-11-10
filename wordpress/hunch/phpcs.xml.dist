@@ -4,9 +4,6 @@
 
   <file>.</file>
   <exclude-pattern>/vendor/*</exclude-pattern>
-  <exclude-pattern>/assets/hunch.global.js</exclude-pattern>
-  <exclude-pattern>*.js</exclude-pattern>
-  <exclude-pattern>*.css</exclude-pattern>
 
   <arg name="extensions" value="php"/>
   <arg value="sp"/>

@@ -158,7 +158,7 @@ final class Hunch_Rest {
 		$post  = get_post( (int) $request['id'] );
 		$input = Hunch_Catalog::input( $post );
 		if ( ! hash_equals( $input['hash'], (string) $request['hash'] ) ) {
-			return new WP_Error( 'hunch_stale_input', 'The post changed while it was embedded.', array( 'status' => 409 ) );
+			return new WP_Error( 'hunch_stale_input', __( 'The post changed while it was embedded.', 'hunch' ), array( 'status' => 409 ) );
 		}
 		$bytes = Hunch_Catalog::check_vector( $request['vector'] );
 		if ( is_wp_error( $bytes ) ) {
@@ -184,12 +184,14 @@ final class Hunch_Rest {
 	}
 
 	/**
-	 * Counts and the last build.
+	 * Counts and the last build, with the settings screen's line about them: the screen asks
+	 * after a build, to show what is true now.
 	 *
 	 * @return WP_REST_Response
 	 */
 	public static function get_status() {
-		return rest_ensure_response( Hunch_Catalog::status() );
+		$status = Hunch_Catalog::status();
+		return rest_ensure_response( $status + array( 'summary' => Hunch_Admin::summary( $status ) ) );
 	}
 
 	/**

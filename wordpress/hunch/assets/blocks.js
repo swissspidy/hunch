@@ -9,6 +9,7 @@
   const { InspectorControls, useBlockProps } = wp.blockEditor;
   const { PanelBody, RangeControl, TextControl } = wp.components;
   const ServerSideRender = wp.serverSideRender;
+  const { __ } = wp.i18n;
 
   function edit(name, withCount) {
     return function Edit({ attributes, setAttributes, context }) {
@@ -17,15 +18,15 @@
         null,
         el(
           PanelBody,
-          { title: 'Settings' },
+          { title: __('Settings', 'hunch') },
           el(TextControl, {
-            label: 'Heading',
+            label: __('Heading', 'hunch'),
             value: attributes.heading || '',
             onChange: (heading) => setAttributes({ heading }),
           }),
           withCount &&
             el(RangeControl, {
-              label: 'Number of posts',
+              label: __('Number of posts', 'hunch'),
               value: attributes.count || undefined,
               onChange: (count) => setAttributes({ count: count || 0 }),
               min: 1,
@@ -51,8 +52,8 @@
                 'p',
                 null,
                 name === 'hunch/related'
-                  ? 'Related posts appear here on published posts.'
-                  : 'Shown once the index is built (Settings → Hunch).',
+                  ? __('Related posts appear here on published posts.', 'hunch')
+                  : __('Shown once the index is built (Settings → Hunch).', 'hunch'),
               ),
           }),
         ),
@@ -63,20 +64,20 @@
   const blocks = [
     [
       'hunch/related',
-      'Related posts (Hunch)',
-      'Posts similar to this one, ranked in the reader’s browser.',
+      __('Related posts (Hunch)', 'hunch'),
+      __('Posts similar to this one, ranked in the reader’s browser.', 'hunch'),
       true,
     ],
     [
       'hunch/for-you',
-      'For you (Hunch)',
-      'Recent posts, re-ranked for the reader with their consent, in their browser.',
+      __('For you (Hunch)', 'hunch'),
+      __('Recent posts, re-ranked for the reader with their consent, in their browser.', 'hunch'),
       true,
     ],
     [
       'hunch/privacy-controls',
-      'Personalization controls (Hunch)',
-      'Lets readers turn personalization on, pause it, export or forget it.',
+      __('Personalization controls (Hunch)', 'hunch'),
+      __('Lets readers turn personalization on, pause it, export or forget it.', 'hunch'),
       false,
     ],
   ];

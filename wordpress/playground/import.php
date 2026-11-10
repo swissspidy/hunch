@@ -51,21 +51,24 @@ function hunch_demo_check( $result ) {
 
 try {
 	foreach ( $hunch_demo['posts'] as $hunch_item ) {
-		$hunch_term = term_exists( $hunch_item['section'], 'category' );
+		// WordPress expects these slashed, as from a form, and strips the slashes itself.
+		$hunch_term = term_exists( wp_slash( $hunch_item['section'] ), 'category' );
 		if ( ! $hunch_term ) {
-			$hunch_term = hunch_demo_check( wp_insert_term( $hunch_item['section'], 'category' ) );
+			$hunch_term = hunch_demo_check( wp_insert_term( wp_slash( $hunch_item['section'] ), 'category' ) );
 		}
 		$hunch_date      = gmdate( 'Y-m-d H:i:s', (int) strtotime( $hunch_item['date'] ) );
 		$hunch_id        = hunch_demo_check(
 			wp_insert_post(
-				array(
-					'post_title'    => $hunch_item['title'],
-					'post_content'  => $hunch_item['content'],
-					'post_status'   => 'publish',
-					'post_date'     => get_date_from_gmt( $hunch_date ),
-					'post_date_gmt' => $hunch_date,
-					'post_category' => array( (int) $hunch_term['term_id'] ),
-					'tags_input'    => $hunch_item['tags'],
+				wp_slash(
+					array(
+						'post_title'    => $hunch_item['title'],
+						'post_content'  => $hunch_item['content'],
+						'post_status'   => 'publish',
+						'post_date'     => get_date_from_gmt( $hunch_date ),
+						'post_date_gmt' => $hunch_date,
+						'post_category' => array( (int) $hunch_term['term_id'] ),
+						'tags_input'    => $hunch_item['tags'],
+					)
 				),
 				true
 			)
@@ -84,19 +87,21 @@ try {
 	// The front page: "For you", and the controls that turn personalization on.
 	$hunch_home      = hunch_demo_check(
 		wp_insert_post(
-			array(
-				'post_type'    => 'page',
-				'post_title'   => 'Welcome',
-				'post_status'  => 'publish',
-				'post_content' => implode(
-					"\n\n",
-					array(
-						'<!-- wp:paragraph --><p>A demo of Hunch. Open any article: its related posts are ranked in your browser. Turn on personalization below, read a few articles, and come back: “For you” follows what you read. Nothing about you leaves your browser.</p><!-- /wp:paragraph -->',
-						'<!-- wp:hunch/for-you /-->',
-						'<!-- wp:heading --><h2 class="wp-block-heading">Your data</h2><!-- /wp:heading -->',
-						'<!-- wp:hunch/privacy-controls /-->',
-					)
-				),
+			wp_slash(
+				array(
+					'post_type'    => 'page',
+					'post_title'   => 'Welcome',
+					'post_status'  => 'publish',
+					'post_content' => implode(
+						"\n\n",
+						array(
+							'<!-- wp:paragraph --><p>A demo of Hunch. Open any article: its related posts are ranked in your browser. Turn on personalization below, read a few articles, and come back: “For you” follows what you read. Nothing about you leaves your browser.</p><!-- /wp:paragraph -->',
+							'<!-- wp:hunch/for-you /-->',
+							'<!-- wp:heading --><h2 class="wp-block-heading">Your data</h2><!-- /wp:heading -->',
+							'<!-- wp:hunch/privacy-controls /-->',
+						)
+					),
+				)
 			),
 			true
 		)

@@ -25,7 +25,7 @@ script-tag bundle, which `npm run wordpress:build` copies in before zipping the 
 ### 1. Embedding happens in the editor's browser
 
 wp-admin loads Transformers.js and EmbeddingGemma with the same model id, pinned revision,
-`q8` weights and document prompt as the CLI's
+weights variant (`q8` unless the site chose `q4`, see below) and document prompt as the CLI's
 [`transformers.ts`](../../src/node/providers/transformers.ts). The manifest's `space` is the one
 the CLI would write, and a catalog built by either can replace the other.
 
@@ -75,11 +75,13 @@ the CLI would write, and a catalog built by either can replace the other.
 `encodeShard()` and the file-writing half of `build()`: the HNCH layout (the columns of
 [ADR 0011](0011-shard-columns.md), with dates read as `Date.parse` reads ISO 8601), float32
 rounding of the renormalized vector, int8 quantization with JavaScript's `Math.round`, the JSON as
-`JSON.stringify` writes it (no escaped slashes or Unicode, `1` not `1.0`), one shard per section
+`JSON.stringify` writes it (no escaped slashes or Unicode, numbers in JavaScript's notation), one shard per section
 spread over buckets by a hash of each item's id, and priors counted from the end of the order
 ([ADR 0012](0012-stable-shards.md)), content-hashed file names, the manifest's `version`,
 keeping `generatedAt` when nothing changed, and deleting shards neither the new nor the previous
-manifest names. These classes don't need WordPress.
+manifest names. These classes don't need WordPress. A shard whose content-hashed name is
+already there with the same size is not written again (the CLI writes it again, with the same
+bytes).
 
 - **Shard file names** use the same slug as the CLI's. Without PHP's `intl` extension, accents
   in a section name are dropped instead of transliterated, so such a shard gets another (still
@@ -91,10 +93,13 @@ manifest names. These classes don't need WordPress.
   would need a stats plugin, so they are left to the `hunch_item` filter.
 - **Item ids are post GUIDs**, the RSS feed's `guid`. A site that built its catalog with the CLI
   from its feed keeps its visitors' signals when it switches to the plugin, and the other way
-  round.
+  round. Two posts can share a GUID (a clone, an import). The writer refuses duplicate ids, as
+  the CLI does; the plugin publishes the newer post, leaves the others out and counts them on
+  the settings screen, so one clone doesn't stop the whole catalog.
 - **Regeneration is debounced:** publishing, updating, trashing or unpublishing a post, storing a
-  vector, changing the settings and (with comment priors) a comment count all schedule one
-  WP-Cron event 30 seconds later, unless one is due within a minute. "Build index" writes
+  vector, renaming or deleting a category or tag, changing a setting the files depend on (not
+  the consent or related posts settings) and (with comment priors) a comment count all schedule
+  one WP-Cron event 30 seconds later, unless one is due within a minute. "Build index" writes
   immediately.
 - **One run at a time.** The lock is a row in the options table, inserted atomically with
   `INSERT IGNORE` (as WordPress's own upgrader lock) and holding a random token and an expiry.
@@ -120,7 +125,8 @@ manifest names. These classes don't need WordPress.
   the default), a cookie (`name=value`), a global JavaScript function (a dotted path, validated
   so it can't inject script), the WP Consent API's "preferences" category, always, or off.
 - **Related posts** are added after the content of every indexed post (an option) or placed as a
-  block. The server renders the newest posts of the same category, filled up with the newest
+  block. They are not added where the block is already in the post's content or in the block
+  theme's template (its template parts and patterns included). The server renders the newest posts of the same category, filled up with the newest
   posts, inside `<hunch-related>`. **"For you"** is a block that renders the newest posts
   inside `<hunch-for-you>`. Indexed posts get an `<hunch-page>` in the footer to record the
   view. Each slot has a fixed height and the title is clamped to two lines, so re-ranking moves

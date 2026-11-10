@@ -16,15 +16,15 @@ Hunch ranks your posts in the visitor's browser. Related posts are ranked by mea
 
 How it works:
 
-1. **Embedding happens in your browser, in wp-admin.** When you publish or update a post in the block editor, your browser turns it into a vector with EmbeddingGemma, an open embedding model. Your server runs no model and needs no Node.js. The post's text goes from your site to your browser and nowhere else. The vector (about 3 KB) is stored with the post.
-2. **Your site publishes the vectors as static files** in `wp-content/uploads/hunch/`: a small `manifest.json` and one shard per category. They are rewritten shortly after a post is published, updated or trashed.
+1. **Embedding happens in your browser, in wp-admin.** When you publish or update a post in the block editor, your browser turns it into a vector with EmbeddingGemma, an open embedding model. Your server runs no model and needs no Node.js. The post's text goes from your site to your browser and nowhere else. The vector (about 4 KB) is stored with the post.
+2. **Your site publishes the vectors as static files** in `wp-content/uploads/hunch/`: a small `manifest.json` and one shard per category. They are rewritten shortly after a post is published, updated or trashed, or a category or tag is renamed.
 3. **On your pages**, the plugin renders normal lists of your own posts: the newest posts in the same category after each post, and the newest posts in the "For you" block. In the visitor's browser, Hunch's script (12 KB, gzipped) re-ranks them in idle time, slot for slot. Nothing moves on the page.
 
-The vectors are the same as those the Hunch command-line tool (`npx @swissspidy/hunch build`) makes from your RSS feed with the same model, so you can switch between the two.
+The files have the same format, model and post ids as those the Hunch command-line tool (`npx @swissspidy/hunch build`) writes from your RSS feed, so you can switch between the two and visitors keep their reading history. The vectors themselves differ slightly (a browser and Node don't compute bit for bit alike), which does not matter for ranking.
 
 = Blocks =
 
-* **Related posts (Hunch)**: posts similar to the current one. Also added after every post's content automatically, unless you turn that off.
+* **Related posts (Hunch)**: posts similar to the current one. Also added after every post's content automatically, unless you turn that off or the block is already in the post or in your theme's template.
 * **For you (Hunch)**: the newest posts, re-ranked for the visitor once they agreed and read a few posts.
 * **Personalization controls (Hunch)**: lets visitors turn personalization on (when you leave consent to them or to the WP Consent API), pause it, export what is stored, or forget it all. Put it on your privacy page.
 

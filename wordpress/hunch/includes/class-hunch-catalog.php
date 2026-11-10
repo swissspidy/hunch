@@ -39,9 +39,23 @@ final class Hunch_Catalog {
 		add_action( 'transition_post_status', array( __CLASS__, 'on_transition' ), 10, 3 );
 		add_action( 'wp_update_comment_count', array( __CLASS__, 'on_comment_count' ) );
 		add_action( 'deleted_post', array( __CLASS__, 'on_delete' ), 10, 2 );
-		add_action( 'update_option_' . Hunch_Settings::OPTION, array( __CLASS__, 'schedule' ) );
-		// The first save creates the option, which is no update.
-		add_action( 'add_option_' . Hunch_Settings::OPTION, array( __CLASS__, 'schedule' ) );
+		add_action( 'edited_term', array( __CLASS__, 'on_term' ), 10, 3 );
+		add_action( 'delete_term', array( __CLASS__, 'on_term' ), 10, 3 );
+		add_action( 'update_option_' . Hunch_Settings::OPTION, array( __CLASS__, 'on_settings' ), 10, 2 );
+		// A save may also create the option (where activation did not), which is no update.
+		add_action( 'add_option_' . Hunch_Settings::OPTION, array( __CLASS__, 'on_settings_added' ), 10, 2 );
+	}
+
+	/**
+	 * Activation: the settings option exists from then on (empty: the defaults apply), so
+	 * reading it on every request is served from the autoloaded options and not looked up, and
+	 * missed, each time. A state stored by an earlier version without autoload is autoloaded too.
+	 */
+	public static function activate() {
+		add_option( Hunch_Settings::OPTION, array() );
+		if ( function_exists( 'wp_set_option_autoload' ) && false !== get_option( self::STATE ) ) {
+			wp_set_option_autoload( self::STATE, true );
+		}
 	}
 
 	/**
@@ -139,22 +153,48 @@ final class Hunch_Catalog {
 	 * @return string|WP_Error The decoded bytes.
 	 */
 	public static function check_vector( $base64 ) {
-		$dims  = self::model()['nativeDims'];
+		$dims   = self::model()['nativeDims'];
+		$vector = self::decode_vector( $base64, $dims );
+		switch ( $vector ) {
+			case 'size':
+				/* translators: %d: number of values */
+				return new WP_Error( 'hunch_bad_vector', sprintf( __( 'The vector must be %d float32 values, base64-encoded.', 'hunch' ), $dims ), array( 'status' => 400 ) );
+			case 'finite':
+				return new WP_Error( 'hunch_bad_vector', __( 'The vector has a non-finite component.', 'hunch' ), array( 'status' => 400 ) );
+			case 'zero':
+				return new WP_Error( 'hunch_bad_vector', __( 'The vector is zero.', 'hunch' ), array( 'status' => 400 ) );
+		}
+		return $vector['bytes'];
+	}
+
+	/**
+	 * Decodes and checks an encoded vector, once: its bytes for storing it and its components
+	 * for writing a shard row.
+	 *
+	 * @param mixed $base64 The encoded vector.
+	 * @param int   $dims   The model's dimensions.
+	 * @return array|string `bytes` and `values`, or what is wrong: `size`, `finite` or `zero`.
+	 */
+	private static function decode_vector( $base64, $dims ) {
 		$bytes = is_string( $base64 ) ? base64_decode( $base64, true ) : false; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- binary vector data.
 		if ( false === $bytes || strlen( $bytes ) !== $dims * 4 ) {
-			return new WP_Error( 'hunch_bad_vector', sprintf( 'The vector must be %d float32 values, base64-encoded.', $dims ), array( 'status' => 400 ) );
+			return 'size';
 		}
-		$sum = 0.0;
-		foreach ( unpack( 'g*', $bytes ) as $x ) {
+		$values = array_values( (array) unpack( 'g*', $bytes ) );
+		$sum    = 0.0;
+		foreach ( $values as $x ) {
 			if ( ! is_finite( $x ) ) {
-				return new WP_Error( 'hunch_bad_vector', 'The vector has a non-finite component.', array( 'status' => 400 ) );
+				return 'finite';
 			}
 			$sum += $x * $x;
 		}
 		if ( ! ( $sum > 0 ) || ! is_finite( $sum ) ) {
-			return new WP_Error( 'hunch_bad_vector', 'The vector is zero.', array( 'status' => 400 ) );
+			return 'zero';
 		}
-		return $bytes;
+		return array(
+			'bytes'  => $bytes,
+			'values' => $values,
+		);
 	}
 
 	/**
@@ -196,27 +236,34 @@ final class Hunch_Catalog {
 		$posts   = array();
 		$cursor  = (int) $after;
 		$scanned = 0;
-		_prime_post_caches( $ids, false, true );
-		foreach ( $ids as $id ) {
+		// The posts and their meta are loaded a few at a time: the scan stops at `$limit` pending
+		// posts, often long before the last id.
+		foreach ( array_chunk( $ids, 20 ) as $chunk ) {
 			if ( count( $posts ) >= $limit ) {
 				break;
 			}
-			$post   = get_post( $id );
-			$cursor = $id;
-			++$scanned;
-			if ( ! $post ) {
-				continue;
+			_prime_post_caches( $chunk, false, true );
+			foreach ( $chunk as $id ) {
+				if ( count( $posts ) >= $limit ) {
+					break;
+				}
+				$post   = get_post( $id );
+				$cursor = $id;
+				++$scanned;
+				if ( ! $post ) {
+					continue;
+				}
+				$input = self::input( $post );
+				if ( ! self::is_current( $post, $input['hash'] ) ) {
+					$posts[] = array(
+						'id'    => $post->ID,
+						'title' => Hunch_Format::html_to_text( get_the_title( $post ) ),
+						'input' => $input['input'],
+						'hash'  => $input['hash'],
+					);
+				}
 			}
-			$input = self::input( $post );
-			if ( ! self::is_current( $post, $input['hash'] ) ) {
-				$posts[] = array(
-					'id'    => $post->ID,
-					'title' => Hunch_Format::html_to_text( get_the_title( $post ) ),
-					'input' => $input['input'],
-					'hash'  => $input['hash'],
-				);
-			}
-		}
+		}//end foreach
 		return array(
 			'posts'   => $posts,
 			'cursor'  => $cursor,
@@ -226,7 +273,9 @@ final class Hunch_Catalog {
 	}
 
 	/**
-	 * Counts for the "Build index" screen.
+	 * Counts for the "Build index" screen. `embedded` counts the posts with a vector of the
+	 * current model, whether or not the post was edited since (finding those takes each
+	 * post's text: `pending()` does it).
 	 *
 	 * @return array{total: int, embedded: int, state: array}
 	 */
@@ -302,6 +351,43 @@ final class Hunch_Catalog {
 		if ( 'comments' === Hunch_Settings::get( 'priors' ) ) {
 			self::schedule();
 		}
+	}
+
+	/**
+	 * A category or tag was renamed or deleted: its name is published with its posts (the
+	 * section, the tags), and no post changed.
+	 *
+	 * @param int    $term     The term's ID.
+	 * @param int    $tt_id    Its term taxonomy ID.
+	 * @param string $taxonomy Its taxonomy.
+	 */
+	public static function on_term( $term, $tt_id, $taxonomy ) {
+		if ( 'post_tag' === $taxonomy || ( 'category' === $taxonomy && 'category' === Hunch_Settings::get( 'sections' ) ) ) {
+			self::schedule();
+		}
+	}
+
+	/**
+	 * The settings were saved: the files are rewritten only when a setting they depend on
+	 * changed, not for the consent or the related posts settings.
+	 *
+	 * @param mixed $old The settings before.
+	 * @param mixed $now The settings now.
+	 */
+	public static function on_settings( $old, $now ) {
+		if ( Hunch_Settings::catalog_changed( $old, $now ) ) {
+			self::schedule();
+		}
+	}
+
+	/**
+	 * The settings were stored for the first time: until then the defaults applied.
+	 *
+	 * @param string $option The option's name.
+	 * @param mixed  $value  The settings.
+	 */
+	public static function on_settings_added( $option, $value ) {
+		self::on_settings( array(), $value );
 	}
 
 	/**
@@ -381,28 +467,40 @@ final class Hunch_Catalog {
 	}
 
 	/**
-	 * A post's section: its primary category (Yoast SEO's, where set, else the first), unless
+	 * The category a post's section is named after: its primary category (Yoast SEO's, where
+	 * set, else the first), or null when sections are off or the post has none.
+	 *
+	 * @param WP_Post $post The post.
+	 * @return WP_Term|null
+	 */
+	public static function section_term( WP_Post $post ) {
+		if ( 'category' !== Hunch_Settings::get( 'sections' ) ) {
+			return null;
+		}
+		$term       = null;
+		$primary    = (int) get_post_meta( $post->ID, '_yoast_wpseo_primary_category', true );
+		$categories = get_the_category( $post->ID );
+		foreach ( $categories as $category ) {
+			if ( $category->term_id === $primary ) {
+				$term = $category;
+			}
+		}
+		if ( ! $term && $categories ) {
+			$term = $categories[0];
+		}
+		return $term ? $term : null;
+	}
+
+	/**
+	 * A post's section: the name of its primary category (see `section_term()`), unless
 	 * sections are off.
 	 *
 	 * @param WP_Post $post The post.
 	 * @return string|null
 	 */
 	public static function section( WP_Post $post ) {
-		$section = null;
-		if ( 'category' === Hunch_Settings::get( 'sections' ) ) {
-			$term       = null;
-			$primary    = (int) get_post_meta( $post->ID, '_yoast_wpseo_primary_category', true );
-			$categories = get_the_category( $post->ID );
-			foreach ( $categories as $category ) {
-				if ( $category->term_id === $primary ) {
-					$term = $category;
-				}
-			}
-			if ( ! $term && $categories ) {
-				$term = $categories[0];
-			}
-			$section = $term ? html_entity_decode( $term->name, ENT_QUOTES, 'UTF-8' ) : null;
-		}
+		$term    = self::section_term( $post );
+		$section = $term ? html_entity_decode( $term->name, ENT_QUOTES, 'UTF-8' ) : null;
 		/**
 		 * Filters a post's section (one shard per section). Null for none.
 		 *
@@ -438,20 +536,20 @@ final class Hunch_Catalog {
 	/**
 	 * Writes the manifest and shards from every published post with a vector, one run at a time.
 	 *
-	 * @return array|WP_Error The new state: `version`, `count`, `pending`, `generatedAt`.
+	 * @return array|WP_Error The new state: `version`, `count`, `pending`, `duplicates`, `generatedAt`.
 	 */
 	public static function regenerate() {
 		$token = self::lock();
 		if ( null === $token ) {
 			self::schedule();
-			return new WP_Error( 'hunch_busy', 'A regeneration is running.', array( 'status' => 409 ) );
+			return new WP_Error( 'hunch_busy', __( 'A regeneration is running.', 'hunch' ), array( 'status' => 409 ) );
 		}
 		try {
 			$state = self::write();
 		} catch ( Exception $e ) {
 			$state = new WP_Error( 'hunch_write_failed', $e->getMessage(), array( 'status' => 500 ) );
 			$saved = get_option( self::STATE, array() );
-			update_option( self::STATE, array_merge( is_array( $saved ) ? $saved : array(), array( 'error' => $e->getMessage() ) ), false );
+			update_option( self::STATE, array_merge( is_array( $saved ) ? $saved : array(), array( 'error' => $e->getMessage() ) ), true );
 		} finally {
 			self::unlock( $token );
 		}
@@ -501,11 +599,14 @@ final class Hunch_Catalog {
 	 * @return array
 	 */
 	private static function write() {
-		$settings  = Hunch_Settings::get();
-		$model_key = self::model_key();
-		$items     = array();
-		$rows      = array();
-		$pending   = 0;
+		$settings   = Hunch_Settings::get();
+		$model_key  = self::model_key();
+		$dims       = self::model()['nativeDims'];
+		$items      = array();
+		$rows       = array();
+		$seen       = array();
+		$pending    = 0;
+		$duplicates = 0;
 		// Newest first: the catalog order, and so the cold-start order unless comments decide.
 		for ( $page = 1; ; $page++ ) {
 			$query = new WP_Query(
@@ -529,21 +630,36 @@ final class Hunch_Catalog {
 			if ( ! $query->posts ) {
 				break;
 			}
+			// The featured images of the page's posts in one query, not one for each post.
+			update_post_thumbnail_cache( $query );
 			foreach ( $query->posts as $post ) {
 				$vector = get_post_meta( $post->ID, self::META_VECTOR, true );
 				if ( '' === $vector || get_post_meta( $post->ID, self::META_MODEL, true ) !== $model_key ) {
 					++$pending;
 					continue;
 				}
-				$bytes = self::check_vector( $vector );
-				if ( is_wp_error( $bytes ) ) {
+				$vector = self::decode_vector( $vector, $dims );
+				if ( ! is_array( $vector ) ) {
 					++$pending;
 					continue;
 				}
-				$items[] = self::item( $post );
-				$rows[]  = Hunch_Shard::row( array_values( unpack( 'g*', $bytes ) ), (int) $settings['dims'], $settings['quantization'] );
+				$item = self::item( $post );
+				// Ids are GUIDs, which a clone or an import may repeat. The writer refuses
+				// duplicates (as the Node build does); one post must not stop the whole catalog,
+				// so the newer post keeps the id and the settings screen counts the others.
+				$key = 'i:' . ( isset( $item['id'] ) ? $item['id'] : '' );
+				if ( isset( $seen[ $key ] ) ) {
+					++$duplicates;
+					continue;
+				}
+				$seen[ $key ] = true;
+				$items[]      = $item;
+				$rows[]       = Hunch_Shard::row( $vector['values'], (int) $settings['dims'], $settings['quantization'] );
+			}//end foreach
+			// Each page's posts, meta and terms are dropped once read, where the object cache can.
+			if ( wp_cache_supports( 'flush_runtime' ) ) {
+				wp_cache_flush_runtime();
 			}
-			wp_cache_flush_runtime();
 		}//end for
 
 		$location = self::location();
@@ -551,6 +667,7 @@ final class Hunch_Catalog {
 			'version'     => null,
 			'count'       => 0,
 			'pending'     => $pending,
+			'duplicates'  => $duplicates,
 			'generatedAt' => Hunch_Format::iso_time( time() ),
 		);
 		if ( $items ) {
@@ -583,7 +700,8 @@ final class Hunch_Catalog {
 				}
 			}
 		}//end if
-		update_option( self::STATE, $state, false );
+		// Autoloaded: every front-end page reads it for the manifest's URL.
+		update_option( self::STATE, $state, true );
 		return $state;
 	}
 

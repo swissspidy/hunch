@@ -19,6 +19,13 @@ final class Hunch_Format {
 	const JS_SPACE = '\t\n\x0b\f\r \x{a0}\x{1680}\x{2000}-\x{200a}\x{2028}\x{2029}\x{202f}\x{205f}\x{3000}\x{feff}';
 
 	/**
+	 * The same characters as UTF-8 byte sequences, for a pattern without the `u` modifier (with
+	 * it, PCRE's caseless matching also folds non-ASCII letters, such as U+017F for `s`, which
+	 * JavaScript's does not without its own `u` flag).
+	 */
+	const JS_SPACE_BYTES = '(?:[\t\n\x0b\f\r ]|\xc2\xa0|\xe1\x9a\x80|\xe2\x80[\x80-\x8a\xa8\xa9\xaf]|\xe2\x81\x9f|\xe3\x80\x80|\xef\xbb\xbf)';
+
+	/**
 	 * EmbeddingGemma, as `src/node/providers/transformers.ts` pins it, with q8 weights.
 	 *
 	 * @return array{id: string, revision: string, dtype: string, nativeDims: int, documentPrompt: string, queryPrompt: string}
@@ -110,7 +117,7 @@ final class Hunch_Format {
 	public static function html_to_text( $html ) {
 		$html = self::valid_utf8( $html );
 		$html = self::strip_spans( $html, '/<!--/', null );
-		$html = self::strip_spans( $html, '/<(script|style|noscript|template|svg)\b/i', '/<\/%s\s*>/i' );
+		$html = self::strip_spans( $html, '/<(script|style|noscript|template|svg)\b/i', '/<\/%s' . self::JS_SPACE_BYTES . '*>/i' );
 		$html = (string) preg_replace( '/<\/?(p|div|br|li|h[1-6]|section|article|blockquote|tr)\b[^>]*>/i', "\n", $html );
 		$html = (string) preg_replace( '/<[^>]+>/', ' ', $html );
 		$text = self::decode_entities( $html );
@@ -201,34 +208,57 @@ final class Hunch_Format {
 			'ldquo'  => "\u{201c}",
 			'rdquo'  => "\u{201d}",
 		);
+		// A run of entities at a time: a high and a low surrogate next to each other are one
+		// character, as in a JavaScript string (`&#xD83D;&#xDE00;` is U+1F600).
 		return (string) preg_replace_callback(
-			'/&(#x[0-9a-f]+|#\d+|[a-z]+);/i',
-			static function ( $m ) use ( $named ) {
-				$code = $m[1];
-				if ( '#' === $code[0] ) {
-					$n = ( 'x' === $code[1] || 'X' === $code[1] ) ? hexdec( substr( $code, 2 ) ) : (float) substr( $code, 1 );
-					if ( $n > 0 && $n <= 0x10ffff ) {
-						return self::chr( (int) $n );
+			'/(?:&(?:#x[0-9a-f]+|#\d+|[a-z]+);)+/i',
+			static function ( $run ) use ( $named ) {
+				preg_match_all( '/&(#x[0-9a-f]+|#\d+|[a-z]+);/i', $run[0], $entities, PREG_SET_ORDER );
+				$out  = '';
+				$high = 0;
+				foreach ( $entities as $m ) {
+					$code = $m[1];
+					$lead = $high;
+					$high = 0;
+					if ( '#' !== $code[0] ) {
+						$key  = strtolower( $code );
+						$out .= isset( $named[ $key ] ) ? $named[ $key ] : $m[0];
+						continue;
 					}
-					return $m[0];
-				}
-				$key = strtolower( $code );
-				return isset( $named[ $key ] ) ? $named[ $key ] : $m[0];
+					$n = ( 'x' === $code[1] || 'X' === $code[1] ) ? hexdec( substr( $code, 2 ) ) : (float) substr( $code, 1 );
+					if ( ! ( $n > 0 && $n <= 0x10ffff ) ) {
+						$out .= $m[0];
+						continue;
+					}
+					$n = (int) $n;
+					if ( $lead && $n >= 0xdc00 && $n <= 0xdfff ) {
+						// Replaces the U+FFFD written for the high surrogate.
+						$out  = substr( $out, 0, -3 );
+						$out .= self::chr( 0x10000 + ( ( $lead - 0xd800 ) << 10 ) + ( $n - 0xdc00 ) );
+						continue;
+					}
+					$out .= self::chr( $n );
+					$high = ( $n >= 0xd800 && $n <= 0xdbff ) ? $n : 0;
+				}//end foreach
+				return $out;
 			},
 			$text
 		);
 	}
 
 	/**
-	 * Replaces each byte that is not part of a valid UTF-8 sequence with U+FFFD, in plain PHP
-	 * (the fallback of `valid_utf8()` without mbstring).
+	 * Replaces invalid UTF-8 with U+FFFD, in plain PHP (the fallback of `valid_utf8()` without
+	 * mbstring): one for each maximal part of a sequence that could have been valid (a
+	 * character cut short), as Node and mbstring decode it, and one for any other byte.
 	 *
 	 * @param string $text Text.
 	 * @return string
 	 */
 	public static function replace_invalid_utf8( $text ) {
 		return (string) preg_replace_callback(
-			'/[\x00-\x7f]|[\xc2-\xdf][\x80-\xbf]|\xe0[\xa0-\xbf][\x80-\xbf]|[\xe1-\xec\xee\xef][\x80-\xbf]{2}|\xed[\x80-\x9f][\x80-\xbf]|\xf0[\x90-\xbf][\x80-\xbf]{2}|[\xf1-\xf3][\x80-\xbf]{3}|\xf4[\x80-\x8f][\x80-\xbf]{2}|(.)/s',
+			'/[\x00-\x7f]|[\xc2-\xdf][\x80-\xbf]|\xe0[\xa0-\xbf][\x80-\xbf]|[\xe1-\xec\xee\xef][\x80-\xbf]{2}|\xed[\x80-\x9f][\x80-\xbf]|\xf0[\x90-\xbf][\x80-\xbf]{2}|[\xf1-\xf3][\x80-\xbf]{3}|\xf4[\x80-\x8f][\x80-\xbf]{2}'
+			// The valid sequences above; below, their beginnings, then any byte.
+			. '|(\xe0[\xa0-\xbf]|[\xe1-\xec\xee\xef][\x80-\xbf]|\xed[\x80-\x9f]|\xf0[\x90-\xbf][\x80-\xbf]?|[\xf1-\xf3][\x80-\xbf]{1,2}|\xf4[\x80-\x8f][\x80-\xbf]?|.)/s',
 			static function ( $m ) {
 				return isset( $m[1] ) ? "\u{fffd}" : $m[0];
 			},
@@ -237,7 +267,8 @@ final class Hunch_Format {
 	}
 
 	/**
-	 * JSON as JavaScript's `JSON.stringify` writes it (no escaped slashes or non-ASCII).
+	 * JSON as JavaScript's `JSON.stringify` writes it (no escaped slashes or non-ASCII, numbers
+	 * in JavaScript's notation).
 	 *
 	 * @param mixed $value The value.
 	 * @param bool  $pretty Two-space indentation, as `JSON.stringify(value, null, 2)`.
@@ -257,6 +288,18 @@ final class Hunch_Format {
 		if ( false === $json ) {
 			throw new InvalidArgumentException( 'Hunch: the value cannot be encoded as JSON' );
 		}
+		// PHP writes `1.0`, `1.0e-7` and `1.0e+25` where JavaScript writes `1`, `1e-7` and `1e+25`.
+		// Only floats have a point or an exponent, or are `-0`; strings are skipped whole.
+		$numbers = preg_replace_callback(
+			'/"(?:[^"\\\\]++|\\\\.)*+"(*SKIP)(*FAIL)|-?\d+(?:\.\d+(?:e[+-]?\d+)?|e[+-]?\d+)|-0\b/i',
+			static function ( $m ) {
+				return self::js_number( $m[0] );
+			},
+			$json
+		);
+		if ( null !== $numbers ) {
+			$json = $numbers;
+		}
 		if ( $pretty ) {
 			// PHP indents by four spaces. Strings hold no raw newlines, so line starts are indentation.
 			$json = (string) preg_replace_callback(
@@ -268,6 +311,37 @@ final class Hunch_Format {
 			);
 		}
 		return $json;
+	}
+
+	/**
+	 * A float as JavaScript's `Number.prototype.toString()` writes it, from PHP's shortest
+	 * round-trip form (the same digits): no exponent from 1e-6 up to 1e21, and no `.0`.
+	 *
+	 * @param string $number A float as `json_encode()` writes it.
+	 * @return string
+	 */
+	private static function js_number( $number ) {
+		preg_match( '/^(-?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i', $number, $m );
+		$m      = array_pad( $m, 5, '' );
+		$all    = $m[2] . $m[3];
+		$digits = ltrim( $all, '0' );
+		// The value is 0.digits x 10^point.
+		$point  = strlen( $m[2] ) + (int) $m[4] - ( strlen( $all ) - strlen( $digits ) );
+		$digits = rtrim( $digits, '0' );
+		$count  = strlen( $digits );
+		if ( 0 === $count ) {
+			return '0';
+		}
+		if ( $point > 21 || $point < -5 ) {
+			$out = $digits[0] . ( $count > 1 ? '.' . substr( $digits, 1 ) : '' ) . 'e' . ( $point > 0 ? '+' : '-' ) . abs( $point - 1 );
+		} elseif ( $point >= $count ) {
+			$out = $digits . str_repeat( '0', $point - $count );
+		} elseif ( $point > 0 ) {
+			$out = substr( $digits, 0, $point ) . '.' . substr( $digits, $point );
+		} else {
+			$out = '0.' . str_repeat( '0', -$point ) . $digits;
+		}
+		return $m[1] . $out;
 	}
 
 	/**

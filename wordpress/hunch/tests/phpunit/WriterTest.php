@@ -183,6 +183,34 @@ final class WriterTest extends TestCase {
 		Hunch_Writer::buckets( array( 'item-11991', 'item-34378' ), 1 );
 	}
 
+	public function test_a_shard_already_there_is_not_written_again() {
+		$manifest = $this->write( $this->items() )['manifest'];
+		$kept     = $this->dir . '/' . $manifest['shards'][0]['url'];
+		$cut      = $this->dir . '/' . $manifest['shards'][1]['url'];
+		touch( $kept, 1000000000 );
+		// A file of another size under the same name is not the shard.
+		file_put_contents( $cut, 'cut short' );
+		$again = $this->write( $this->items() );
+		clearstatcache();
+		$this->assertSame( $manifest, $again['manifest'] );
+		$this->assertSame( 1000000000, filemtime( $kept ) );
+		$this->assertSame( $manifest['shards'][1]['sha256'], hash_file( 'sha256', $cut ) );
+		$this->assertSame( array(), $again['removed'] );
+	}
+
+	public function test_duplicate_ids_are_an_error_and_nothing_is_written() {
+		$items          = $this->items();
+		$items[3]['id'] = 1;
+		try {
+			$this->write( $items );
+			$this->fail( 'No exception.' );
+		} catch ( InvalidArgumentException $e ) {
+			$this->assertSame( 'Hunch: duplicate item id "1"', $e->getMessage() );
+		}
+		$this->assertFileDoesNotExist( $this->dir . '/manifest.json' );
+		$this->assertSame( array(), (array) glob( $this->dir . '/shards/*' ) );
+	}
+
 	public function test_an_empty_catalog_is_an_error() {
 		$this->expectException( LengthException::class );
 		$this->write( array() );

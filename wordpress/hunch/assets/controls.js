@@ -10,6 +10,21 @@
   const CONSENT_KEY = 'hunch-consent';
   const CATEGORY = 'preferences';
   const DATABASE = 'hunch';
+  // The messages, translated by the site (Hunch_Front::controls_strings()): this script loads no
+  // `wp.i18n`. English where the page did not carry them.
+  const text = {
+    failed: 'That did not work in this browser.',
+    noIndex: 'Personalization is off. Forget deletes anything stored earlier.',
+    off: 'Personalization is off: nothing new is recorded. Forget deletes anything stored earlier.',
+    pause: 'Pause',
+    resume: 'Resume',
+    remembered: 'Items remembered in this browser: %d.',
+    paused: 'Items remembered in this browser: %d (paused).',
+    notSaved: 'Your choice could not be saved, so personalization stays off.',
+    notSavedOwn:
+      'This browser did not let the site save your choice, so personalization stays off.',
+    ...window.hunchControlsL10n,
+  };
   const roots = [...document.querySelectorAll('[data-hunch-controls]')];
   const updaters = [];
 
@@ -67,27 +82,26 @@
       el?.addEventListener(el.type === 'checkbox' ? 'change' : 'click', () => {
         listener().catch((error) => {
           console.error(error);
-          status.value = 'That did not work in this browser.';
+          status.value = text.failed;
         });
       });
 
     async function update() {
       if (consent) consent.checked = storedConsent(root);
       if (!manifest) {
-        status.value = 'Personalization is off. Forget deletes anything stored earlier.';
+        status.value = text.noIndex;
         return;
       }
       const hunch = await shared();
       if (!(await hunch.consented())) {
-        status.value =
-          'Personalization is off: nothing new is recorded. Forget deletes anything stored earlier.';
-        if (pause) pause.textContent = 'Pause';
+        status.value = text.off;
+        if (pause) pause.textContent = text.pause;
         return;
       }
       const { signals } = await hunch.export();
       const paused = await hunch.paused();
-      pause.textContent = paused ? 'Resume' : 'Pause';
-      status.value = `${signals.length} ${signals.length === 1 ? 'item' : 'items'} remembered in this browser${paused ? ' (paused)' : ''}.`;
+      pause.textContent = paused ? text.resume : text.pause;
+      status.value = (paused ? text.paused : text.remembered).replace('%d', signals.length);
     }
     updaters.push(update);
 
@@ -95,7 +109,7 @@
       if (root.dataset.consent === 'wp-consent-api' && !consentApi(root)) {
         // The API's script did not load: its choice can't be stored, and a local one is ignored.
         consent.checked = false;
-        status.value = 'Your choice could not be saved, so personalization stays off.';
+        status.value = text.notSaved;
         return;
       }
       if (consentApi(root)) {
@@ -108,8 +122,7 @@
           localStorage.setItem(CONSENT_KEY, 'yes');
         } catch {
           consent.checked = false;
-          status.value =
-            'This browser did not let the site save your choice, so personalization stays off.';
+          status.value = text.notSavedOwn;
           return;
         }
       } else {
