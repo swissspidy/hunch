@@ -72,25 +72,25 @@ function load(options: Partial<HunchOptions> = {}, version = 'v1') {
 
 test('without consent nothing is recorded and the site’s order stands', async () => {
   const store = new MemoryStore();
-  const ink = await load({ consent: undefined, store });
-  assert.equal(await ink.record('view', 'bread-0'), false);
+  const hunch = await load({ consent: undefined, store });
+  assert.equal(await hunch.record('view', 'bread-0'), false);
   assert.deepEqual(await store.all(), []);
-  const recs = await ink.recommend({ n: 4 });
+  const recs = await hunch.recommend({ n: 4 });
   assert.deepEqual(
     recs.map((r) => r.id),
     ['bread-0', 'space-0', 'rail-0', 'bread-1'],
   );
   assert.ok(recs.every((r) => r.why.confidence === 0 && r.why.because.length === 0));
   assert.ok(recs.every((r) => r.why.similarityShare === 0));
-  assert.deepEqual((await ink.export()).signals, []);
+  assert.deepEqual((await hunch.export()).signals, []);
 });
 
 test('views shape "for you": same topic first, seen items left out, with reasons', async () => {
-  const ink = await load();
-  assert.equal(await ink.record('view', 'rail-0'), true);
-  await ink.record('view', 'rail-1');
-  await ink.record('click', 'rail-1');
-  const recs = await ink.recommend({ n: 3 });
+  const hunch = await load();
+  assert.equal(await hunch.record('view', 'rail-0'), true);
+  await hunch.record('view', 'rail-1');
+  await hunch.record('click', 'rail-1');
+  const recs = await hunch.recommend({ n: 3 });
   assert.deepEqual(
     recs
       .map((r) => r.id)
@@ -109,38 +109,38 @@ test('views shape "for you": same topic first, seen items left out, with reasons
   // Each item's own similarity to the recommendation: rails are close to rails.
   for (const b of recs[0]!.why.because)
     assert.ok(b.similarity > 0.5 && b.similarity <= 1, String(b.similarity));
-  const withSeen = await ink.recommend({ n: 2, includeSeen: true, diversity: 0 });
+  const withSeen = await hunch.recommend({ n: 2, includeSeen: true, diversity: 0 });
   assert.ok(withSeen.some((r) => r.id === 'rail-1'));
 });
 
 test('hidden items never appear, and push their topic down', async () => {
-  const ink = await load();
-  await ink.record('follow', 'space-0');
-  await ink.record('hide', 'bread-1');
-  const recs = await ink.recommend({ n: 12, diversity: 0 });
+  const hunch = await load();
+  await hunch.record('follow', 'space-0');
+  await hunch.record('hide', 'bread-1');
+  const recs = await hunch.recommend({ n: 12, diversity: 0 });
   const ids = recs.map((r) => r.id);
   assert.ok(!ids.includes('bread-1'));
   assert.equal(ids.length, 10, 'all but the hidden item and the followed (known) one');
   assert.ok(ids.indexOf('space-1') < ids.indexOf('rail-0'));
   assert.ok(ids.indexOf('rail-0') < ids.indexOf('bread-0'), ids.join());
   // Forgetting an item undoes its hide.
-  await ink.forget('bread-1');
-  assert.ok((await ink.recommend({ n: 12 })).some((r) => r.id === 'bread-1'));
+  await hunch.forget('bread-1');
+  assert.ok((await hunch.recommend({ n: 12 })).some((r) => r.id === 'bread-1'));
 });
 
 test('pause, resume, forget and export', async () => {
   const store = new MemoryStore();
-  const ink = await load({ store });
-  await ink.record('view', 'bread-0');
-  await ink.pause();
-  assert.equal(await ink.paused(), true);
-  assert.equal(await ink.record('view', 'bread-1'), false);
-  await ink.resume();
-  assert.equal(await ink.record('dwell', 'bread-1', { seconds: 30 }), true);
-  assert.equal(await ink.record('dwell', 'bread-2', { seconds: 5 }), false);
-  assert.equal(await ink.record('dwell', 'bread-2', { seconds: Number.NaN }), false);
-  assert.equal(await ink.record('nope' as 'view', 'bread-2'), false);
-  const exported = await ink.export();
+  const hunch = await load({ store });
+  await hunch.record('view', 'bread-0');
+  await hunch.pause();
+  assert.equal(await hunch.paused(), true);
+  assert.equal(await hunch.record('view', 'bread-1'), false);
+  await hunch.resume();
+  assert.equal(await hunch.record('dwell', 'bread-1', { seconds: 30 }), true);
+  assert.equal(await hunch.record('dwell', 'bread-2', { seconds: 5 }), false);
+  assert.equal(await hunch.record('dwell', 'bread-2', { seconds: Number.NaN }), false);
+  assert.equal(await hunch.record('nope' as 'view', 'bread-2'), false);
+  const exported = await hunch.export();
   assert.equal(exported.format, 'hunch/signals');
   assert.deepEqual(
     exported.signals.map((s) => [s.itemId, s.kind, s.weight]),
@@ -149,19 +149,19 @@ test('pause, resume, forget and export', async () => {
       ['bread-1', 'dwell', 1],
     ],
   );
-  await ink.forget();
+  await hunch.forget();
   assert.deepEqual(await store.all(), []);
-  assert.equal((await ink.recommend({ n: 1 }))[0]!.why.confidence, 0);
+  assert.equal((await hunch.recommend({ n: 1 }))[0]!.why.confidence, 0);
 });
 
 test('consent is asked every time, so withdrawing it stops personalization', async () => {
   let consent = true;
-  const ink = await load({ consent: () => consent });
-  await ink.record('view', 'space-0');
-  assert.ok((await ink.recommend())[0]!.why.confidence > 0);
+  const hunch = await load({ consent: () => consent });
+  await hunch.record('view', 'space-0');
+  assert.ok((await hunch.recommend())[0]!.why.confidence > 0);
   consent = false;
-  assert.equal((await ink.recommend())[0]!.why.confidence, 0);
-  assert.equal(await ink.record('view', 'space-1'), false);
+  assert.equal((await hunch.recommend())[0]!.why.confidence, 0);
+  assert.equal(await hunch.record('view', 'space-1'), false);
   // A throwing hook means no.
   const broken = await load({
     consent: () => {
@@ -172,37 +172,37 @@ test('consent is asked every time, so withdrawing it stops personalization', asy
 });
 
 test('rank() reorders a server list, keeping unknown ids and moving hidden ones last', async () => {
-  const ink = await load();
+  const hunch = await load();
   const list = ['bread-0', 'space-0', 'nope', 'rail-0', 'space-1'];
-  assert.deepEqual(await ink.rank(list), ['bread-0', 'space-0', 'rail-0', 'space-1', 'nope']);
+  assert.deepEqual(await hunch.rank(list), ['bread-0', 'space-0', 'rail-0', 'space-1', 'nope']);
   // With the catalog's prior, the editorial order (bread-0, space-0, rail-0, …, space-1) decides.
-  assert.deepEqual(await ink.rank([...list].reverse(), { prior: 'catalog' }), [
+  assert.deepEqual(await hunch.rank([...list].reverse(), { prior: 'catalog' }), [
     'bread-0',
     'space-0',
     'rail-0',
     'space-1',
     'nope',
   ]);
-  await ink.record('follow', 'space-2');
-  await ink.record('follow', 'space-3');
-  await ink.record('hide', 'bread-0');
-  const ranked = await ink.rank(list, { diversity: 0 });
+  await hunch.record('follow', 'space-2');
+  await hunch.record('follow', 'space-3');
+  await hunch.record('hide', 'bread-0');
+  const ranked = await hunch.rank(list, { diversity: 0 });
   assert.deepEqual(ranked.slice(0, 2).sort(), ['space-0', 'space-1']);
   assert.deepEqual(ranked.slice(-2), ['nope', 'bread-0']);
 });
 
 test('explain() shows how the profile sees an item', async () => {
-  const ink = await load();
-  await ink.record('view', 'bread-0');
-  await ink.record('view', 'space-0');
-  const bread = (await ink.explain('bread-2'))!;
+  const hunch = await load();
+  await hunch.record('view', 'bread-0');
+  await hunch.record('view', 'space-0');
+  const bread = (await hunch.explain('bread-2'))!;
   assert.equal(bread.signals, 2);
   assert.equal(bread.seen, false);
   assert.equal(bread.because[0]!.id, 'bread-0');
   assert.equal(bread.because[0]!.title, 'bread 0');
-  assert.ok(bread.similarity > (await ink.explain('rail-2'))!.similarity);
-  assert.equal((await ink.explain('bread-0'))!.seen, true);
-  assert.equal(await ink.explain('nope'), undefined);
+  assert.ok(bread.similarity > (await hunch.explain('rail-2'))!.similarity);
+  assert.equal((await hunch.explain('bread-0'))!.seen, true);
+  assert.equal(await hunch.explain('nope'), undefined);
 });
 
 test('a new model needs no migration: the same signals meet the new vectors', async () => {
@@ -231,8 +231,8 @@ test('the signal store is pruned to its cap', async () => {
   const store = new MemoryStore();
   for (let i = 0; i < 5; i++)
     await store.add({ itemId: `rail-${i % 4}`, kind: 'view', weight: 1, at: now() - i });
-  const ink = await load({ store, maxSignals: 3 });
-  await ink.record('view', 'space-0');
+  const hunch = await load({ store, maxSignals: 3 });
+  await hunch.record('view', 'space-0');
   const kept = await store.all();
   assert.equal(kept.length, 3);
   assert.ok(kept.some((s) => s.itemId === 'space-0'));
@@ -245,8 +245,8 @@ test('documentInput fills the prompt (topic provider sanity)', () => {
 test('forget(itemId) works without consent, but creates nothing', async () => {
   const store = new MemoryStore();
   await store.add({ itemId: 'rail-0', kind: 'hide', weight: -5, at: now() });
-  const ink = await load({ store, consent: false });
-  await ink.forget('rail-0');
+  const hunch = await load({ store, consent: false });
+  await hunch.forget('rail-0');
   assert.deepEqual(await store.all(), []);
   // An empty store is not touched (IndexedDB would be created by reading it).
   let reads = 0;
@@ -259,8 +259,8 @@ test('forget(itemId) works without consent, but creates nothing', async () => {
 
 test('pruning runs on every write, and options are checked', async () => {
   const store = new MemoryStore();
-  const ink = await load({ store, maxSignals: 2 });
-  for (let i = 0; i < 5; i++) await ink.record('view', `rail-${i % 4}`);
+  const hunch = await load({ store, maxSignals: 2 });
+  for (let i = 0; i < 5; i++) await hunch.record('view', `rail-${i % 4}`);
   assert.equal((await store.all()).length, 2);
   for (const bad of [0, -1, Number.NaN]) {
     await assert.rejects(

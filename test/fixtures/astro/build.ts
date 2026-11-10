@@ -1,8 +1,22 @@
 /** The fixture Astro site with the integration, from the sources: `astro build` and `astro dev`. */
 
+import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { build, dev, type AstroInlineConfig } from 'astro';
 import hunch, { type HunchAstroOptions } from '../../../src/astro/index.ts';
+import { tempDir } from '../../helpers.ts';
+
+const BUILDS = fileURLToPath(new URL('./.builds/', import.meta.url));
+
+/**
+ * A fresh output directory for a build, removed after the test file. It is inside the checkout
+ * (and gitignored): for an `outDir` outside the working directory, Astro prerenders in
+ * `<cwd>/.astro` instead, the same directory for every build, and two builds at once collide.
+ */
+export async function buildDir(): Promise<string> {
+  await mkdir(BUILDS, { recursive: true });
+  return tempDir(BUILDS);
+}
 
 function config(
   outDir: string,

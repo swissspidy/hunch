@@ -7,95 +7,73 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { BrowserContext, Page } from 'playwright-core';
+import type { Hunch } from '../../src/client/index.ts';
 import {
   assertClean,
   axe,
+  context,
   DESKTOP,
-  fakeTransformers,
+  FOOD,
+  holdManifest,
+  home,
+  newContext,
   read,
   ready,
+  routeFakeTransformers,
   serveDemo,
   slots,
 } from './site.ts';
 
 const site = serveDemo();
-const FOOD = ['sourdough-starter', 'baguette-shaping', 'rye-bread'];
-
-async function context(consent: boolean): Promise<BrowserContext> {
-  const ctx = await site.browser.newContext(DESKTOP);
-  if (consent) {
-    await ctx.addInitScript(() => localStorage.setItem('hunch-demo-consent', 'yes'));
-  }
-  return ctx;
-}
-
-async function home(page: Page, query = ''): Promise<void> {
-  await page.goto(`${site.origin}/${query}`);
-  await ready(page, 'hunch-for-you');
-  await ready(page, 'hunch-digest');
-}
 
 for (const colorScheme of ['light', 'dark'] as const) {
-  test(`axe: the home page, cold (no consent), ${colorScheme}`, async () => {
-    const ctx = await site.browser.newContext({ ...DESKTOP, colorScheme });
+  test(`axe: the home page, cold (no consent), ${colorScheme}`, async (t) => {
+    const ctx = await newContext(t, site, { ...DESKTOP, colorScheme });
     const page = await ctx.newPage();
-    await home(page);
+    await home(site, page);
     assertClean(await axe(page), `cold, ${colorScheme}`);
-    await ctx.close();
   });
 }
 
-test('axe: an article page, with its related items', async () => {
-  const ctx = await context(false);
+test('axe: an article page, with its related items', async (t) => {
+  const ctx = await context(t, site, false);
   const page = await ctx.newPage();
   await page.goto(`${site.origin}/items/cold-brew.html`);
   await ready(page, 'hunch-related');
   assertClean(await axe(page), 'article');
-  await ctx.close();
 });
 
-test('axe: the home page, personalized', async () => {
-  const ctx = await context(true);
+test('axe: the home page, personalized', async (t) => {
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
   for (const id of FOOD) await read(site, page, id);
-  await home(page);
+  await home(site, page);
   assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'true');
   assertClean(await axe(page), 'personalized');
-  await ctx.close();
 });
 
-test('axe: the home page after a search', async () => {
-  const ctx = await context(false);
+test('axe: the home page after a search', async (t) => {
+  const ctx = await context(t, site, false);
   const page = await ctx.newPage();
-  const fake = await fakeTransformers();
-  await page.route('https://cdn.jsdelivr.net/**', (route) =>
-    route.fulfill({
-      contentType: 'text/javascript',
-      body: fake,
-      headers: { 'access-control-allow-origin': '*' },
-    }),
-  );
-  await home(page);
+  await routeFakeTransformers(site, page);
+  await home(site, page);
   await page.fill('input[name="q"]', 'something cold to drink');
   await page.click('#search button');
   await page.waitForFunction(() => document.querySelectorAll('#results li').length > 0);
   assertClean(await axe(page), 'search');
-  await ctx.close();
 });
 
-test('axe: the home page with a digest of what is new', async () => {
-  const ctx = await context(true);
+test('axe: the home page with a digest of what is new', async (t) => {
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
-  await home(page, '?as-of=2026-09-15');
-  await home(page);
+  await home(site, page, '?as-of=2026-09-15');
+  await home(site, page);
   assert.equal(await page.getAttribute('hunch-digest', 'data-hunch-new'), '3');
   assertClean(await axe(page), 'digest');
-  await ctx.close();
 });
 
-test('filled slots stay a list of links named by their titles', async () => {
-  const ctx = await context(false);
+test('filled slots stay a list of links named by their titles', async (t) => {
+  const ctx = await context(t, site, false);
   const page = await ctx.newPage();
   await page.goto(`${site.origin}/items/cold-brew.html`);
   await ready(page, 'hunch-related');
@@ -106,11 +84,10 @@ test('filled slots stay a list of links named by their titles', async () => {
   for (const { title } of filled) {
     assert.equal(await page.getByRole('link', { name: title, exact: true }).count(), 1, title);
   }
-  await ctx.close();
 });
 
-test('a stale aria-label on a slot follows the item it now shows', async () => {
-  const ctx = await context(false);
+test('a stale aria-label on a slot follows the item it now shows', async (t) => {
+  const ctx = await context(t, site, false);
   const page = await ctx.newPage();
   // A site that names its links "Read: <title>" in an aria-label.
   await page.route('**/items/cold-brew.html', async (route) => {
@@ -122,9 +99,7 @@ test('a stale aria-label on a slot follows the item it now shows', async () => {
     assert.notEqual(labelled, html);
     await route.fulfill({ body: labelled, contentType: 'text/html' });
   });
-  let release = () => {};
-  const gate = new Promise<void>((resolve) => (release = resolve));
-  await page.route('**/hunch/manifest.json', (route) => gate.then(() => route.continue()));
+  const release = await holdManifest(page);
   await page.goto(`${site.origin}/items/cold-brew.html`);
   const original = (await slots(page, 'hunch-related')).map((s) => s.title);
   release();
@@ -141,15 +116,12 @@ test('a stale aria-label on a slot follows the item it now shows', async () => {
     labels.map(([, title]) => title),
     original,
   );
-  await ctx.close();
 });
 
-test('focus stays on a focused slot while the list is ranked', async () => {
-  const ctx = await context(false);
+test('focus stays on a focused slot while the list is ranked', async (t) => {
+  const ctx = await context(t, site, false);
   const page = await ctx.newPage();
-  let release = () => {};
-  const gate = new Promise<void>((resolve) => (release = resolve));
-  await page.route('**/hunch/manifest.json', (route) => gate.then(() => route.continue()));
+  const release = await holdManifest(page);
   await page.goto(`${site.origin}/items/stargazing-atacama.html`);
   const fallback = await slots(page, 'hunch-related');
   await page.focus('hunch-related [data-hunch-slot]:nth-child(2) a');
@@ -157,11 +129,11 @@ test('focus stays on a focused slot while the list is ranked', async () => {
   // The ranking is done (the page's shared client has the shards), but the list waits until
   // focus leaves it.
   await page.evaluate(async () => {
-    const { Hunch } = window as unknown as {
-      Hunch: { shared(m: string): Promise<{ related(id: string): Promise<unknown> }> };
-    };
-    await (await Hunch.shared(document.body.dataset.manifest!)).related('stargazing-atacama');
+    const { Hunch: Client } = window as unknown as { Hunch: typeof Hunch };
+    await (await Client.shared(document.body.dataset.manifest!)).related('stargazing-atacama');
   });
+  // A fixed wait: the element shows nothing while it waits for focus to leave, so that it
+  // went on to fill the list could only show later.
   await page.waitForTimeout(300);
   assert.equal(await page.getAttribute('hunch-related', 'data-hunch-state'), 'loading');
   assert.deepEqual(await slots(page, 'hunch-related'), fallback);
@@ -173,7 +145,8 @@ test('focus stays on a focused slot while the list is ranked', async () => {
   );
   // Moving focus to another slot doesn't fill it either.
   await page.focus('hunch-related [data-hunch-slot]:nth-child(1) a');
-  await page.waitForTimeout(100);
+  // The element looks again in a task after the focus change: this later task comes after it.
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve)));
   assert.equal(await page.getAttribute('hunch-related', 'data-hunch-state'), 'loading');
   assert.equal(
     await page.evaluate(() =>
@@ -186,13 +159,12 @@ test('focus stays on a focused slot while the list is ranked', async () => {
   await ready(page, 'hunch-related');
   assert.notDeepEqual(await slots(page, 'hunch-related'), fallback);
   assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'SUMMARY');
-  await ctx.close();
 });
 
-test('status messages: quiet on load, spoken when the visitor acts', async () => {
-  const ctx = await context(true);
+test('status messages: quiet on load, spoken when the visitor acts', async (t) => {
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
-  await home(page);
+  await home(site, page);
   const status = page.locator('#status');
   assert.equal(await status.evaluate((el) => el.tagName), 'OUTPUT'); // role="status"
   await page.waitForFunction(() => /stored/.test(document.getElementById('status')!.textContent));
@@ -202,13 +174,12 @@ test('status messages: quiet on load, spoken when the visitor acts', async () =>
   assert.equal(await status.getAttribute('aria-live'), null);
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => /paused/.test(document.getElementById('status')!.textContent));
-  await ctx.close();
 });
 
-test('the privacy controls work from the keyboard and are labelled', async () => {
-  const ctx = await context(false);
+test('the privacy controls work from the keyboard and are labelled', async (t) => {
+  const ctx = await context(t, site, false);
   const page = await ctx.newPage();
-  await home(page);
+  await home(site, page);
   const consent = page.getByRole('checkbox', { name: 'Personalize this site on my device' });
   await consent.focus();
   await page.keyboard.press('Space');
@@ -220,5 +191,4 @@ test('the privacy controls work from the keyboard and are labelled', async () =>
   await page.getByRole('button', { name: 'Pause' }).focus();
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => /paused/.test(document.getElementById('status')!.textContent));
-  await ctx.close();
 });

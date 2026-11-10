@@ -23,7 +23,7 @@ import {
 import { decodeShard, encodeShard, SHARD_FORMAT_VERSION } from '../../src/format/shard.ts';
 import { build } from '../../src/node/build.ts';
 import { hashProvider } from '../../src/node/providers/hash.ts';
-import { dirFetch, tempDir } from '../helpers.ts';
+import { arrayBuffer, dirFetch, tempDir } from '../helpers.ts';
 
 const V1 = 'test/fixtures/format-v1';
 const FOOD_SHARD = 'shards/food.a9821627ccc1.hunch';
@@ -34,10 +34,6 @@ async function fixture(): Promise<{ manifest: Manifest; shards: Map<string, Buff
   const shards = new Map<string, Buffer>();
   for (const ref of manifest.shards) shards.set(ref.url, await readFile(join(V1, ref.url)));
   return { manifest, shards };
-}
-
-function buffer(bytes: Uint8Array): ArrayBuffer {
-  return new Uint8Array(bytes).buffer;
 }
 
 test('format v1: the frozen manifest is read as it was written', async () => {
@@ -67,14 +63,14 @@ test('format v1: the frozen shards decode to the same items, columns and vectors
     assert.equal(createHash('sha256').update(bytes).digest('hex'), ref.sha256, ref.url);
     // The fixed header: magic "HNCH", version 1, int8, reserved 0, dims 8.
     assert.deepEqual([...bytes.subarray(0, 12)], [72, 78, 67, 72, 1, 1, 0, 0, 8, 0, 0, 0]);
-    const shard = decodeShard(buffer(bytes));
+    const shard = decodeShard(arrayBuffer(bytes));
     assert.equal(shard.version, 1);
     assert.equal(shard.space, manifest.space);
     assert.equal(shard.dims, 8);
     assert.equal(shard.quantization, 'int8');
     assert.equal(shard.count, ref.count);
   }
-  const food = decodeShard(buffer(shards.get(FOOD_SHARD)!));
+  const food = decodeShard(arrayBuffer(shards.get(FOOD_SHARD)!));
   assert.deepEqual(food.items, FOOD);
   assert.deepEqual(food.item(1), FOOD[1]);
   assert.deepEqual(food.ids, ['sourdough', 'rye']);
@@ -89,9 +85,9 @@ test('format v1: the frozen shards decode to the same items, columns and vectors
     [...food.vectors],
     [0, 0, 107, 30, 67, 0, 0, 127, -77, 14, -14, 14, 14, -14, -50, 127],
   );
-  const travel = decodeShard(buffer(shards.get('shards/travel.49f872c005d0.hunch')!));
+  const travel = decodeShard(arrayBuffer(shards.get('shards/travel.49f872c005d0.hunch')!));
   assert.deepEqual([...travel.vectors], [0, -108, 19, -127, -63, 64, 0, 64]);
-  const about = decodeShard(buffer(shards.get('shards/all.127cc2a88bc1.hunch')!));
+  const about = decodeShard(arrayBuffer(shards.get('shards/all.127cc2a88bc1.hunch')!));
   assert.deepEqual([...about.section], [-1]);
   assert.deepEqual([...about.time], [NaN]);
 });
@@ -134,7 +130,7 @@ test('format v1: the writer still writes it', async () => {
   // Re-encoding the decoded shards gives the same bytes...
   const { manifest, shards } = await fixture();
   for (const [url, bytes] of shards) {
-    const shard = decodeShard(buffer(bytes));
+    const shard = decodeShard(arrayBuffer(bytes));
     const rows = shard.items.map((_, i) => {
       const row = Float32Array.from(shard.vectors.subarray(i * shard.dims, (i + 1) * shard.dims));
       return row.map((x) => x * shard.invNorms[i]!);
@@ -160,7 +156,7 @@ test('format v1: the writer still writes it', async () => {
   for (const file of await readdir(join(out, 'shards'))) {
     const bytes = await readFile(join(out, 'shards', file));
     assert.deepEqual([...bytes.subarray(0, 12)], [72, 78, 67, 72, 1, 1, 0, 0, 8, 0, 0, 0], file);
-    assert.equal(decodeShard(buffer(bytes)).dims, result.manifest.dims, file);
+    assert.equal(decodeShard(arrayBuffer(bytes)).dims, result.manifest.dims, file);
   }
 });
 

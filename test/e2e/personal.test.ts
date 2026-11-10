@@ -6,64 +6,40 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import type { BrowserContext, Page } from 'playwright-core';
+import type { Page } from 'playwright-core';
+import type { Hunch } from '../../src/client/index.ts';
 import { loadSource } from '../../src/node/sources/index.ts';
 import {
-  DESKTOP,
   assertNoLayoutShift,
+  captureClicks,
+  context,
+  DESKTOP,
+  FOOD,
+  home,
   observeLayoutShifts,
   PHONE,
   read,
   ready,
   serveDemo,
   slots,
-  waitUntil,
+  storedSignals,
+  waitForSignal,
 } from './site.ts';
 
 const site = serveDemo();
-const FOOD = ['sourdough-starter', 'baguette-shaping', 'rye-bread'];
-
-async function context(consent: boolean, options = DESKTOP): Promise<BrowserContext> {
-  const ctx = await site.browser.newContext(options);
-  if (consent) {
-    await ctx.addInitScript(() => localStorage.setItem('hunch-demo-consent', 'yes'));
-  }
-  return ctx;
-}
 
 async function visit(page: Page, id: string): Promise<void> {
   await page.goto(`${site.origin}/items/${id}.html`);
   await ready(page, 'hunch-related');
 }
 
-/** The demo's signals, read from IndexedDB as the page sees them. */
-function storedSignals(page: Page): Promise<{ itemId: string; kind: string }[]> {
-  return page.evaluate(async () => {
-    const hunch = await (
-      window as unknown as {
-        Hunch: {
-          shared(
-            m: string,
-          ): Promise<{ export(): Promise<{ signals: { itemId: string; kind: string }[] }> }>;
-        };
-      }
-    ).Hunch.shared(document.body.dataset.manifest!);
-    return (await hunch.export()).signals;
-  });
-}
-
-async function home(page: Page): Promise<void> {
-  await page.goto(`${site.origin}/`);
-  await ready(page, 'hunch-for-you');
-}
-
-test('without consent nothing is stored and "for you" is the editors’ order', async () => {
-  const ctx = await context(false);
+test('without consent nothing is stored and "for you" is the editors’ order', async (t) => {
+  const ctx = await context(t, site, false);
   const page = await ctx.newPage();
   await visit(page, FOOD[0]!);
   await page.click('[data-signal="follow"]');
   assert.match((await page.locator('#feedback').textContent()) ?? '', /Turn on personalization/);
-  await home(page);
+  await home(site, page);
   assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'false');
   // The editors' order: the feed's first items, as the demo renders them (scripts/demo.ts).
   const editorial = (await loadSource('demo/feed.xml')).slice(0, 4).map((item) => item.id);
@@ -73,7 +49,6 @@ test('without consent nothing is stored and "for you" is the editors’ order', 
   );
   // Not even an empty database was created.
   assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);
-  await ctx.close();
 });
 
 for (const [name, options] of [
@@ -81,7 +56,7 @@ for (const [name, options] of [
   ['phone', PHONE],
 ] as const) {
   test(`reading food articles makes "for you" about food, without layout shift (${name})`, async (t) => {
-    const ctx = await context(true, options);
+    const ctx = await context(t, site, true, options);
     const page = await ctx.newPage();
     for (const id of FOOD) await read(site, page, id);
     const signals = await storedSignals(page);
@@ -91,7 +66,7 @@ for (const [name, options] of [
     );
 
     await observeLayoutShifts(page);
-    await home(page);
+    await home(site, page);
     assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'true');
     const recs = await slots(page, 'hunch-for-you');
     assert.equal(recs.length, 4);
@@ -104,33 +79,26 @@ for (const [name, options] of [
     const why = await page.locator('#why-list li').first().textContent();
     assert.match(why ?? '', /because you read “/);
     await assertNoLayoutShift(t, page);
-    await ctx.close();
   });
 }
 
-test('"Not interested" hides an item for good; "Forget everything" starts over', async () => {
-  const ctx = await context(true);
+test('"Not interested" hides an item for good; "Forget everything" starts over', async (t) => {
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
   for (const id of FOOD) await read(site, page, id);
-  await home(page);
+  await home(site, page);
   const first = (await slots(page, 'hunch-for-you'))[0]!.id;
 
   await visit(page, first);
   await page.click('[data-signal="hide"]');
   await page.waitForFunction(() => document.getElementById('feedback')!.textContent !== '');
-  await home(page);
+  await home(site, page);
   // The hidden item is gone, and so is the visit to it (seen items are not recommended).
   assert.ok(!(await slots(page, 'hunch-for-you')).some((r) => r.id === first));
   // Hidden even where seen items are allowed: the hide signal, not the view, keeps it out.
   const withSeen = await page.evaluate(async () => {
-    const shared = (
-      window as unknown as {
-        Hunch: {
-          shared(m: string): Promise<{ recommend(o: object): Promise<{ id: string }[]> }>;
-        };
-      }
-    ).Hunch.shared;
-    const hunch = await shared(document.body.dataset.manifest!);
+    const { Hunch: Client } = window as unknown as { Hunch: typeof Hunch };
+    const hunch = await Client.shared(document.body.dataset.manifest!);
     return (await hunch.recommend({ n: 40, includeSeen: true })).map((r) => r.id);
   });
   assert.ok(withSeen.length > 20);
@@ -153,14 +121,13 @@ test('"Not interested" hides an item for good; "Forget everything" starts over',
   await page.reload();
   await ready(page, 'hunch-for-you');
   assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'false');
-  await ctx.close();
 });
 
-test('pause stops recording; withdrawing consent deletes the data; export downloads it', async () => {
-  const ctx = await context(true);
+test('pause stops recording; withdrawing consent deletes the data; export downloads it', async (t) => {
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
   await read(site, page, FOOD[0]!);
-  await home(page);
+  await home(site, page);
   await page.waitForFunction(() =>
     document.getElementById('status')!.textContent.startsWith('1 signal stored'),
   );
@@ -181,15 +148,14 @@ test('pause stops recording; withdrawing consent deletes the data; export downlo
   await visit(page, FOOD[1]!);
   assert.equal((await storedSignals(page)).length, 1);
 
-  await home(page);
+  await home(site, page);
   await page.uncheck('#consent');
   await page.waitForFunction(() => /off/.test(document.getElementById('status')!.textContent));
   assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);
-  await ctx.close();
 });
 
-test('staying on an article records dwell time', async () => {
-  const ctx = await context(true);
+test('staying on an article records dwell time', async (t) => {
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
   // A clock that runs 30 seconds while the page is visible.
   await page.clock.install();
@@ -200,42 +166,20 @@ test('staying on an article records dwell time', async () => {
     Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await waitUntil(
-    page,
-    async () => {
-      const hunch = await (
-        window as unknown as {
-          Hunch: {
-            shared(m: string): Promise<{ export(): Promise<{ signals: { kind: string }[] }> }>;
-          };
-        }
-      ).Hunch.shared(document.body.dataset.manifest!);
-      return (await hunch.export()).signals.some((s) => s.kind === 'dwell');
-    },
-    undefined,
-  );
-  const dwell = (await storedSignals(page)).find((s) => s.kind === 'dwell') as unknown as {
-    weight: number;
-  };
+  await waitForSignal(page, (s) => s.kind === 'dwell');
+  const dwell = (await storedSignals(page)).find((s) => s.kind === 'dwell')!;
   assert.ok(dwell.weight > 0.9 && dwell.weight <= 1.1, String(dwell.weight));
-  await ctx.close();
 });
 
-test('an item hidden before there is a profile leaves the fallback', async () => {
-  const ctx = await context(true);
+test('an item hidden before there is a profile leaves the fallback', async (t) => {
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
-  await home(page);
+  await home(site, page);
   const editorial = (await loadSource('demo/feed.xml')).slice(0, 5).map((item) => item.id);
   // Only a hide: no profile, but the editors' first pick must go.
   await page.evaluate(async (id) => {
-    const shared = (
-      window as unknown as {
-        Hunch: {
-          shared(m: string): Promise<{ record(k: string, id: string): Promise<boolean> }>;
-        };
-      }
-    ).Hunch.shared;
-    await (await shared(document.body.dataset.manifest!)).record('hide', id);
+    const { Hunch: Client } = window as unknown as { Hunch: typeof Hunch };
+    await (await Client.shared(document.body.dataset.manifest!)).record('hide', id);
   }, editorial[0]!);
   await page.reload();
   await ready(page, 'hunch-for-you');
@@ -244,15 +188,14 @@ test('an item hidden before there is a profile leaves the fallback', async () =>
     (await slots(page, 'hunch-for-you')).map((s) => s.id),
     editorial.slice(1),
   );
-  await ctx.close();
 });
 
 test('"For you" says why, and its × button hides an item in place', async (t) => {
-  const ctx = await context(true);
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
   for (const id of FOOD) await read(site, page, id);
   await observeLayoutShifts(page);
-  await home(page);
+  await home(site, page);
   assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'true');
   // "Because you read …" names one of the articles read, on the items the profile placed.
   const because = await page.$$eval('hunch-for-you [data-hunch-because]', (els) =>
@@ -300,13 +243,12 @@ test('"For you" says why, and its × button hides an item in place', async (t) =
   assert.match((await page.locator('[data-hunch-announce]').textContent()) ?? '', /^Hidden/);
   assert.ok((await storedSignals(page)).some((s) => s.kind === 'hide' && s.itemId === before[0]));
   await assertNoLayoutShift(t, page);
-  await ctx.close();
 });
 
-test('without consent the × buttons stay hidden', async () => {
-  const ctx = await context(false);
+test('without consent the × buttons stay hidden', async (t) => {
+  const ctx = await context(t, site, false);
   const page = await ctx.newPage();
-  await home(page);
+  await home(site, page);
   assert.equal(await page.locator('hunch-for-you [data-hunch-hide]:visible').count(), 0);
   assert.deepEqual(
     await page.$$eval('hunch-for-you [data-hunch-because]', (els) =>
@@ -314,14 +256,13 @@ test('without consent the × buttons stay hidden', async () => {
     ),
     ['', '', '', ''],
   );
-  await ctx.close();
 });
 
-test('a double click on × records one hide', async () => {
-  const ctx = await context(true);
+test('a double click on × records one hide', async (t) => {
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
   for (const id of FOOD) await read(site, page, id);
-  await home(page);
+  await home(site, page);
   const first = (await slots(page, 'hunch-for-you'))[0]!.id;
   await page
     .locator('hunch-for-you [data-hunch-slot]')
@@ -340,39 +281,22 @@ test('a double click on × records one hide', async () => {
     hides.map((s) => s.itemId),
     [first],
   );
-  await ctx.close();
 });
 
-test('a click in a personalized "for you" list reports personalized: true', async () => {
-  const ctx = await context(true);
+test('a click in a personalized "for you" list reports personalized: true', async (t) => {
+  const ctx = await context(t, site, true);
   const page = await ctx.newPage();
   for (const id of FOOD) await read(site, page, id);
-  await home(page);
+  await home(site, page);
   assert.equal(await page.getAttribute('hunch-for-you', 'data-hunch-personalized'), 'true');
   const first = (await slots(page, 'hunch-for-you'))[0]!.id;
-  await page.evaluate(() => {
-    document.addEventListener('click', (event) => event.preventDefault());
-    document.addEventListener('hunch:click', (event) => {
-      (window as unknown as { clicked: unknown }).clicked = (event as CustomEvent).detail;
-    });
-  });
+  const clicked = await captureClicks(page);
   await page.locator('hunch-for-you [data-hunch-slot] a').first().click();
-  const detail = (await page.evaluate(
-    () => (window as unknown as { clicked: unknown }).clicked,
-  )) as {
-    id: string;
-    list: string;
-    position: number;
-    personalized: boolean;
-  };
-  assert.deepEqual(
-    {
-      id: detail.id,
-      list: detail.list,
-      position: detail.position,
-      personalized: detail.personalized,
-    },
-    { id: first, list: 'hunch-for-you', position: 1, personalized: true },
-  );
-  await ctx.close();
+  const { url: _, ...detail } = (await clicked())!;
+  assert.deepEqual(detail, {
+    id: first,
+    list: 'hunch-for-you',
+    position: 1,
+    personalized: true,
+  });
 });

@@ -4,7 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
-import { extname, resolve, sep } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { after, before, type TestContext } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
@@ -12,10 +12,12 @@ import {
   firefox,
   webkit,
   type Browser,
+  type BrowserContext,
   type BrowserContextOptions,
   type Page,
 } from 'playwright-core';
-import { decodeShard } from '../../src/format/shard.ts';
+import type { Hunch, Signal } from '../../src/client/index.ts';
+import { readShard, tempDir } from '../helpers.ts';
 
 const ENGINES = { chromium, firefox, webkit };
 type Engine = keyof typeof ENGINES;
@@ -33,7 +35,7 @@ export const BROWSER: Engine = (() => {
  * The Layout Instability API (`layout-shift` entries) is Chromium's only: elsewhere a test that
  * measures layout shift skips that check with this reason. The slots' boxes are still compared.
  */
-export const NO_LAYOUT_SHIFT_API =
+const NO_LAYOUT_SHIFT_API =
   BROWSER === 'chromium' ? false : `${BROWSER} has no Layout Instability API (layout-shift)`;
 
 export const DESKTOP: BrowserContextOptions = { viewport: { width: 1280, height: 800 } };
@@ -49,16 +51,21 @@ export const PHONE: BrowserContextOptions = {
 export interface Site {
   origin: string;
   browser: Browser;
+  /** The directory that is served. */
+  dir: string;
 }
 
-/** Builds and serves the demo, and launches the browser, for the tests of the calling file. */
+/**
+ * Builds the demo in a directory of its own and serves it, and launches the browser, for the
+ * tests of the calling file.
+ */
 export function serveDemo(): Site {
-  const site = { origin: '', browser: undefined as unknown as Browser };
+  const site = { origin: '', browser: undefined as unknown as Browser, dir: '' };
   let server: ChildProcess | undefined;
   before(async () => {
-    const child = spawn(process.execPath, ['scripts/demo.ts', '--serve', '--port', '0'], {
-      stdio: ['ignore', 'inherit', 'pipe'],
-    });
+    site.dir = await tempDir();
+    const args = ['scripts/demo.ts', '--out', site.dir, '--serve', '--port', '0'];
+    const child = spawn(process.execPath, args, { stdio: ['ignore', 'inherit', 'pipe'] });
     server = child;
     site.origin = await new Promise<string>((resolve, reject) => {
       let output = '';
@@ -90,10 +97,11 @@ const TYPES: Record<string, string> = {
  * for the tests of the calling file. `/path/` serves `path/index.html`.
  */
 export function serveDir(prepare: () => Promise<string>): Site {
-  const site = { origin: '', browser: undefined as unknown as Browser };
+  const site = { origin: '', browser: undefined as unknown as Browser, dir: '' };
   let server: Server | undefined;
   before(async () => {
     const root = resolve(await prepare());
+    site.dir = root;
     server = createServer((req, res) => {
       const path = decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname);
       const file = resolve(root, `.${path.endsWith('/') ? `${path}index.html` : path}`);
@@ -128,6 +136,52 @@ export function serveDir(prepare: () => Promise<string>): Site {
   return site;
 }
 
+/** A browser context, closed when the test ends, however it ends. */
+export async function newContext(
+  t: TestContext,
+  site: Site,
+  options: BrowserContextOptions = DESKTOP,
+): Promise<BrowserContext> {
+  const ctx = await site.browser.newContext(options);
+  t.after(() => ctx.close());
+  return ctx;
+}
+
+/** A context for the demo, whose visitor has turned personalization on (`consent`) or has not. */
+export async function context(
+  t: TestContext,
+  site: Site,
+  consent: boolean,
+  options: BrowserContextOptions = DESKTOP,
+): Promise<BrowserContext> {
+  const ctx = await newContext(t, site, options);
+  if (consent) {
+    await ctx.addInitScript(() => localStorage.setItem('hunch-demo-consent', 'yes'));
+  }
+  return ctx;
+}
+
+/** Three of the demo's Food articles: reading them makes a profile about food. */
+export const FOOD = ['sourdough-starter', 'baguette-shaping', 'rye-bread'];
+
+/** Opens the demo's home page and waits for its lists. */
+export async function home(site: Site, page: Page, query = ''): Promise<void> {
+  await page.goto(`${site.origin}/${query}`);
+  await ready(page, 'hunch-for-you');
+  await ready(page, 'hunch-digest');
+}
+
+/**
+ * Holds the manifest back until the returned function is called, so a test can look at the
+ * server-rendered fallback first and a fast fill can't race it.
+ */
+export async function holdManifest(page: Page): Promise<() => void> {
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/hunch/manifest.json', (route) => gate.then(() => route.continue()));
+  return release;
+}
+
 /** Sums layout shifts from the first paint on (call before navigating). Chromium only. */
 export async function observeLayoutShifts(page: Page): Promise<void> {
   if (NO_LAYOUT_SHIFT_API) return;
@@ -151,6 +205,7 @@ export async function observeLayoutShifts(page: Page): Promise<void> {
  */
 export async function assertNoLayoutShift(t: TestContext, page: Page): Promise<void> {
   await t.test('no layout shift', { skip: NO_LAYOUT_SHIFT_API }, async () => {
+    // A fixed wait: no event says that nothing more will shift, so late shifts get this long.
     await page.waitForTimeout(300);
     const cls = await page.evaluate(() => (window as unknown as { __cls: number }).__cls);
     assert.equal(cls, 0);
@@ -178,33 +233,21 @@ export async function ready(page: Page, element: string): Promise<void> {
 }
 
 /**
- * Visits an article and waits until its view is stored. Leaving a page aborts its pending
- * IndexedDB writes, and Firefox can still be opening the database when the list is ready.
+ * Waits until `check` resolves to true, asking again every 50 ms. One deadline for the whole
+ * wait, a check that never settles included.
  */
-/**
- * Waits until `check`, which may be async, returns true in the page. Not page.waitForFunction:
- * it doesn't wait for a returned promise, which counts as true at once, so an async check never
- * waited for anything.
- */
-export async function waitUntil<A>(
-  page: Page,
-  check: (arg: A) => boolean | Promise<boolean>,
-  arg: A,
-  timeout = 10_000,
-): Promise<void> {
+async function eventually(check: () => Promise<boolean>, timeout: number): Promise<void> {
   const end = Date.now() + timeout;
   const late = (): Error => new Error(`waitUntil: still false after ${timeout} ms`);
   let timer: ReturnType<typeof setTimeout> | undefined;
-  // One deadline for the whole wait, a check that never settles included.
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(late()), timeout);
   });
   try {
     for (;;) {
-      // The argument is plain JSON here, which Playwright's Unboxed<A> type can't see.
-      const evaluated = page.evaluate(check as (arg: unknown) => Promise<boolean>, arg as unknown);
-      evaluated.catch(() => {}); // Settled after the deadline: nobody awaits it any more.
-      const result = await Promise.race([evaluated, deadline]);
+      const checked = check();
+      checked.catch(() => {}); // Settled after the deadline: nobody awaits it any more.
+      const result = await Promise.race([checked, deadline]);
       if (Date.now() >= end) throw late();
       if (result) return;
       await Promise.race([new Promise((resolve) => setTimeout(resolve, 50)), deadline]);
@@ -214,42 +257,83 @@ export async function waitUntil<A>(
   }
 }
 
+/**
+ * Waits until `check`, which may be async, returns true in the page. Not page.waitForFunction:
+ * it doesn't wait for a returned promise, which counts as true at once, so an async check never
+ * waited for anything.
+ */
+export function waitUntil<A>(
+  page: Page,
+  check: (arg: A) => boolean | Promise<boolean>,
+  arg: A,
+  timeout = 10_000,
+): Promise<void> {
+  // The argument is plain JSON here, which Playwright's Unboxed<A> type can't see.
+  return eventually(
+    () => page.evaluate(check as (arg: unknown) => Promise<boolean>, arg as unknown),
+    timeout,
+  );
+}
+
+/** The demo's signals, read from IndexedDB as the page's shared client sees them. */
+export function storedSignals(page: Page): Promise<Signal[]> {
+  return page.evaluate(async () => {
+    const { Hunch: Client } = window as unknown as { Hunch: typeof Hunch };
+    return (await (await Client.shared(document.body.dataset.manifest!)).export()).signals;
+  });
+}
+
+/** Waits until one of the stored signals matches. */
+export function waitForSignal(page: Page, match: (signal: Signal) => boolean): Promise<void> {
+  return eventually(async () => (await storedSignals(page)).some(match), 10_000);
+}
+
+/**
+ * Visits an article and waits until its view is stored. Leaving a page aborts its pending
+ * IndexedDB writes, and Firefox can still be opening the database when the list is ready.
+ */
 export async function read(site: Site, page: Page, id: string): Promise<void> {
   const since = Date.now();
   await page.goto(`${site.origin}/items/${id}.html`);
   await ready(page, 'hunch-related');
-  await waitUntil(
-    page,
-    async (item) => {
-      const hunch = await (
-        window as unknown as {
-          Hunch: {
-            shared(m: string): Promise<{
-              export(): Promise<{ signals: { itemId: string; kind: string; at: number }[] }>;
-            }>;
-          };
-        }
-      ).Hunch.shared(document.body.dataset.manifest!);
-      // This visit's view, not an earlier signal for the item.
-      return (await hunch.export()).signals.some(
-        (s) => s.itemId === item.id && s.kind === 'view' && s.at >= item.since,
-      );
-    },
-    { id, since },
-  );
+  // This visit's view, not an earlier signal for the item.
+  await waitForSignal(page, (s) => s.itemId === id && s.kind === 'view' && s.at >= since);
 }
 
-/** The article a search with `fakeTransformers` finds first. */
+/** What `hunch:click` says about a click on a slot. */
+export interface Click {
+  id: string;
+  url: string;
+  position: number;
+  list: string;
+  personalized: boolean;
+}
+
+/**
+ * From now on a click on a link keeps the page (after the components have seen it), and the
+ * returned function gives the last `hunch:click` the page's analytics would have got.
+ */
+export async function captureClicks(page: Page): Promise<() => Promise<Click | undefined>> {
+  await page.evaluate(() => {
+    document.addEventListener('click', (event) => event.preventDefault());
+    document.addEventListener('hunch:click', (event) => {
+      (window as unknown as { clicked: unknown }).clicked = (event as CustomEvent).detail;
+    });
+  });
+  return () => page.evaluate(() => (window as unknown as { clicked?: Click }).clicked);
+}
+
+/** The article a search finds first after `routeFakeTransformers`. */
 export const TARGET = 'cold-brew';
 
 /**
  * A stand-in for Transformers.js, served for the CDN URL: its "model" returns the vector of
  * the `TARGET` article, so that article must come first in a search.
  */
-export async function fakeTransformers(): Promise<string> {
-  const manifest = JSON.parse(await readFile('demo/dist/hunch/manifest.json', 'utf8'));
+async function fakeTransformers(site: Site): Promise<string> {
+  const manifest = JSON.parse(await readFile(join(site.dir, 'hunch/manifest.json'), 'utf8'));
   const ref = manifest.shards.find((s: { section: string }) => s.section === 'Food');
-  const shard = decodeShard(new Uint8Array(await readFile(`demo/dist/hunch/${ref.url}`)).buffer);
+  const shard = await readShard(join(site.dir, 'hunch', ref.url));
   const row = shard.items.findIndex((item) => item.id === TARGET);
   // The article's vector, padded to the model's 768 dims: truncation gives it back exactly.
   const vector = new Array(manifest.model.nativeDims).fill(0);
@@ -268,6 +352,18 @@ export async function fakeTransformers(): Promise<string> {
         return model;
       },
     };`;
+}
+
+/** Serves `fakeTransformers` to the page where it asks the CDN for Transformers.js. */
+export async function routeFakeTransformers(site: Site, page: Page): Promise<void> {
+  const fake = await fakeTransformers(site);
+  await page.route('https://cdn.jsdelivr.net/**', (route) =>
+    route.fulfill({
+      contentType: 'text/javascript',
+      body: fake,
+      headers: { 'access-control-allow-origin': '*' },
+    }),
+  );
 }
 
 const AXE = fileURLToPath(import.meta.resolve('axe-core/axe.min.js'));

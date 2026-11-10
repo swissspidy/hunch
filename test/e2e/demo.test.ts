@@ -6,13 +6,19 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { test } from 'node:test';
-import { decodeShard, encodeShard } from '../../src/format/shard.ts';
+import { join } from 'node:path';
+import { test, type TestContext } from 'node:test';
+import type { Hunch } from '../../src/client/index.ts';
+import { encodeShard } from '../../src/format/shard.ts';
 import type { BrowserContextOptions, Page } from 'playwright-core';
+import { readShard } from '../helpers.ts';
 import {
   DESKTOP,
   assertNoLayoutShift,
   BROWSER,
+  captureClicks,
+  holdManifest,
+  newContext,
   observeLayoutShifts,
   PHONE,
   ready as readyFor,
@@ -22,17 +28,21 @@ import {
 
 const site = serveDemo();
 
-async function open(path: string, options: BrowserContextOptions = DESKTOP, gate?: Promise<void>) {
-  const context = await site.browser.newContext(options);
+/** Opens a page of the demo; with `hold`, its manifest waits until `release()` is called. */
+async function open(
+  t: TestContext,
+  path: string,
+  options: BrowserContextOptions = DESKTOP,
+  hold = false,
+) {
+  const context = await newContext(t, site, options);
   const page = await context.newPage();
-  // Holds the manifest back until `gate` settles, so a test can see the fallback first.
-  if (gate)
-    await page.route('**/hunch/manifest.json', (route) => gate.then(() => route.continue()));
+  const release = hold ? await holdManifest(page) : () => {};
   const requests: string[] = [];
   page.on('request', (request) => requests.push(request.url()));
   await observeLayoutShifts(page);
   await page.goto(`${site.origin}${path}`);
-  return { page, requests, close: () => context.close() };
+  return { page, requests, release };
 }
 
 const slots = (page: Page) => slotsOf(page, 'hunch-related');
@@ -43,9 +53,12 @@ for (const [name, options] of [
   ['phone', PHONE],
 ] as const) {
   test(`related items replace the fallback in place, with no layout shift (${name})`, async (t) => {
-    let release = () => {};
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    const { page, requests, close } = await open('/items/stargazing-atacama.html', options, gate);
+    const { page, requests, release } = await open(
+      t,
+      '/items/stargazing-atacama.html',
+      options,
+      true,
+    );
     const fallback = await slots(page);
     const box = await page.locator('hunch-related').boundingBox();
     assert.ok(fallback.every((f) => f.href === `/items/${f.id}.html`));
@@ -84,26 +97,18 @@ for (const [name, options] of [
       '/hunch/shards/science.hunch',
       '/hunch/shards/technology.hunch',
     ]);
-    await close();
   });
 }
 
-test(`the WebAssembly SIMD kernel runs in ${BROWSER}, with the JavaScript one's results`, async () => {
-  const { page, close } = await open('/items/cold-brew.html');
+test(`the WebAssembly SIMD kernel runs in ${BROWSER}, with the JavaScript one's results`, async (t) => {
+  const { page } = await open(t, '/items/cold-brew.html');
   await ready(page);
   const result = await page.evaluate(async () => {
-    const { Hunch } = window as unknown as {
-      Hunch: {
-        load(o: object): Promise<{
-          kernel: string;
-          related(id: string, o: object): Promise<{ id: string; score: number }[]>;
-        }>;
-      };
-    };
+    const { Hunch: Client } = window as unknown as { Hunch: typeof Hunch };
     const manifest = document.body.dataset.manifest!;
     const [wasm, js] = await Promise.all([
-      Hunch.load({ manifest }),
-      Hunch.load({ manifest, kernel: 'js' }),
+      Client.load({ manifest }),
+      Client.load({ manifest, kernel: 'js' }),
     ]);
     return {
       kinds: [wasm.kernel, js.kernel],
@@ -117,11 +122,10 @@ test(`the WebAssembly SIMD kernel runs in ${BROWSER}, with the JavaScript one's 
     result.b.map((r) => r.id),
   );
   result.a.forEach((r, i) => assert.ok(Math.abs(r.score - result.b[i]!.score) < 1e-8));
-  await close();
 });
 
-test('the explanation lists each item’s similarity', async () => {
-  const { page, close } = await open('/items/cold-brew.html');
+test('the explanation lists each item’s similarity', async (t) => {
+  const { page } = await open(t, '/items/cold-brew.html');
   await ready(page);
   const why = await page.locator('#why-list li').allTextContents();
   assert.equal(why.length, 4);
@@ -129,25 +133,23 @@ test('the explanation lists each item’s similarity', async () => {
     why[0]!,
     /^The chemistry of roasting coffee beans: similarity 0\.\d\d, recency 0\.\d\d$/,
   );
-  await close();
 });
 
-test('no animation when the visitor prefers reduced motion', async () => {
-  const { page, close } = await open('/items/cold-brew.html', {
+test('no animation when the visitor prefers reduced motion', async (t) => {
+  const { page } = await open(t, '/items/cold-brew.html', {
     ...DESKTOP,
     reducedMotion: 'reduce',
   });
   await ready(page);
   const animations = await page.evaluate(() => document.getAnimations().length);
   assert.equal(animations, 0);
-  await close();
 });
 
-test('a javascript: URL in the catalog never becomes a link', async () => {
+test('a javascript: URL in the catalog never becomes a link', async (t) => {
   // The Food shard, re-encoded with a script URL for every item, and the manifest to match.
-  const manifest = JSON.parse(await readFile('demo/dist/hunch/manifest.json', 'utf8'));
+  const manifest = JSON.parse(await readFile(join(site.dir, 'hunch/manifest.json'), 'utf8'));
   const ref = manifest.shards.find((s: { section: string }) => s.section === 'Food');
-  const shard = decodeShard(new Uint8Array(await readFile(`demo/dist/hunch/${ref.url}`)).buffer);
+  const shard = await readShard(join(site.dir, 'hunch', ref.url));
   const vectors = shard.items.map((_, i) => {
     const row = Float32Array.from(shard.vectors.subarray(i * shard.dims, (i + 1) * shard.dims));
     return row.map((x) => x * shard.invNorms[i]!);
@@ -163,7 +165,7 @@ test('a javascript: URL in the catalog never becomes a link', async () => {
   );
   ref.sha256 = createHash('sha256').update(bytes).digest('hex');
   ref.bytes = bytes.length;
-  const context = await site.browser.newContext(DESKTOP);
+  const context = await newContext(t, site);
   const page = await context.newPage();
   await page.route('**/hunch/manifest.json', (route) => route.fulfill({ json: manifest }));
   await page.route(`**/hunch/${ref.url}`, (route) => route.fulfill({ body: Buffer.from(bytes) }));
@@ -182,23 +184,21 @@ test('a javascript: URL in the catalog never becomes a link', async () => {
     JSON.stringify(links),
   );
   assert.ok(links.every(([, href]) => !href?.startsWith('javascript:')));
-  await context.close();
 });
 
-test('the server-rendered fallback stays when the manifest cannot load', async () => {
-  const context = await site.browser.newContext(DESKTOP);
+test('the server-rendered fallback stays when the manifest cannot load', async (t) => {
+  const context = await newContext(t, site);
   const page = await context.newPage();
   await page.route('**/hunch/manifest.json', (route) => route.fulfill({ status: 503 }));
   await page.goto(`${site.origin}/items/cold-brew.html`);
   const fallback = await slots(page);
   await page.waitForSelector('hunch-related[data-hunch-state="error"]');
   assert.deepEqual(await slots(page), fallback);
-  await context.close();
 });
 
-test('on a plain-HTTP site (no SubtleCrypto), fetch checks the shards’ hashes', async () => {
+test('on a plain-HTTP site (no SubtleCrypto), fetch checks the shards’ hashes', async (t) => {
   // The demo under an origin that isn't localhost, so the page is not a secure context.
-  const context = await site.browser.newContext(DESKTOP);
+  const context = await newContext(t, site);
   let tamper = false;
   await context.route('http://hunch.test/**', async (route) => {
     const url = new URL(route.request().url());
@@ -224,30 +224,31 @@ test('on a plain-HTTP site (no SubtleCrypto), fetch checks the shards’ hashes'
   tamper = true;
   await page.reload();
   await page.waitForSelector('hunch-related[data-hunch-state="error"]');
-  await context.close();
 });
 
-test('a click on a slot fires hunch:click for the site’s analytics, and sends nothing', async () => {
-  const { page, requests, close } = await open('/items/sourdough-starter.html');
+test('a click on a slot fires hunch:click for the site’s analytics, and sends nothing', async (t) => {
+  const { page, requests } = await open(t, '/items/sourdough-starter.html');
   await ready(page);
   const ranked = await slots(page);
-  await page.evaluate(() => {
-    // Keep the page: stop the link, after the component has seen the click.
-    document.addEventListener('click', (event) => event.preventDefault());
-    document.addEventListener('hunch:click', (event) => {
-      (window as unknown as { clicked: unknown }).clicked = (event as CustomEvent).detail;
-    });
-  });
+  const clicked = await captureClicks(page);
   const before = requests.length;
   await page.locator('hunch-related [data-hunch-slot] a').nth(1).click();
-  const detail = await page.evaluate(() => (window as unknown as { clicked: unknown }).clicked);
-  assert.deepEqual(detail, {
+  assert.deepEqual(await clicked(), {
     id: ranked[1]!.id,
     url: new URL(ranked[1]!.href, site.origin).href,
     position: 2,
     list: 'hunch-related',
     personalized: false,
   });
-  assert.deepEqual(requests.slice(before), []);
-  await close();
+  // A request of the page's own, a task after the click: one the click made, in its handler
+  // or in what the handler started, would be reported before it.
+  const marker = `${site.origin}/style.css?after-the-click`;
+  await Promise.all([
+    page.waitForRequest(marker),
+    page.evaluate(async (url) => {
+      await new Promise((resolve) => setTimeout(resolve));
+      await fetch(url);
+    }, marker),
+  ]);
+  assert.deepEqual(requests.slice(before), [marker]);
 });

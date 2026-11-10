@@ -20,9 +20,9 @@ before(async () => {
 });
 
 test('related items share the query item’s topic', async () => {
-  const ink = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir), now });
+  const hunch = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir), now });
   // The hash provider is lexical, not semantic: "night", "train" and "rail" carry this.
-  const related = await ink.related('night-train-alps', { n: 3, diversity: 0 });
+  const related = await hunch.related('night-train-alps', { n: 3, diversity: 0 });
   assert.equal(related.length, 3);
   const ids = related.map((r) => r.id);
   assert.ok(ids.slice(0, 2).includes('budget-rail-europe'), ids.join(', '));
@@ -40,8 +40,8 @@ test('related items share the query item’s topic', async () => {
 
 test('only the shards needed are fetched', async () => {
   const log: string[] = [];
-  const ink = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir, log), now });
-  const related = await ink.related('coffee-chemistry', {
+  const hunch = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir, log), now });
+  const related = await hunch.related('coffee-chemistry', {
     sections: 'same',
     sectionHint: 'Science',
   });
@@ -50,8 +50,8 @@ test('only the shards needed are fetched', async () => {
   assert.equal(log.length, 2, log.join(', '));
   assert.match(log[1]!, /\/hunch\/shards\/science\./);
   // Asking across all sections loads the rest, once.
-  await ink.related('coffee-chemistry');
-  await ink.related('cold-brew');
+  await hunch.related('coffee-chemistry');
+  await hunch.related('cold-brew');
   assert.equal(log.length, 5, log.join(', '));
 });
 
@@ -72,14 +72,14 @@ test('a catalog in one shard is filtered by section too', async () => {
 });
 
 test('exclusions, unknown items and n', async () => {
-  const ink = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir), now });
-  const all = await ink.related('cold-brew', { n: 100 });
+  const hunch = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir), now });
+  const all = await hunch.related('cold-brew', { n: 100 });
   assert.equal(all.length, 31);
   assert.equal(new Set(all.map((r) => r.id)).size, 31);
-  const without = await ink.related('cold-brew', { n: 3, exclude: [all[0]!.id] });
+  const without = await hunch.related('cold-brew', { n: 3, exclude: [all[0]!.id] });
   assert.ok(!without.some((r) => r.id === all[0]!.id));
-  assert.deepEqual(await ink.related('no-such-item'), []);
-  assert.equal((await ink.item('cold-brew'))?.section, 'Food');
+  assert.deepEqual(await hunch.related('no-such-item'), []);
+  assert.equal((await hunch.item('cold-brew'))?.section, 'Food');
 });
 
 test('a shard from another embedding space is refused', async () => {
@@ -97,8 +97,8 @@ test('a shard from another embedding space is refused', async () => {
   const otherManifest = JSON.parse(await readFile(join(other, 'hunch/manifest.json'), 'utf8'));
   manifest.shards = otherManifest.shards;
   await writeFile(join(other, 'hunch/manifest.json'), JSON.stringify(manifest));
-  const ink = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(other), now });
-  await assert.rejects(ink.related('cold-brew'), /is from space .*hash@1\|native=256\|dims=256/);
+  const hunch = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(other), now });
+  await assert.rejects(hunch.related('cold-brew'), /is from space .*hash@1\|native=256\|dims=256/);
 });
 
 test('a shard that does not match its hash is refused', async () => {
@@ -107,7 +107,7 @@ test('a shard that does not match its hash is refused', async () => {
   manifest.shards[0].sha256 = '0'.repeat(64);
   await writeFile(join(copy, 'manifest.json'), JSON.stringify(manifest));
   const fetchFn = dirFetch(dir);
-  const ink = await Hunch.load({
+  const hunch = await Hunch.load({
     manifest: MANIFEST,
     fetch: (url, init) =>
       String(url).endsWith('manifest.json')
@@ -116,7 +116,7 @@ test('a shard that does not match its hash is refused', async () => {
     now,
   });
   await assert.rejects(
-    ink.related('cold-brew', { sectionHint: 'Food' }),
+    hunch.related('cold-brew', { sectionHint: 'Food' }),
     /does not match the manifest's hash/,
   );
 });
@@ -141,8 +141,8 @@ test('without SubtleCrypto (plain HTTP), fetch checks the hash as Subresource In
   const real = Object.getOwnPropertyDescriptor(globalThis, 'crypto')!;
   Object.defineProperty(globalThis, 'crypto', { value: undefined, configurable: true });
   try {
-    const ink = await Hunch.load({ manifest: MANIFEST, fetch: sriFetch((u) => inner(u)), now });
-    assert.ok((await ink.related('cold-brew', { sectionHint: 'Food' })).length > 0);
+    const hunch = await Hunch.load({ manifest: MANIFEST, fetch: sriFetch((u) => inner(u)), now });
+    assert.ok((await hunch.related('cold-brew', { sectionHint: 'Food' })).length > 0);
     const food = manifest.shards.find((s: { section: string }) => s.section === 'Food');
     assert.ok(
       seen.includes(`sha256-${Buffer.from(food.sha256, 'hex').toString('base64')}`),
@@ -164,14 +164,14 @@ test('without SubtleCrypto (plain HTTP), fetch checks the hash as Subresource In
     // A hash browsers couldn't parse would mean no check at all: refused before fetching.
     for (const sha256 of ['', 'xyz', '0'.repeat(63), 'A'.repeat(64)]) {
       const odd = { ...manifest, shards: manifest.shards.map((s: object) => ({ ...s, sha256 })) };
-      const ink = await Hunch.load({
+      const hunch = await Hunch.load({
         manifest: MANIFEST,
         fetch: sriFetch((u) =>
           u.pathname.endsWith('manifest.json') ? Promise.resolve(Response.json(odd)) : inner(u),
         ),
         now,
       });
-      await assert.rejects(ink.related('cold-brew', { sectionHint: 'Food' }), /no valid SHA-256/);
+      await assert.rejects(hunch.related('cold-brew', { sectionHint: 'Food' }), /no valid SHA-256/);
     }
   } finally {
     Object.defineProperty(globalThis, 'crypto', real);

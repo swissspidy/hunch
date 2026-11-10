@@ -40,17 +40,20 @@ test('hunch build, then hunch inspect', async () => {
   assert.match(stdout, /Food +8 /);
 });
 
-test('errors are one line and exit 1', async () => {
-  await assert.rejects(hunch('build', '--out', 'x'), (e: { code: number; stderr: string }) => {
-    assert.equal(e.code, 1);
-    assert.equal(e.stderr, 'hunch: build needs at least one --source\n');
-    return true;
-  });
-  await assert.rejects(
-    hunch('build', '--source', 'demo/feed.xml', '--quantization', 'int4'),
-    /int8 or float32/,
+test('an error is one line and exits 1; an unknown command prints the usage too', async () => {
+  const fails = (args: string[], stderr: string | RegExp) =>
+    assert.rejects(hunch(...args), (e: { code: number; stderr: string }) => {
+      assert.equal(e.code, 1);
+      if (typeof stderr === 'string') assert.equal(e.stderr, stderr);
+      else assert.match(e.stderr, stderr);
+      return true;
+    });
+  await fails(['build', '--out', 'x'], 'hunch: build needs at least one --source\n');
+  await fails(
+    ['build', '--source', 'demo/feed.xml', '--quantization', 'int4'],
+    'hunch: --quantization is int8 or float32, not int4\n',
   );
-  await assert.rejects(hunch('nope'), /Unknown command nope/);
+  await fails(['nope'], /^Unknown command nope\n\nUsage: hunch <command>/);
 });
 
 test('hunch --version prints the package version', async () => {

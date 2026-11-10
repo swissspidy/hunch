@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { decodeShard, encodeShard } from '../../src/format/shard.ts';
 import { normalize } from '../../src/rank/vector.ts';
+import { arrayBuffer } from '../helpers.ts';
 
 const items = [
   { id: 'a', url: '/a', title: 'A', prior: 1 },
@@ -18,7 +19,7 @@ const items = [
 const vectors = [normalize([3, -4, 0, 1, 2]), normalize([0.1, 0.2, -0.3, 0.4, -0.5])];
 
 test('float32 shards round-trip exactly', () => {
-  const shard = decodeShard(copy(encodeShard({ space: 's', items }, vectors, 5, 'float32')));
+  const shard = decodeShard(arrayBuffer(encodeShard({ space: 's', items }, vectors, 5, 'float32')));
   assert.equal(shard.space, 's');
   assert.equal(shard.dims, 5);
   assert.equal(shard.quantization, 'float32');
@@ -28,7 +29,7 @@ test('float32 shards round-trip exactly', () => {
 });
 
 test('int8 shards keep cosine similarity within 1%', () => {
-  const shard = decodeShard(copy(encodeShard({ space: 's', items }, vectors, 5, 'int8')));
+  const shard = decodeShard(arrayBuffer(encodeShard({ space: 's', items }, vectors, 5, 'int8')));
   assert.equal(shard.quantization, 'int8');
   for (let i = 0; i < 2; i++) {
     let dot = 0;
@@ -41,7 +42,7 @@ test('int8 shards keep cosine similarity within 1%', () => {
 });
 
 test('the columns are read as written, the metadata only on demand', () => {
-  const shard = decodeShard(copy(encodeShard({ space: 's', items }, vectors, 5, 'int8')));
+  const shard = decodeShard(arrayBuffer(encodeShard({ space: 's', items }, vectors, 5, 'int8')));
   assert.equal(shard.version, 1);
   assert.equal(shard.count, 2);
   assert.deepEqual(shard.ids, ['a', 'b']);
@@ -67,7 +68,7 @@ test('the columns and vectors are aligned whatever the header length', () => {
         5,
         quantization,
       );
-      const buffer = copy(bytes);
+      const buffer = arrayBuffer(bytes);
       const view = new DataView(buffer);
       const columns = Math.ceil((24 + view.getUint32(16, true)) / 8) * 8;
       assert.equal(view.getFloat64(columns, true), 1, `${id}: the prior opens the columns`);
@@ -82,7 +83,7 @@ test('bad input is rejected', () => {
   assert.throws(() => decodeShard(new ArrayBuffer(4)), /truncated/);
   assert.throws(() => decodeShard(new ArrayBuffer(64)), /magic/);
   const bytes = encodeShard({ space: 's', items }, vectors, 5, 'int8');
-  assert.throws(() => decodeShard(copy(bytes.subarray(0, bytes.length - 1))), /truncated/);
+  assert.throws(() => decodeShard(arrayBuffer(bytes.subarray(0, bytes.length - 1))), /truncated/);
   assert.throws(
     () => encodeShard({ space: 's', items }, [vectors[0]!], 5, 'int8'),
     /2 items but 1 vectors/,
@@ -100,10 +101,10 @@ test('bad input is rejected', () => {
   const lengths = Math.ceil((24 + view.getUint32(16, true)) / 8) * 8 + 16 * 2;
   const broken = good.slice();
   new DataView(broken.buffer).setUint32(lengths + 4, 10_000, true);
-  assert.throws(() => decodeShard(copy(broken)), /bad metadata lengths/);
+  assert.throws(() => decodeShard(arrayBuffer(broken)), /bad metadata lengths/);
   const unlisted = good.slice();
   new DataView(unlisted.buffer).setUint16(lengths + 8 + 2, 1, true);
-  assert.throws(() => decodeShard(copy(unlisted)), /section index is out of range/);
+  assert.throws(() => decodeShard(arrayBuffer(unlisted)), /section index is out of range/);
 });
 
 /** A shard with no items and the given raw JSON header. */
@@ -120,10 +121,6 @@ function withHeader(json: string): ArrayBuffer {
   view.setUint32(16, text.length, true);
   out.set(text, start);
   return out.buffer;
-}
-
-function copy(bytes: Uint8Array): ArrayBuffer {
-  return bytes.slice().buffer;
 }
 
 test('a shard holds up to 65,535 sections (0xffff means none)', () => {
@@ -143,7 +140,7 @@ test('a shard holds up to 65,535 sections (0xffff means none)', () => {
       1,
       'int8',
     );
-  const decoded = decodeShard(copy(shard(0xffff)));
+  const decoded = decodeShard(arrayBuffer(shard(0xffff)));
   assert.equal(decoded.sections.length, 0xffff);
   assert.deepEqual([...decoded.section.subarray(-2)], [0xfffe, -1]);
   assert.throws(() => shard(0x10000), /too many sections/);

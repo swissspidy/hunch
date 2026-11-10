@@ -6,11 +6,11 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildFixture } from '../fixtures/astro/build.ts';
-import { tempDir } from '../helpers.ts';
+import { buildDir, buildFixture } from '../fixtures/astro/build.ts';
 import {
   assertNoLayoutShift,
-  DESKTOP,
+  holdManifest,
+  newContext,
   observeLayoutShifts,
   ready,
   serveDir,
@@ -19,25 +19,20 @@ import {
 } from './site.ts';
 
 const site = serveDir(async () => {
-  const out = await tempDir();
+  const out = await buildDir();
   await buildFixture(out, { cacheDir: false, include: '/blog/**' });
   return out;
 });
 
 test('the related list fills in place from the integration’s manifest', async (t) => {
-  const context = await site.browser.newContext(DESKTOP);
+  const context = await newContext(t, site);
   const page = await context.newPage();
   const requests: string[] = [];
   page.on('request', (request) => requests.push(new URL(request.url()).pathname));
   await observeLayoutShifts(page);
   // Hold the manifest until the server-rendered fallback has been read, so a fast fill can't
   // race the snapshot.
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => (release = resolve));
-  await page.route('**/hunch/manifest.json', async (route) => {
-    await gate;
-    await route.continue();
-  });
+  const release = await holdManifest(page);
   await page.goto(`${site.origin}/blog/rye-bread/`);
   const fallback = await slots(page, 'hunch-related');
   const box = await page.locator('hunch-related').boundingBox();
@@ -57,11 +52,10 @@ test('the related list fills in place from the integration’s manifest', async 
   assert.ok(requests.includes('/hunch/manifest.json'), requests.join('\n'));
   // Without consent, <hunch-page> stores nothing.
   assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);
-  await context.close();
 });
 
-test('the site’s HunchConfig keeps its consent hook and gets the manifest', async () => {
-  const context = await site.browser.newContext(DESKTOP);
+test('the site’s HunchConfig keeps its consent hook and gets the manifest', async (t) => {
+  const context = await newContext(t, site);
   // As an inline script in the site's <head> would.
   await context.addInitScript(() => {
     (window as unknown as { HunchConfig: object }).HunchConfig = { consent: () => true };
@@ -103,11 +97,10 @@ test('the site’s HunchConfig keeps its consent hook and gets the manifest', as
     ),
     '/hunch/manifest.json',
   );
-  await context.close();
 });
 
-test('a manifest attribute wins over HunchConfig.manifest', async () => {
-  const context = await site.browser.newContext(DESKTOP);
+test('a manifest attribute wins over HunchConfig.manifest', async (t) => {
+  const context = await newContext(t, site);
   const page = await context.newPage();
   const requests: string[] = [];
   page.on('request', (request) => requests.push(new URL(request.url()).pathname));
@@ -125,5 +118,4 @@ test('a manifest attribute wins over HunchConfig.manifest', async () => {
   assert.ok(requests.includes('/elsewhere/manifest.json'), requests.join('\n'));
   // Its fallback stays.
   assert.equal(await page.locator('#other [data-hunch-title]').textContent(), 'Fallback');
-  await context.close();
 });

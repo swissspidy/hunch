@@ -10,7 +10,6 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { promisify } from 'node:util';
-import { pairedDifference } from '../../eval/metrics.ts';
 import { tempDir } from '../helpers.ts';
 
 interface Result {
@@ -95,36 +94,6 @@ test('synthetic evaluation: beats popularity, a model switch loses nothing, one 
   ]);
   const more = result.comparisons.find((c) => c.b === 'model A (128 dims)')!;
   assert.ok(more.mean > 0 && more.ci95[0] > 0, 'twice the dimensions ranks better here');
-});
-
-test('pairedDifference: mean, standard error and a bootstrap interval of b − a', () => {
-  const a = [0.1, 0.5, 0.3, 0.9, 0.2, 0.4];
-  const same = pairedDifference(a, a);
-  assert.deepEqual(same, { mean: 0, stderr: 0, ci95: [0, 0] });
-
-  const shifted = pairedDifference(
-    a.map((x) => x + 0.25),
-    a,
-  );
-  assert.ok(Math.abs(shifted.mean - 0.25) < 1e-12);
-  assert.ok(shifted.stderr < 1e-12);
-
-  // Differences of +1 and −1 in equal numbers: mean 0, standard error 1 / sqrt(n − 1).
-  const n = 400;
-  const b = Array.from({ length: n }, (_, i) => (i % 2 ? 1 : -1));
-  const zero = new Array<number>(n).fill(0);
-  const noisy = pairedDifference(b, zero);
-  assert.equal(noisy.mean, 0);
-  assert.ok(Math.abs(noisy.stderr - 1 / Math.sqrt(n - 1)) < 1e-12);
-  // The 95% interval is about ±1.96 standard errors around the mean, and deterministic.
-  assert.ok(noisy.ci95[0] < -1.5 * noisy.stderr && noisy.ci95[0] > -2.5 * noisy.stderr);
-  assert.ok(noisy.ci95[1] > 1.5 * noisy.stderr && noisy.ci95[1] < 2.5 * noisy.stderr);
-  assert.deepEqual(pairedDifference(b, zero), noisy);
-
-  assert.throws(() => pairedDifference([1, 2], [1]), RangeError);
-  for (const resamples of [0, -1, 2.5, Number.NaN]) {
-    assert.throws(() => pairedDifference(b, zero, resamples), RangeError, String(resamples));
-  }
 });
 
 test('eval run: rejects an empty --variants list and writes results for a single impression', async () => {

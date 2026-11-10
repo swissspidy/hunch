@@ -5,16 +5,23 @@
  */
 
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import type { BrowserContext, Page } from 'playwright-core';
-import { DESKTOP, assertNoLayoutShift, observeLayoutShifts, ready, serveDemo } from './site.ts';
+import {
+  assertNoLayoutShift,
+  context as consentContext,
+  newContext,
+  observeLayoutShifts,
+  ready,
+  serveDemo,
+} from './site.ts';
 
 const site = serveDemo();
 const SEPT_15 = Date.parse('2026-09-15');
 
-async function context(summarizer: boolean): Promise<BrowserContext> {
-  const ctx = await site.browser.newContext(DESKTOP);
-  await ctx.addInitScript(() => localStorage.setItem('hunch-demo-consent', 'yes'));
+/** A visitor with personalization on, in a browser with a built-in Summarizer or without. */
+async function context(t: TestContext, summarizer: boolean): Promise<BrowserContext> {
+  const ctx = await consentContext(t, site, true);
   if (summarizer) {
     await ctx.addInitScript(() => {
       (window as unknown as { Summarizer: unknown }).Summarizer = {
@@ -44,7 +51,7 @@ async function digest(page: Page) {
 }
 
 test('a returning visitor sees what was published since the last visit, summarized', async (t) => {
-  const ctx = await context(true);
+  const ctx = await context(t, true);
   const page = await ctx.newPage();
   await page.goto(`${site.origin}/?as-of=2026-09-15`);
   const first = await digest(page);
@@ -69,11 +76,10 @@ test('a returning visitor sees what was published since the last visit, summariz
     '3 new articles while you were away.',
   );
   await assertNoLayoutShift(t, page);
-  await ctx.close();
 });
 
-test('without a built-in Summarizer the placeholder stays; without consent nothing changes', async () => {
-  const ctx = await context(false);
+test('without a built-in Summarizer the placeholder stays; without consent nothing changes', async (t) => {
+  const ctx = await context(t, false);
   const page = await ctx.newPage();
   await page.goto(`${site.origin}/?as-of=2026-09-15`);
   await digest(page);
@@ -82,14 +88,12 @@ test('without a built-in Summarizer the placeholder stays; without consent nothi
   assert.equal(back.new, '3');
   assert.equal(back.summarized, 'false');
   assert.match(back.summary ?? '', /^The latest articles/);
-  await ctx.close();
 
-  const anonymous = await site.browser.newContext(DESKTOP);
+  const anonymous = await newContext(t, site);
   const other = await anonymous.newPage();
   await other.goto(`${site.origin}/?as-of=2026-09-15`);
   await digest(other);
   await other.goto(`${site.origin}/`);
   assert.equal((await digest(other)).new, '0');
   assert.deepEqual(await other.evaluate(() => indexedDB.databases()), []);
-  await anonymous.close();
 });

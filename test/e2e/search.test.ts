@@ -6,12 +6,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { DESKTOP, fakeTransformers, serveDemo, TARGET } from './site.ts';
+import { newContext, routeFakeTransformers, serveDemo, TARGET } from './site.ts';
 
 const site = serveDemo();
 
-test('a text search is embedded and ranked in the browser, and the query is not sent', async () => {
-  const context = await site.browser.newContext(DESKTOP);
+test('a text search is embedded and ranked in the browser, and the query is not sent', async (t) => {
+  const context = await newContext(t, site);
   const page = await context.newPage();
   const requests: string[] = [];
   const payloads: string[] = [];
@@ -19,14 +19,7 @@ test('a text search is embedded and ranked in the browser, and the query is not 
     requests.push(r.url());
     payloads.push(`${r.postData() ?? ''}\n${JSON.stringify(r.headers())}`);
   });
-  const fake = await fakeTransformers();
-  await page.route('https://cdn.jsdelivr.net/**', (route) =>
-    route.fulfill({
-      contentType: 'text/javascript',
-      body: fake,
-      headers: { 'access-control-allow-origin': '*' },
-    }),
-  );
+  await routeFakeTransformers(site, page);
   await page.goto(`${site.origin}/`);
   await page.waitForLoadState('networkidle');
   assert.ok(
@@ -59,5 +52,4 @@ test('a text search is embedded and ranked in the browser, and the query is not 
     requests.join('\n'),
   );
   assert.ok(!payloads.some((p) => /cold|drink/.test(p)), payloads.join('\n'));
-  await context.close();
 });

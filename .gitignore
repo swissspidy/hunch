@@ -11,5 +11,5 @@ wordpress/hunch/assets/hunch.global.js
 wordpress/hunch.zip
 wordpress/hunch/.phpunit.result.cache
 test/fixtures/astro/.astro/
-/.astro/
+test/fixtures/astro/.builds/
 site/dist/

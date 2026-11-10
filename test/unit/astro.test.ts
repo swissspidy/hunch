@@ -4,13 +4,12 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import type { Manifest, ShardItem } from '../../src/format/manifest.ts';
-import { decodeShard } from '../../src/format/shard.ts';
-import { buildFixture, devFixture } from '../fixtures/astro/build.ts';
-import { countingProvider, tempDir } from '../helpers.ts';
+import { buildDir, buildFixture, devFixture } from '../fixtures/astro/build.ts';
+import { countingProvider, readShard, tempDir } from '../helpers.ts';
 
 const POSTS = [
   '/blog/alpine-hut/',
@@ -26,11 +25,30 @@ async function readManifest(dir: string): Promise<Manifest> {
 
 async function shardItems(dir: string, manifest: Manifest): Promise<ShardItem[]> {
   const items: ShardItem[] = [];
-  for (const shard of manifest.shards) {
-    const bytes = new Uint8Array(await readFile(join(dir, shard.url)));
-    items.push(...decodeShard(bytes.buffer).items);
-  }
+  for (const shard of manifest.shards) items.push(...(await readShard(join(dir, shard.url))).items);
   return items;
+}
+
+interface DefaultBuild {
+  out: string;
+  cacheDir: string;
+  /** What the build embedded. */
+  provider: ReturnType<typeof countingProvider>;
+}
+let built: Promise<DefaultBuild> | undefined;
+
+/**
+ * The default configuration, built once, from an empty cache, for the tests that only read
+ * what it wrote.
+ */
+function defaultBuild(): Promise<DefaultBuild> {
+  built ??= (async () => {
+    const [out, cacheDir] = [await buildDir(), await tempDir()];
+    const provider = countingProvider();
+    await buildFixture(out, { provider, cacheDir });
+    return { out, cacheDir, provider };
+  })();
+  return built;
 }
 
 /** The JavaScript a built page loads, inline or from files. */
@@ -45,10 +63,7 @@ async function pageScripts(out: string, page: string, base = '/'): Promise<strin
 }
 
 test('builds the catalog from the built pages, and rebuilds from the cache', async () => {
-  const out = await tempDir();
-  const cacheDir = await tempDir();
-  const first = countingProvider();
-  await buildFixture(out, { provider: first, cacheDir });
+  const { out, cacheDir, provider: first } = await defaultBuild();
 
   const manifest = await readManifest(join(out, 'hunch'));
   // Every page but the 404 page.
@@ -80,14 +95,15 @@ test('builds the catalog from the built pages, and rebuilds from the cache', asy
   assert.deepEqual(files.sort(), manifest.shards.map((s) => s.url.slice('shards/'.length)).sort());
 
   // A second build embeds nothing, and publishes the same vectors.
+  const again = await buildDir();
   const second = countingProvider();
-  await buildFixture(out, { provider: second, cacheDir });
+  await buildFixture(again, { provider: second, cacheDir });
   assert.equal(second.calls.length, 0);
-  assert.equal((await readManifest(join(out, 'hunch'))).version, manifest.version);
+  assert.equal((await readManifest(join(again, 'hunch'))).version, manifest.version);
 
   // One changed page is the only one embedded.
   const third = countingProvider();
-  await buildFixture(out, {
+  await buildFixture(again, {
     provider: third,
     cacheDir,
     page: (item) => (item.id === '/tags/' ? { ...item, text: 'Food, travel and more.' } : item),
@@ -96,8 +112,7 @@ test('builds the catalog from the built pages, and rebuilds from the cache', asy
 });
 
 test('loads the web components on every page, with the manifest preset', async () => {
-  const out = await tempDir();
-  await buildFixture(out, { cacheDir: false });
+  const { out } = await defaultBuild();
   for (const page of ['index.html', 'blog/rye-bread/index.html']) {
     const code = await pageScripts(out, page);
     assert.match(code, /HunchConfig/);
@@ -111,7 +126,7 @@ test('loads the web components on every page, with the manifest preset', async (
 });
 
 test('include, exclude and page select the pages', async () => {
-  const out = await tempDir();
+  const out = await buildDir();
   await buildFixture(out, {
     cacheDir: false,
     include: ['/blog/*'],
@@ -128,7 +143,7 @@ test('include, exclude and page select the pages', async () => {
   assert.deepEqual(manifest.sections, ['Posts']);
 
   // Globs: ** for any depth, a RegExp, and trailing slashes either way.
-  const globbed = await tempDir();
+  const globbed = await buildDir();
   await buildFixture(globbed, {
     cacheDir: false,
     exclude: ['/', '/tags', /cold|night/, '/**/alpine-*/'],
@@ -138,7 +153,7 @@ test('include, exclude and page select the pages', async () => {
 });
 
 test('items replaces the catalog, and base and out move it', async () => {
-  const out = await tempDir();
+  const out = await buildDir();
   await buildFixture(
     out,
     {
@@ -173,7 +188,7 @@ test('ids follow build.format, as Astro.url.pathname does', async () => {
     join(publicDir, 'blog/rye-bread/index.html'),
     '<title>A public file</title><body>Not the page</body>',
   );
-  const out = await tempDir();
+  const out = await buildDir();
   await buildFixture(out, { cacheDir: false }, { build: { format: 'file' }, publicDir });
   const items = await shardItems(join(out, 'hunch'), await readManifest(join(out, 'hunch')));
   assert.deepEqual(items.map((item) => item.id).sort(), [
@@ -195,7 +210,7 @@ test('ids follow build.format, as Astro.url.pathname does', async () => {
   // `preserve`: index pages keep the directory form, other pages end in .html. The tags page
   // prints its Astro.url.pathname.
   for (const trailingSlash of ['ignore', 'never'] as const) {
-    const preserved = await tempDir();
+    const preserved = await buildDir();
     await buildFixture(
       preserved,
       { cacheDir: false },
@@ -212,7 +227,7 @@ test('ids follow build.format, as Astro.url.pathname does', async () => {
 });
 
 test('the manifest URL uses the final base, after every integration', async () => {
-  const out = await tempDir();
+  const out = await buildDir();
   await buildFixture(
     out,
     { cacheDir: false },
@@ -235,12 +250,13 @@ test('the manifest URL uses the final base, after every integration', async () =
 });
 
 test('astro dev serves the last build’s vectors and the components', async () => {
-  const out = await tempDir();
+  const out = await buildDir();
   const server = await devFixture(out, { cacheDir: false });
   try {
     // No build yet: no vectors, and the page still renders its fallback.
     assert.equal((await fetch(`${server.origin}/hunch/manifest.json`)).status, 404);
-    await buildFixture(out, { cacheDir: false });
+    // A build's output arrives: a copy, which this test then changes.
+    await cp((await defaultBuild()).out, out, { recursive: true });
     const manifest = await fetch(`${server.origin}/hunch/manifest.json`);
     assert.equal(manifest.status, 200);
     assert.equal(((await manifest.json()) as Manifest).count, 7);

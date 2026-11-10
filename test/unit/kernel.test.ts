@@ -4,9 +4,12 @@ import { test } from 'node:test';
 import { compileKernel, KERNEL_TS } from '../../scripts/kernel.ts';
 import type { Quantization } from '../../src/format/manifest.ts';
 import { createVectorStore, MAX_SPAN } from '../../src/rank/kernel.ts';
+import { random as unit } from '../helpers.ts';
 
+/** A seeded generator in [-1, 1). */
 function random(seed: number): () => number {
-  return () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32) * 2 - 1;
+  const next = unit(seed);
+  return () => next() * 2 - 1;
 }
 
 function rows(count: number, dims: number, quantization: Quantization, seed: number) {

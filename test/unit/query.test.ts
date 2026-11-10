@@ -24,13 +24,13 @@ const load = (options: { consent?: boolean; store?: MemoryStore } = {}) =>
   Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir), ...options });
 
 test('a text query, embedded in the browser with the catalog’s model, finds matching items', async () => {
-  const ink = await load();
-  assert.equal(ink.manifest.model.queryPrompt, '{query}');
-  const embedder = await createQueryEmbedder(ink.manifest);
+  const hunch = await load();
+  assert.equal(hunch.manifest.model.queryPrompt, '{query}');
+  const embedder = await createQueryEmbedder(hunch.manifest);
   const query = await embedder.embed('sourdough starter bread baking');
-  assert.equal(query.length, ink.manifest.dims);
+  assert.equal(query.length, hunch.manifest.dims);
   assert.ok(Math.abs(Math.hypot(...query) - 1) < 1e-5);
-  const results = await ink.search(query, { n: 3 });
+  const results = await hunch.search(query, { n: 3 });
   assert.equal(results[0]!.id, 'sourdough-starter');
   assert.ok(results.every((r) => r.why.confidence === 1));
   // Cached: the same vector object.
@@ -39,40 +39,43 @@ test('a text query, embedded in the browser with the catalog’s model, finds ma
 
 test('search() takes full or truncated vectors, filters and personalizes', async () => {
   const store = new MemoryStore();
-  const ink = await load({ consent: true, store });
-  const embedder = await createQueryEmbedder(ink.manifest);
+  const hunch = await load({ consent: true, store });
+  const embedder = await createQueryEmbedder(hunch.manifest);
   const query = await embedder.embed('night trains rail travel');
-  await assert.rejects(ink.search(new Float32Array(7)), /query vector has 256 or 512 dims/);
-  await assert.rejects(ink.search(query.map((x, i) => (i ? x : NaN))), /non-finite/);
+  await assert.rejects(hunch.search(new Float32Array(7)), /query vector has 256 or 512 dims/);
+  await assert.rejects(hunch.search(query.map((x, i) => (i ? x : NaN))), /non-finite/);
   // A native-size vector is truncated to the catalog's dims: extra components don't count.
-  const native = new Float32Array(ink.manifest.model.nativeDims);
+  const native = new Float32Array(hunch.manifest.model.nativeDims);
   native.set(query);
   native.fill(0.05, query.length);
   const ids = (list: { id: string }[]) => list.map((r) => r.id);
-  assert.deepEqual(ids(await ink.search(native, { n: 5 })), ids(await ink.search(query, { n: 5 })));
-  const travel = await ink.search(query, { n: 3, sections: ['Travel'] });
+  assert.deepEqual(
+    ids(await hunch.search(native, { n: 5 })),
+    ids(await hunch.search(query, { n: 5 })),
+  );
+  const travel = await hunch.search(query, { n: 3, sections: ['Travel'] });
   assert.ok(travel.every((r) => r.section === 'Travel'));
-  await ink.record('hide', travel[0]!.id);
-  assert.ok(!(await ink.search(query, { n: 10 })).some((r) => r.id === travel[0]!.id), 'hidden');
-  await ink.record('view', travel[1]!.id);
+  await hunch.record('hide', travel[0]!.id);
+  assert.ok(!(await hunch.search(query, { n: 10 })).some((r) => r.id === travel[0]!.id), 'hidden');
+  await hunch.record('view', travel[1]!.id);
   assert.ok(
-    (await ink.search(query, { n: 10 })).some((r) => r.id === travel[1]!.id),
+    (await hunch.search(query, { n: 10 })).some((r) => r.id === travel[1]!.id),
     'seen stays',
   );
   assert.ok(
-    !(await ink.search(query, { n: 10, excludeSeen: true })).some((r) => r.id === travel[1]!.id),
+    !(await hunch.search(query, { n: 10, excludeSeen: true })).some((r) => r.id === travel[1]!.id),
   );
   // A strong profile for Food pulls food items up when personalizing.
   for (const id of ['sourdough-starter', 'rye-bread', 'baguette-shaping'])
-    await ink.record('follow', id);
-  const plain = await ink.search(query, { n: 32 });
-  const mixed = await ink.search(query, { n: 32, personalize: 0.8 });
+    await hunch.record('follow', id);
+  const plain = await hunch.search(query, { n: 32 });
+  const mixed = await hunch.search(query, { n: 32, personalize: 0.8 });
   const rankOf = (list: { id: string }[], id: string) => list.findIndex((r) => r.id === id);
   assert.ok(rankOf(mixed, 'fresh-pasta') < rankOf(plain, 'fresh-pasta'));
 });
 
 test('Transformers.js gets the pinned model, revision and weights; the query prompt is applied', async () => {
-  const ink = await load();
+  const hunch = await load();
   const calls: string[] = [];
   const fake: TransformersModule = {
     env: {},
@@ -98,7 +101,7 @@ test('Transformers.js gets the pinned model, revision and weights; the query pro
     },
   };
   const manifest = {
-    ...ink.manifest,
+    ...hunch.manifest,
     dims: 512,
     model: {
       id: 'acme/embed',
@@ -132,7 +135,7 @@ test('Transformers.js gets the pinned model, revision and weights; the query pro
 });
 
 test('EmbeddingGemma q4 loads the file browsers can run, for a q8 or a q4 catalog', async () => {
-  const ink = await load();
+  const hunch = await load();
   const options: string[] = [];
   const fake: TransformersModule = {
     AutoTokenizer: { from_pretrained: () => Promise.resolve(() => ({})) },
@@ -156,12 +159,12 @@ test('EmbeddingGemma q4 loads the file browsers can run, for a q8 or a q4 catalo
   };
   const transformers = () => Promise.resolve(fake);
   // A q8 catalog, queried with smaller weights.
-  await createQueryEmbedder({ ...ink.manifest, model: gemma }, { transformers, dtype: 'q4' });
+  await createQueryEmbedder({ ...hunch.manifest, model: gemma }, { transformers, dtype: 'q4' });
   // A q4 catalog: its own file.
   const q4 = { ...gemma, dtype: 'q4', file: 'model_no_gather' };
-  await createQueryEmbedder({ ...ink.manifest, model: q4 }, { transformers });
+  await createQueryEmbedder({ ...hunch.manifest, model: q4 }, { transformers });
   // A q8 catalog with its own weights: the default file.
-  await createQueryEmbedder({ ...ink.manifest, model: gemma }, { transformers });
+  await createQueryEmbedder({ ...hunch.manifest, model: gemma }, { transformers });
   assert.deepEqual(options, [
     '{"revision":"r","dtype":"q4","model_file_name":"model_no_gather"}',
     '{"revision":"r","dtype":"q4","model_file_name":"model_no_gather"}',
@@ -170,7 +173,7 @@ test('EmbeddingGemma q4 loads the file browsers can run, for a q8 or a q4 catalo
 });
 
 test('a model that loads when the tokenizer fails is released', async () => {
-  const ink = await load();
+  const hunch = await load();
   let disposed = false;
   const fake: TransformersModule = {
     AutoTokenizer: { from_pretrained: () => Promise.reject(new Error('no tokenizer')) },
@@ -186,19 +189,38 @@ test('a model that loads when the tokenizer fails is released', async () => {
         ),
     },
   };
-  const manifest = { ...ink.manifest, model: { ...ink.manifest.model, id: 'acme/embed' } };
+  const manifest = { ...hunch.manifest, model: { ...hunch.manifest.model, id: 'acme/embed' } };
   await assert.rejects(createQueryEmbedder(manifest, { transformers: fake }), /no tokenizer/);
   assert.ok(disposed);
 });
 
-test('search() treats a NaN personalize as 0 and loads no profile without it', async () => {
-  const ink = await load({ consent: true, store: new MemoryStore() });
-  const query = await (await createQueryEmbedder(ink.manifest)).embed('night trains');
-  for (const id of ['sourdough-starter', 'rye-bread']) await ink.record('follow', id);
-  const scores = (list: { id: string; score: number }[]) =>
-    list.map((r) => `${r.id} ${r.score.toFixed(6)}`);
-  assert.deepEqual(
-    scores(await ink.search(query, { n: 5, personalize: NaN })),
-    scores(await ink.search(query, { n: 5 })),
-  );
+test('search() loads the profile only when personalizing; a NaN personalize is 0', async () => {
+  // Follows in Food, shared by a new client for every search, so each one's fetches are its own.
+  const store = new MemoryStore();
+  const first = await load({ consent: true, store });
+  for (const id of ['sourdough-starter', 'rye-bread']) await first.record('follow', id);
+  const query = await (await createQueryEmbedder(first.manifest)).embed('night trains');
+  const shard = (section: string) =>
+    `/hunch/${first.manifest.shards.find((ref) => ref.section === section)!.url}`;
+  const search = async (personalize?: number) => {
+    const log: string[] = [];
+    const hunch = await Hunch.load({
+      manifest: MANIFEST,
+      fetch: dirFetch(dir, log),
+      consent: true,
+      store,
+    });
+    const results = await hunch.search(query, { n: 5, sections: ['Travel'], personalize });
+    return { log, scores: results.map((r) => `${r.id} ${r.score.toFixed(6)}`) };
+  };
+  // Not personalizing: the searched section's shard and no other, though the store has signals.
+  const plain = await search();
+  assert.deepEqual(plain.log, ['/hunch/manifest.json', shard('Travel')]);
+  // Personalizing: also the shard of the followed items, for the profile, and other scores.
+  const personal = await search(0.5);
+  assert.ok(personal.log.includes(shard('Food')), personal.log.join(' '));
+  assert.notDeepEqual(personal.scores, plain.scores);
+  // NaN is no personalization at all: no profile loaded, the plain scores. (search() also maps
+  // NaN to 0 by name, which nothing can observe: without that line NaN > 0 is still false.)
+  assert.deepEqual(await search(NaN), plain);
 });

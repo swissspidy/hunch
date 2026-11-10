@@ -5,26 +5,20 @@
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { after, before, test } from 'node:test';
-import { syntheticCatalog, type SyntheticCatalog } from '../../scripts/synthetic.ts';
+import { before, test } from 'node:test';
+import type { SyntheticCatalog } from '../../scripts/synthetic.ts';
 import { Hunch, MemoryStore } from '../../src/client/index.ts';
 import { slicer } from '../../src/client/slices.ts';
 import { DEFAULT_WEIGHTS, rank, ranking, type RankInput } from '../../src/rank/rank.ts';
 import {
-  DIMS,
-  ITEMS,
   assertSameResults,
+  largeCatalog,
   NOW,
-  SECTIONS,
   rankingCalls,
   type Result,
 } from '../fixtures/large-catalog.ts';
+import { random } from '../helpers.ts';
 import { referenceRank } from '../reference-rank.ts';
-
-/** A seeded generator in [0, 1). */
-function random(seed: number): () => number {
-  return () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
-}
 
 /** Inputs with many ties: values on a coarse grid. */
 function input(count: number, seed: number, grid: number): RankInput {
@@ -149,14 +143,13 @@ test('a slicer yields only once a slice has run its time', async () => {
 let catalog: SyntheticCatalog;
 let expected: Result[];
 before(async () => {
-  catalog = await syntheticCatalog(ITEMS, DIMS, SECTIONS, 'int8');
+  catalog = await largeCatalog();
   expected = JSON.parse(
     await readFile(new URL('../fixtures/large-catalog.json', import.meta.url), 'utf8'),
   ) as Result[];
 });
 
 const g = globalThis as { scheduler?: { yield(): Promise<void> } };
-after(() => delete g.scheduler);
 
 test('20,000 items: same ids and scores as before slicing, with scheduler.yield()', async () => {
   let yields = 0;
@@ -171,7 +164,7 @@ test('20,000 items: same ids and scores as before slicing, with scheduler.yield(
   const realNow = performance.now.bind(performance);
   performance.now = () => (clock += 20);
   try {
-    assertSameResults(await rankingCalls(Hunch, new MemoryStore(), catalog), expected);
+    assertSameResults(await rankingCalls(new MemoryStore(), catalog), expected);
   } finally {
     performance.now = realNow;
     delete g.scheduler;
@@ -183,17 +176,17 @@ test('20,000 items: same ids and scores as before slicing, with scheduler.yield(
 
 test('20,000 items: same ids and scores without scheduler.yield() (new tasks instead)', async () => {
   assert.equal(g.scheduler, undefined);
-  assertSameResults(await rankingCalls(Hunch, new MemoryStore(), catalog), expected);
+  assertSameResults(await rankingCalls(new MemoryStore(), catalog), expected);
 });
 
 test('20,000 items: the JavaScript kernel gives the same results as the WebAssembly one', async () => {
-  assertSameResults(await rankingCalls(Hunch, new MemoryStore(), catalog, 'js'), expected);
+  assertSameResults(await rankingCalls(new MemoryStore(), catalog, 'js'), expected);
 });
 
 test('20,000 items: a manifest without a sections list filters by section as before', async () => {
   const { sections: _, ...manifest } = catalog.manifest;
   const bare = { ...catalog, manifest: manifest as typeof catalog.manifest };
-  assertSameResults(await rankingCalls(Hunch, new MemoryStore(), bare), expected);
+  assertSameResults(await rankingCalls(new MemoryStore(), bare), expected);
 });
 
 test('ties come in manifest order, whatever order the shards arrive in', async () => {
@@ -219,14 +212,14 @@ test('ties come in manifest order, whatever order the shards arrive in', async (
       })();
     });
   };
-  const ink = await Hunch.load({
+  const hunch = await Hunch.load({
     manifest: 'http://large/manifest.json',
     fetch: fetchFn,
     consent: true,
     store: new MemoryStore(),
     now: () => NOW,
   });
-  const recs = await ink.recommend({ n: 10 });
+  const recs = await hunch.recommend({ n: 10 });
   assert.equal(held.length, shards);
   // The cold start ranks the first item of every section equally (prior 1): manifest order.
   assert.deepEqual(

@@ -51,14 +51,14 @@ async function load(now: () => number, store = new MemoryStore(), consent = true
 test('since your last visit: items published after the previous visit, ranked', async () => {
   let now = t0;
   const store = new MemoryStore();
-  const ink = await load(() => now, store);
-  assert.deepEqual(await ink.sinceLastVisit(), [], 'first visit');
+  const hunch = await load(() => now, store);
+  assert.deepEqual(await hunch.sinceLastVisit(), [], 'first visit');
   assert.equal((await store.getState()).lastSeen, t0);
-  await ink.record('view', 'item-9');
+  await hunch.record('view', 'item-9');
 
   // Three days later: items 0 to 4 are dated after the first visit (t0); item-5 is dated t0.
   now = t0 + 3 * DAY + 10 * MIN;
-  const recs = await ink.sinceLastVisit({ n: 10 });
+  const recs = await hunch.sinceLastVisit({ n: 10 });
   assert.deepEqual(recs.map((r) => r.id).sort(), [
     'item-0',
     'item-1',
@@ -71,14 +71,14 @@ test('since your last visit: items published after the previous visit, ranked', 
   assert.equal(recs[0]!.section, 'Food');
   // Later in the same visit, the same previous visit.
   now += 5 * MIN;
-  assert.equal(await ink.visit(), t0);
-  assert.equal((await ink.sinceLastVisit({ n: 10 })).length, recs.length);
+  assert.equal(await hunch.visit(), t0);
+  assert.equal((await hunch.sinceLastVisit({ n: 10 })).length, recs.length);
 });
 
 test('without consent, or while paused, visits are not recorded', async () => {
   const store = new MemoryStore();
-  const ink = await load(() => t0, store, false);
-  assert.equal(await ink.visit(), undefined);
+  const hunch = await load(() => t0, store, false);
+  assert.equal(await hunch.visit(), undefined);
   assert.deepEqual(await store.getState(), { paused: false });
   const paused = await load(() => t0, store);
   await paused.pause();
@@ -123,28 +123,28 @@ test('the Summarizer is used only where an on-device model is available', async 
 test('since your last visit leaves out seen and hidden items, like recommend()', async () => {
   let now = t0;
   const store = new MemoryStore();
-  const ink = await load(() => now, store);
-  await ink.visit();
+  const hunch = await load(() => now, store);
+  await hunch.visit();
   now = t0 + 3 * DAY;
   // Both dated after the first visit.
-  await ink.record('view', 'item-2');
-  await ink.record('hide', 'item-3');
-  const ids = (await ink.sinceLastVisit({ n: 10 })).map((r) => r.id);
+  await hunch.record('view', 'item-2');
+  await hunch.record('hide', 'item-3');
+  const ids = (await hunch.sinceLastVisit({ n: 10 })).map((r) => r.id);
   assert.ok(ids.length > 0);
   assert.ok(!ids.includes('item-2') && !ids.includes('item-3'), ids.join());
-  const withSeen = (await ink.sinceLastVisit({ n: 10, includeSeen: true })).map((r) => r.id);
+  const withSeen = (await hunch.sinceLastVisit({ n: 10, includeSeen: true })).map((r) => r.id);
   assert.ok(withSeen.includes('item-2'));
   assert.ok(!withSeen.includes('item-3'));
 });
 
 test('a visit never overwrites a pause, and does not undo a forget', async () => {
   const store = new MemoryStore();
-  const ink = await load(() => t0, store);
-  await ink.visit();
-  await Promise.all([ink.pause(), ink.visit()]);
+  const hunch = await load(() => t0, store);
+  await hunch.visit();
+  await Promise.all([hunch.pause(), hunch.visit()]);
   assert.equal((await store.getState()).paused, true);
-  await ink.resume();
-  await ink.forget();
+  await hunch.resume();
+  await hunch.forget();
   assert.deepEqual(await store.getState(), { paused: false });
-  assert.equal(await ink.visit(), undefined, 'a first visit again');
+  assert.equal(await hunch.visit(), undefined, 'a first visit again');
 });
