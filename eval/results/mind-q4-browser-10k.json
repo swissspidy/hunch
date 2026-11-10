@@ -33,19 +33,19 @@
         "ndcg10": 0.38243551996475394,
         "recall10": 0.6271328442390435
       },
-      "rankMs": 1.5675207939000093
+      "rankMs": 1.3397634216000005
     },
     {
       "ranker": "Hunch, EmbeddingGemma q8 (256 dims): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q8 (256 dims)",
       "metrics": {
-        "auc": 0.6267832123875806,
-        "mrr": 0.29890076693100326,
-        "ndcg5": 0.3289339477620782,
-        "ndcg10": 0.38563820923745806,
-        "recall10": 0.631134233127932
+        "auc": 0.6259387101142783,
+        "mrr": 0.2984043306540733,
+        "ndcg5": 0.3282243074251551,
+        "ndcg10": 0.38524724566581053,
+        "recall10": 0.6311750664612652
       },
-      "rankMs": 1.5284473511000127
+      "rankMs": 1.5111864458999946
     },
     {
       "ranker": "Hunch, EmbeddingGemma q4 (256 dims): profile only",
@@ -57,19 +57,19 @@
         "ndcg10": 0.3880996805092201,
         "recall10": 0.6332295607170093
       },
-      "rankMs": 1.5632418003991246
+      "rankMs": 1.2430410523999882
     },
     {
       "ranker": "Hunch, EmbeddingGemma q4 (256 dims): profile + popularity (default weights)",
       "catalog": "EmbeddingGemma q4 (256 dims)",
       "metrics": {
-        "auc": 0.6289165855796706,
-        "mrr": 0.3026708663855212,
-        "ndcg5": 0.33343449636958,
-        "ndcg10": 0.3904084014555326,
-        "recall10": 0.6356208702408186
+        "auc": 0.6282397564897917,
+        "mrr": 0.3026693086265798,
+        "ndcg5": 0.3333269605023502,
+        "ndcg10": 0.3903001853173622,
+        "recall10": 0.6353522194471679
       },
-      "rankMs": 1.5300445572963917
+      "rankMs": 1.3078676133999696
     }
   ],
   "modelSwitch": {
@@ -87,10 +87,10 @@
       "items": 24784,
       "embedded": 0,
       "cached": 24784,
-      "shardBytes": 11690392,
-      "manifestBytes": 5393,
-      "bytesPerItem": 471.6910910264687,
-      "buildSeconds": 1.1651448179999997
+      "shardBytes": 10945646,
+      "manifestBytes": 8473,
+      "bytesPerItem": 441.6416236281472,
+      "buildSeconds": 1.2206585749999999
     },
     {
       "label": "EmbeddingGemma q4 (256 dims)",
@@ -100,12 +100,12 @@
       "quantization": "int8",
       "default": true,
       "items": 24784,
-      "embedded": 24647,
-      "cached": 137,
-      "shardBytes": 11690828,
-      "manifestBytes": 5445,
-      "bytesPerItem": 471.70868302130407,
-      "buildSeconds": 6175.352428117
+      "embedded": 0,
+      "cached": 24784,
+      "shardBytes": 10946398,
+      "manifestBytes": 8525,
+      "bytesPerItem": 441.671965784377,
+      "buildSeconds": 1.1209012889999976
     }
   ],
   "comparisons": [
@@ -114,9 +114,12 @@
       "b": "EmbeddingGemma q4 (256 dims)",
       "metric": "ndcg10",
       "variant": "profile + popularity (default weights)",
-      "mean": 0.0047701922180732595,
-      "stderr": 0.0010017707889569247,
-      "ci95": [0.002868525101074377, 0.006794971388890087]
+      "mean": 0.005052939651551671,
+      "stderr": 0.0010273541356758825,
+      "ci95": [
+        0.003081505777024717,
+        0.007101101729671126
+      ]
     }
   ]
 }

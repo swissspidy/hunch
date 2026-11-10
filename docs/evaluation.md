@@ -81,24 +81,24 @@ so each build took one or two seconds. Raw numbers:
 in the [eval README](../eval/README.md#ablation-dimensions-quantization-weights).
 
 Default weights (profile blended with popularity). Bytes are the uncompressed shards; each item
-also carries about 216 bytes of metadata (id, URL, title, section, tags, prior). Ranking time is
+also carries about 186 bytes of columns and metadata (id, URL, title, section, tags, prior). Ranking time is
 the mean `rank()` call per impression (about 37 shown items, about 33 history signals), in Node
 on a shared 4-CPU machine, so read it as relative.
 
 | EmbeddingGemma catalog  | nDCG@10    | AUC       | MRR       | Recall@10 | Shard bytes per item | Catalog (shards + manifest) | `rank()` per impression |
 | ----------------------- | ---------- | --------- | --------- | --------- | -------------------- | --------------------------- | ----------------------- |
-| 128, int8               | 0.3841     | 0.626     | 0.298     | 0.630     | 344                  | 8.5 MB                      | 0.9 ms                  |
-| 128, float32            | 0.3845     | 0.627     | 0.298     | 0.631     | 728                  | 18.0 MB                     | 0.9 ms                  |
-| **256, int8 (default)** | **0.3856** | **0.627** | **0.299** | **0.631** | **472**              | **11.7 MB**                 | **1.6 ms**              |
-| 256, float32            | 0.3858     | 0.627     | 0.299     | 0.631     | 1,240                | 30.7 MB                     | 1.6 ms                  |
-| 512, int8               | 0.3776     | 0.624     | 0.294     | 0.621     | 728                  | 18.0 MB                     | 3.0 ms                  |
-| 512, float32            | 0.3775     | 0.624     | 0.294     | 0.621     | 2,264                | 56.1 MB                     | 2.5 ms                  |
-| 768, int8               | 0.3872     | 0.634     | 0.301     | 0.632     | 984                  | 24.4 MB                     | 3.8 ms                  |
-| 768, float32            | 0.3872     | 0.634     | 0.301     | 0.632     | 3,288                | 81.5 MB                     | 3.6 ms                  |
-| q4 weights: 256, int8   | 0.3910     | 0.629     | 0.304     | 0.634     | 472                  | 11.7 MB                     | 1.6 ms                  |
+| 128, int8               | 0.3835     | 0.626     | 0.297     | 0.630     | 314                  | 7.8 MB                      | 0.9 ms                  |
+| 128, float32            | 0.3840     | 0.626     | 0.298     | 0.630     | 698                  | 17.3 MB                     | 1.0 ms                  |
+| **256, int8 (default)** | **0.3852** | **0.626** | **0.298** | **0.631** | **442**              | **11.0 MB**                 | **1.4 ms**              |
+| 256, float32            | 0.3852     | 0.626     | 0.298     | 0.631     | 1,210                | 30.0 MB                     | 1.5 ms                  |
+| 512, int8               | 0.3771     | 0.624     | 0.293     | 0.622     | 698                  | 17.3 MB                     | 2.4 ms                  |
+| 512, float32            | 0.3770     | 0.624     | 0.293     | 0.622     | 2,234                | 55.4 MB                     | 2.4 ms                  |
+| 768, int8               | 0.3871     | 0.634     | 0.301     | 0.632     | 954                  | 23.6 MB                     | 3.2 ms                  |
+| 768, float32            | 0.3873     | 0.634     | 0.301     | 0.633     | 3,258                | 80.7 MB                     | 3.4 ms                  |
+| q4 weights: 256, int8   | 0.3903     | 0.628     | 0.303     | 0.635     | 442                  | 11.0 MB                     | 1.4 ms                  |
 
 Random scores 0.288 nDCG@10 on these impressions, popularity 0.310, and `hash` (256, int8)
-0.321.
+0.320.
 
 The differences that matter are paired: both catalogs ranked the same impressions, so the
 table below gives the mean per-impression difference in nDCG@10, its standard error, and a
@@ -106,38 +106,38 @@ bootstrap 95% interval (2,000 resamples of impressions).
 
 | Comparison (b − a)          | nDCG@10 difference | Standard error | 95% interval       |
 | --------------------------- | ------------------ | -------------- | ------------------ |
-| 256 − 128 (int8)            | +0.0015            | 0.0014         | −0.0011 to +0.0042 |
-| 256 − 128 (float32)         | +0.0013            | 0.0014         | −0.0013 to +0.0041 |
-| 512 − 256 (int8)            | −0.0080            | 0.0016         | −0.0112 to −0.0048 |
-| 512 − 256 (float32)         | −0.0083            | 0.0016         | −0.0115 to −0.0051 |
-| 768 − 512 (int8)            | +0.0095            | 0.0011         | +0.0074 to +0.0116 |
-| 768 − 512 (float32)         | +0.0097            | 0.0011         | +0.0076 to +0.0118 |
-| 768 − 256 (int8)            | +0.0015            | 0.0016         | −0.0015 to +0.0045 |
-| float32 − int8 at 128       | +0.0003            | 0.0002         | −0.0001 to +0.0008 |
-| float32 − int8 at 256       | +0.0002            | 0.0002         | −0.0002 to +0.0006 |
-| float32 − int8 at 512       | −0.0001            | 0.0002         | −0.0005 to +0.0002 |
-| float32 − int8 at 768       | +0.0000            | 0.0002         | −0.0003 to +0.0003 |
-| q4 − q8 weights (256, int8) | +0.0054            | 0.0010         | +0.0034 to +0.0074 |
+| 256 − 128 (int8)            | +0.0017            | 0.0014         | −0.0009 to +0.0045 |
+| 256 − 128 (float32)         | +0.0012            | 0.0014         | −0.0014 to +0.0040 |
+| 512 − 256 (int8)            | −0.0081            | 0.0016         | −0.0112 to −0.0050 |
+| 512 − 256 (float32)         | −0.0082            | 0.0016         | −0.0113 to −0.0051 |
+| 768 − 512 (int8)            | +0.0100            | 0.0011         | +0.0079 to +0.0121 |
+| 768 − 512 (float32)         | +0.0103            | 0.0011         | +0.0083 to +0.0124 |
+| 768 − 256 (int8)            | +0.0019            | 0.0016         | −0.0012 to +0.0050 |
+| float32 − int8 at 128       | +0.0005            | 0.0002         | +0.0001 to +0.0009 |
+| float32 − int8 at 256       | +0.0000            | 0.0002         | −0.0004 to +0.0003 |
+| float32 − int8 at 512       | −0.0001            | 0.0002         | −0.0005 to +0.0003 |
+| float32 − int8 at 768       | +0.0002            | 0.0002         | −0.0001 to +0.0005 |
+| q4 − q8 weights (256, int8) | +0.0051            | 0.0010         | +0.0031 to +0.0071 |
 
-- **256/int8 holds up.** It is 0.0015 nDCG@10 below 768/int8, the best q8 catalog, and that
-  gap is about one standard error (the interval includes 0). 768/int8 costs twice the bytes
-  and about 2.4 times the ranking time for it. The data gives no reason to change the default.
-- **128 costs little.** 128/int8 is 0.0015 below 256/int8 (standard error 0.0014, the interval
-  includes 0). It saves 128 bytes per item, about 27% of the shards, and ranks fastest. A site
+- **256/int8 holds up.** It is 0.0019 nDCG@10 below 768/int8, the best q8 catalog, and that
+  gap is about one standard error (the interval includes 0). 768/int8 costs over twice the bytes
+  and about 2.3 times the ranking time for it. The data gives no reason to change the default.
+- **128 costs little.** 128/int8 is 0.0017 below 256/int8 (standard error 0.0014, the interval
+  includes 0). It saves 128 bytes per item, about 29% of the shards, and ranks fastest. A site
   with a large catalog, or one that cares most about bytes, loses almost nothing with
   `--dims 128`.
-- **float32 buys nothing.** At every size, float32 is within 0.0003 of int8, with intervals
-  around 0, and its shards are 2 to 3.3 times larger. int8 quantization costs nothing
+- **float32 buys nothing.** At every size, float32 is within 0.0005 of int8 (the interval
+  excludes 0 only at 128, by 0.0001), and its shards are 2.2 to 3.4 times larger. int8 quantization costs nothing
   measurable here.
 - **More dimensions are not monotonically better.** 512 is clearly worse than both 256 and 768
-  (−0.008 and −0.0095, about 5 and 9 standard errors). A separate check outside the client
+  (−0.008 and −0.010, about 5 and 9 standard errors). A separate check outside the client
   (cosine to the mean of the history vectors, straight from the embedding cache) gives the
   same curve: 0.374 at 64, 0.381 at 128, 0.383 at 256, 0.374 at 512, 0.385 at 768. So this is
   the model's Matryoshka prefixes on this task, not the client.
 - **Sizes are small next to the model's own differences.** All four sizes are within 0.01
   nDCG@10 of each other. Moving from `hash` to EmbeddingGemma gains 0.065.
 - **q4 weights did better, not worse.** Embedding the catalog with EmbeddingGemma's q4 weights
-  instead of q8 (the CLI's default) gained 0.0054 nDCG@10 at 256/int8, about 5 standard
+  instead of q8 (the CLI's default) gained 0.0051 nDCG@10 at 256/int8, about 5 standard
   errors, with identical shard sizes. The 4-bit weights are not a better model, so read this
   as "q4 costs nothing here" rather than as a reason to expect gains elsewhere. It needs its
   own embedding pass (24,647 inputs took 52 minutes on 4 busy CPUs), and the dtype is part of
@@ -146,13 +146,14 @@ bootstrap 95% interval (2,000 resamples of impressions).
   embedder may use a smaller variant ([ADR 0005](adr/0005-query-embedding.md): q4 and q8 query
   vectors have cosine 0.98). The CLI (`--dtype q4`) and the WordPress plugin (Model weights) offer
   q4 as an option; q8 stays the default until more than one dataset says otherwise.
-- **The q4 row measured `model_q4`, which browsers can't run.** q4 now means
-  `model_no_gather_q4` ([ADR 0005](adr/0005-query-embedding.md)), whose vectors are within cosine
-  0.998 of `model_q4`'s. On the same 10,000 impressions it scores 0.3904 nDCG@10 at 256/int8
-  (default weights; profile only: 0.3881), against 0.3856 for q8: **+0.0048** (standard error
-  0.0010, 95% interval +0.0029 to +0.0068), about the gain `model_q4` showed (+0.0054). So the
-  browser file costs nothing either. Its embedding needed `--batch-size 2`: with 16 long
-  inputs per pass, its unquantized token embeddings took the process past 14 GB. Results:
+- **The q4 row is the file browsers can run.** q4 means `model_no_gather_q4`
+  ([ADR 0005](adr/0005-query-embedding.md)): browsers can't run `model_q4`, and the two files'
+  vectors are within cosine 0.998 of each other. It scores 0.3903 nDCG@10 at 256/int8 (default
+  weights; profile only: 0.3881), against 0.3852 for q8: **+0.0051** (standard error 0.0010, 95%
+  interval +0.0031 to +0.0071). An earlier run of this table with `model_q4` itself showed about
+  the same gain (+0.0054), so the browser file costs nothing either. Its embedding needed
+  `--batch-size 2`: with 16 long inputs per pass, its unquantized token embeddings took the
+  process past 14 GB. Results:
   [`mind-q4-browser-10k.json`](../eval/results/mind-q4-browser-10k.json).
 - **Model switch:** histories recorded on the `hash` catalog and ranked on EmbeddingGemma's
   matched a fresh profile in **10,000 of 10,000** impressions.
