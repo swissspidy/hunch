@@ -33,7 +33,7 @@ configuration, and keep the two apart. It follows
   the size check on Linux, unit tests on macOS and Windows, the browser tests, the package
   test, and the WordPress plugin's tests on the oldest and a current PHP. Actions are pinned to commits, checkouts don't persist credentials, and every workflow
   declares least-privilege permissions. zizmor checks the workflows.
-- **Dependabot** updates npm and GitHub Actions weekly, grouped, after a 7-day cooldown.
+- **Dependabot** updates npm, GitHub Actions and the plugin's Composer dependencies weekly, grouped, after a 7-day cooldown.
 - **Releases use Changesets and npm trusted publishing** (`.github/workflows/release.yml`), as in
   Sandburg: pull requests add changesets, and Changesets keeps a "Version packages" pull request
   open. When `main`'s version has no tag and isn't on npm, the workflow tests and packs the
