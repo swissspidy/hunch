@@ -229,16 +229,9 @@ export class IndexedDbStore implements SignalStore {
   }
 
   async getState(): Promise<SignalState> {
-    const row = await this.tx(
-      'meta',
-      'readonly',
-      (store) => store.get('state') as IDBRequest<(SignalState & { key: string }) | undefined>,
+    return stateOf(
+      await this.tx('meta', 'readonly', (store) => store.get('state') as IDBRequest<StateRow>),
     );
-    return compactState({
-      paused: row?.paused ?? false,
-      lastSeen: row?.lastSeen,
-      previousVisit: row?.previousVisit,
-    });
   }
 
   async setState(state: SignalState): Promise<void> {
@@ -251,16 +244,9 @@ export class IndexedDbStore implements SignalStore {
     const store = tx.objectStore('meta');
     let next: SignalState | undefined;
     // The read and the write share one readwrite transaction: IndexedDB runs it alone.
-    const read = store.get('state') as IDBRequest<(SignalState & { key: string }) | undefined>;
+    const read = store.get('state') as IDBRequest<StateRow>;
     read.onsuccess = () => {
-      const row = read.result;
-      next = update(
-        compactState({
-          paused: row?.paused ?? false,
-          lastSeen: row?.lastSeen,
-          previousVisit: row?.previousVisit,
-        }),
-      );
+      next = update(stateOf(read.result));
       store.put({ key: 'state', ...next });
     };
     await new Promise<void>((resolve, reject) => {
@@ -275,9 +261,7 @@ export class IndexedDbStore implements SignalStore {
       const open = indexedDB.open(this.name, 1);
       open.onupgradeneeded = () => {
         const db = open.result;
-        const signals = db.createObjectStore('signals', { keyPath: 'seq', autoIncrement: true });
-        signals.createIndex('itemId', 'itemId');
-        signals.createIndex('at', 'at');
+        db.createObjectStore('signals', { keyPath: 'seq', autoIncrement: true });
         db.createObjectStore('meta', { keyPath: 'key' });
       };
       open.onsuccess = () => {
@@ -313,9 +297,14 @@ export class IndexedDbStore implements SignalStore {
   }
 }
 
-function compactState(state: SignalState): SignalState {
-  if (state.lastSeen === undefined) delete state.lastSeen;
-  if (state.previousVisit === undefined) delete state.previousVisit;
+/** The `meta` store's `state` record, if it was ever written. */
+type StateRow = (SignalState & { key: string }) | undefined;
+
+/** The state a record holds (not paused, no visits, without one): only the fields it has. */
+function stateOf(row: StateRow): SignalState {
+  const state: SignalState = { paused: row?.paused ?? false };
+  if (row?.lastSeen !== undefined) state.lastSeen = row.lastSeen;
+  if (row?.previousVisit !== undefined) state.previousVisit = row.previousVisit;
   return state;
 }
 

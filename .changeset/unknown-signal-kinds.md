@@ -2,4 +2,4 @@
 '@swissspidy/hunch': patch
 ---
 
-Signals of a kind the client doesn't know (written by a newer release) are no longer counted as views or pruned by age: they are kept as they are and ignored (ADR 0009).
+Signals of a kind the client doesn't know (written by a newer release) are kept as they are and ignored, neither counted as views nor pruned by age (ADR 0009).

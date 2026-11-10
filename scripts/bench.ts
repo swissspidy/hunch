@@ -61,19 +61,19 @@ async function node(quantization: Quantization): Promise<void> {
   };
   const store = new MemoryStore();
   const start = performance.now();
-  const ink = await Hunch.load({
+  const hunch = await Hunch.load({
     manifest: 'http://bench/manifest.json',
     fetch: fetchFn,
     consent: true,
     store,
   });
-  await ink.related('s0-item-0', { sections: 'same' });
+  await hunch.related('s0-item-0', { sections: 'same' });
   const firstSection = performance.now() - start;
-  await ink.related('s0-item-0');
+  await hunch.related('s0-item-0');
   const allLoaded = performance.now() - start;
-  const related = await time(20, (i) => ink.related(itemId(i), { n: 10 }));
-  for (let i = 0; i < 50; i++) await ink.record('view', itemId(i * 7));
-  const recommend = await time(20, () => ink.recommend({ n: 10 }));
+  const related = await time(20, (i) => hunch.related(itemId(i), { n: 10 }));
+  for (let i = 0; i < 50; i++) await hunch.record('view', itemId(i * 7));
+  const recommend = await time(20, () => hunch.recommend({ n: 10 }));
   const heap = process.memoryUsage();
   console.log(`${count} items, ${dims} dims, ${quantization}, ${shape(catalog)} (Node)`);
   console.log(
@@ -135,8 +135,8 @@ async function browser(): Promise<void> {
       async ({ sections, perSection }) => {
         const id = (i: number) => `s${i % sections}-item-${Math.floor(i / sections) % perSection}`;
         const I = (window as unknown as { Hunch: typeof Hunch }).Hunch;
-        const ink = await I.load({ manifest: '/manifest.json', consent: true });
-        for (let i = 0; i < 50; i++) await ink.record('view', id(i * 7));
+        const hunch = await I.load({ manifest: '/manifest.json', consent: true });
+        for (let i = 0; i < 50; i++) await hunch.record('view', id(i * 7));
       },
       { sections, perSection },
     );
@@ -145,7 +145,7 @@ async function browser(): Promise<void> {
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await cdp.send('Performance.enable');
     const result = await page.evaluate(
-      async ({ sections, perSection, options }) => {
+      async ({ sections, perSection }) => {
         // As itemId() below: an id that exists whatever the catalog's size.
         const id = (i: number) => `s${i % sections}-item-${Math.floor(i / sections) % perSection}`;
         const w = window as unknown as {
@@ -155,8 +155,8 @@ async function browser(): Promise<void> {
         const I = w.Hunch;
         // Load + first recommend(), as a returning visitor's "for you" would.
         const t0 = performance.now();
-        const ink = await I.load({ manifest: '/manifest.json', consent: true, ...options });
-        await ink.recommend({ n: 10 });
+        const hunch = await I.load({ manifest: '/manifest.json', consent: true });
+        await hunch.recommend({ n: 10 });
         const t1 = performance.now();
         const firstRecommend = t1 - t0;
         // Let the observer deliver the last entries.
@@ -166,7 +166,7 @@ async function browser(): Promise<void> {
           .map((t) => t.duration);
         // The rest on a fresh client, so the first section's load is measured on its own.
         const t2 = performance.now();
-        const fresh = await I.load({ manifest: '/manifest.json', consent: true, ...options });
+        const fresh = await I.load({ manifest: '/manifest.json', consent: true });
         await fresh.related('s0-item-0', { sections: 'same' });
         const first = performance.now() - t2;
         await fresh.related('s0-item-0');
@@ -180,7 +180,7 @@ async function browser(): Promise<void> {
         await fresh.forget();
         return { firstRecommend, longTasks, first, all, related, recommend };
       },
-      { sections, perSection, options: {} },
+      { sections, perSection },
     );
     const metrics = await cdp.send('Performance.getMetrics').catch(() => ({ metrics: [] }));
     console.log(`${count} items, ${dims} dims, int8, ${shape(catalog)} (Chromium, CPU 4× slower)`);

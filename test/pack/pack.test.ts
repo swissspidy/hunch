@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { cp, readFile, writeFile } from 'node:fs/promises';
+import { cp, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { before, test } from 'node:test';
 import { promisify } from 'node:util';
@@ -18,18 +18,34 @@ let files: string[] = [];
 
 before(async () => {
   const work = await tempDir();
-  const { stdout } = await run(npm, ['pack', '--json', '--pack-destination', work], {
-    shell: process.platform === 'win32',
-    maxBuffer: 1 << 24,
-  });
-  const [info] = JSON.parse(stdout.slice(stdout.indexOf('['))) as {
-    filename: string;
-    files: { path: string }[];
-  }[];
-  files = info!.files.map((f) => f.path).sort();
+  let tarball: string;
+  // The release tests the tarball it publishes (HUNCH_TARBALL_DIR holds it); otherwise pack one.
+  const packed = process.env.HUNCH_TARBALL_DIR;
+  if (packed) {
+    const names = (await readdir(packed)).filter((name) => name.endsWith('.tgz'));
+    assert.equal(names.length, 1, `one tarball in ${packed}, not ${names.length}`);
+    tarball = resolve(packed, names[0]!);
+    const { stdout } = await run('tar', ['-tzf', tarball], { maxBuffer: 1 << 24 });
+    files = stdout
+      .split('\n')
+      .filter((path) => path && !path.endsWith('/'))
+      .map((path) => path.replace(/^package\//, ''))
+      .sort();
+  } else {
+    const { stdout } = await run(npm, ['pack', '--json', '--pack-destination', work], {
+      shell: process.platform === 'win32',
+      maxBuffer: 1 << 24,
+    });
+    const [info] = JSON.parse(stdout.slice(stdout.indexOf('['))) as {
+      filename: string;
+      files: { path: string }[];
+    }[];
+    files = info!.files.map((f) => f.path).sort();
+    tarball = resolve(work, info!.filename);
+  }
   project = join(work, 'consumer');
   await cp('test/fixtures/consumer', project, { recursive: true });
-  await run(npm, ['install', '--no-audit', '--no-fund', resolve(work, info!.filename)], {
+  await run(npm, ['install', '--no-audit', '--no-fund', tarball], {
     cwd: project,
     shell: process.platform === 'win32',
   });

@@ -328,7 +328,7 @@ async function evaluateHunch(
 ): Promise<{ metrics: Metrics; ndcg10: number[]; rankMs: number }> {
   const store = new MemoryStore();
   let now = 0;
-  const ink = await load(dir, store, () => now);
+  const hunch = await load(dir, store, () => now);
   const all: Metrics[] = [];
   let ms = 0;
   for (const imp of dataset.impressions) {
@@ -337,7 +337,7 @@ async function evaluateHunch(
     for (const itemId of imp.history)
       await store.add({ itemId, kind: 'view', weight: 1, at: imp.at });
     const started = performance.now();
-    const ranked = await ink.rank(imp.candidates, options);
+    const ranked = await hunch.rank(imp.candidates, options);
     ms += performance.now() - started;
     all.push(score(ranked, imp.clicked));
   }

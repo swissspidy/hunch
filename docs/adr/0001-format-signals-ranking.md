@@ -169,7 +169,7 @@ origin:
 
 - Database `hunch` (the name takes a site-chosen suffix when several catalogs share an
   origin), version 1.
-- Object store `signals`, `keyPath: "seq"`, auto-increment, indexes on `itemId` and `at`:
+- Object store `signals`, `keyPath: "seq"`, auto-increment (no indexes: every read is of all signals):
 
   ```ts
   interface Signal {
@@ -249,8 +249,10 @@ pick    = argmax_c  (1 − λ) · base(c) − λ · red(c)       (MMR, λ = 0.2)
 
 ## Consequences
 
-- The client was 2.5 KB gzipped with `related()` alone, and is 6.6 KB with personalization
-  and the hash check's fallback (7.9 KB with the web components), under the 10 KB budget. `npm run size` checks this in CI.
+- The client was 2.5 KB gzipped with `related()` alone, and 6.6 KB with personalization and the
+  hash check's fallback at milestone 2 (7.9 KB with the web components). With search, visits and
+  the similarity kernel it is 9.4 KB (12 KB with the components), against budgets of 10 KB and
+  12 KB. `npm run size` checks this in CI.
 - Related items need no consent and no storage. They are the safe first integration.
 - A site can switch models by rebuilding, with no migration on any device. The price is that
   the first page after a switch fetches new shards, and that items removed from the catalog

@@ -145,7 +145,7 @@ export abstract class SlotsElement extends Base {
           .map((_, i) => i)
           .sort((a, b) => Math.abs(a - focus) - Math.abs(b - focus));
         const target = order.map((i) => copies[i]!).find((copy) => !copy.hidden);
-        (target?.matches('a') ? target : target?.querySelector('a'))?.focus();
+        if (target) linkOf(target)?.focus();
       }
       this.dataset.hunchState = 'ready';
       this.dispatchEvent(
@@ -202,7 +202,7 @@ export abstract class SlotsElement extends Base {
         bubbles: true,
         detail: {
           id,
-          url: (slot.matches('a') ? slot : slot.querySelector('a'))?.href ?? '',
+          url: (linkOf(slot) as HTMLAnchorElement | null)?.href ?? '',
           position: slots.indexOf(slot) + 1,
           list: this.localName,
           personalized: this.dataset.hunchPersonalized === 'true',
@@ -234,7 +234,7 @@ function fill(slot: HTMLElement, rec: Recommendation): void {
         );
     }
   }
-  const link = slot.matches('a') ? slot : slot.querySelector('[data-hunch-href], a');
+  const link = linkOf(slot);
   if (link) {
     // Only web URLs: a javascript: URL from a catalog would run script when clicked.
     if (isWebUrl(rec.url)) link.setAttribute('href', rec.url);
@@ -253,6 +253,13 @@ function fill(slot: HTMLElement, rec: Recommendation): void {
     else image.removeAttribute('src');
     image.setAttribute('alt', '');
   }
+}
+
+/** A slot's link: the slot itself, else its `[data-hunch-href]`, else its first `a`. */
+function linkOf(slot: HTMLElement): HTMLElement | null {
+  return slot.matches('a')
+    ? slot
+    : (slot.querySelector<HTMLElement>('[data-hunch-href]') ?? slot.querySelector('a'));
 }
 
 function isWebUrl(url: string): boolean {

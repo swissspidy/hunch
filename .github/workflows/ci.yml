@@ -132,4 +132,6 @@ jobs:
         working-directory: wordpress/hunch
       # The PHP encoder against the Node build, byte for byte (ADR 0007).
       - run: node --test --test-reporter=spec test/unit/wordpress.test.ts
+      # The zip is the same whatever the PHP version: built once.
       - run: npm run wordpress:build
+        if: matrix.php == '8.4'

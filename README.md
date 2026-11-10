@@ -319,7 +319,7 @@ embeds only pages that are new or changed since the cached ones. In CI, restore 
 
 ```yaml
 - run: npm ci
-- uses: actions/cache@v4
+- uses: actions/cache@v6
   with:
     path: node_modules/.cache/hunch
     key: hunch-${{ github.run_id }}

@@ -15,14 +15,14 @@ popularity's, or if any ranking differs after a model switch.
 
 | Ranker                                  | AUC       | MRR       | nDCG@5    | nDCG@10   | Recall@10 |
 | --------------------------------------- | --------- | --------- | --------- | --------- | --------- |
-| Random                                  | 0.498     | 0.178     | 0.186     | 0.284     | 0.499     |
+| Random                                  | 0.498     | 0.178     | 0.186     | 0.283     | 0.499     |
 | Popularity                              | 0.553     | 0.219     | 0.246     | 0.340     | 0.559     |
 | Hunch, model A: profile only            | 0.843     | 0.497     | 0.655     | 0.719     | 0.888     |
-| **Hunch, model A: default weights**     | **0.847** | **0.502** | **0.661** | **0.723** | **0.892** |
-| Hunch, model A: default + diversity 0.2 | 0.842     | 0.498     | 0.655     | 0.716     | 0.885     |
+| **Hunch, model A: default weights**     | **0.846** | **0.502** | **0.661** | **0.724** | **0.893** |
+| Hunch, model A: default + diversity 0.2 | 0.841     | 0.498     | 0.654     | 0.716     | 0.883     |
 | Hunch, model B: profile only            | 0.826     | 0.476     | 0.629     | 0.690     | 0.866     |
-| **Hunch, model B: default weights**     | **0.829** | **0.478** | **0.630** | **0.692** | **0.870** |
-| Hunch, model B: default + diversity 0.2 | 0.824     | 0.473     | 0.620     | 0.688     | 0.873     |
+| **Hunch, model B: default weights**     | **0.828** | **0.477** | **0.631** | **0.691** | **0.868** |
+| Hunch, model B: default + diversity 0.2 | 0.824     | 0.473     | 0.622     | 0.686     | 0.867     |
 
 **Model switch:** signals recorded on model A's catalog and then ranked on model B's gave the same
 ranking as a fresh profile on model B in **1,230 of 1,230** impressions. The device stores only
@@ -37,17 +37,17 @@ average of 37 shown items each. The catalog is the 13,965 articles they show or 
 histories, embedded from title and abstract. Popularity counts the clicks of the days before
 (the training impressions). Most of the day's articles are new, so popularity knows little
 about them. Raw numbers:
-[`eval/results/mind-hash-256-embeddinggemma-300m-ONNX-256.json`](../eval/results/mind-hash-256-embeddinggemma-300m-ONNX-256.json).
+[`eval/results/mind-hash-256-embeddinggemma-300m-ONNX-q8-256.json`](../eval/results/mind-hash-256-embeddinggemma-300m-ONNX-q8-256.json).
 
 | Ranker                                         | AUC       | MRR       | nDCG@5    | nDCG@10   | Recall@10 |
 | ---------------------------------------------- | --------- | --------- | --------- | --------- | --------- |
 | Random                                         | 0.504     | 0.217     | 0.219     | 0.285     | 0.523     |
 | Popularity                                     | 0.534     | 0.236     | 0.244     | 0.308     | 0.547     |
 | Hunch, `hash` (lexical): profile only          | 0.544     | 0.251     | 0.257     | 0.321     | 0.548     |
-| Hunch, `hash` (lexical): default weights       | 0.553     | 0.251     | 0.259     | 0.324     | 0.559     |
-| Hunch, EmbeddingGemma: profile only            | 0.630     | 0.304     | 0.331     | 0.387     | 0.618     |
-| **Hunch, EmbeddingGemma: default weights**     | **0.634** | **0.307** | **0.335** | **0.390** | **0.620** |
-| Hunch, EmbeddingGemma: default + diversity 0.2 | 0.634     | 0.305     | 0.333     | 0.388     | 0.618     |
+| Hunch, `hash` (lexical): default weights       | 0.552     | 0.250     | 0.257     | 0.323     | 0.558     |
+| Hunch, EmbeddingGemma: profile only            | 0.630     | 0.304     | 0.331     | 0.387     | 0.617     |
+| **Hunch, EmbeddingGemma: default weights**     | **0.634** | **0.306** | **0.335** | **0.390** | **0.621** |
+| Hunch, EmbeddingGemma: default + diversity 0.2 | 0.633     | 0.305     | 0.332     | 0.389     | 0.620     |
 
 - **Hunch beats popularity on nDCG@10 by 0.08 (0.390 vs 0.308)** with EmbeddingGemma at 256
   int8 dimensions, the defaults the demo ships. That meets milestone 4. No model was trained,
@@ -56,7 +56,7 @@ about them. Raw numbers:
   semantic embedding does much better from the same signals and the same ranking function.
 - **Popularity helps a little.** The default blend is slightly better than the profile alone. At
   100 or more signals, confidence is close to 1, so the profile dominates.
-- **Diversity costs almost nothing.** A diversity of 0.2 loses 0.002 nDCG@10, the price of
+- **Diversity costs almost nothing.** A diversity of 0.2 loses 0.001 nDCG@10, the price of
   varied lists in `recommend()`.
 - **Model switch:** histories recorded through the client on the `hash` catalog and then ranked on
   EmbeddingGemma's matched a fresh EmbeddingGemma profile in **2,000 of 2,000** impressions. So a

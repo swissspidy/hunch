@@ -127,9 +127,12 @@ jobs:
       - run: npm test
       - run: npm run size
       - run: npm run test:e2e
-      - run: npm run test:pack
       # Runs prepack (the dist/ build).
       - run: mkdir release && npm pack --pack-destination release
+      # The tarball that is uploaded and published is the one tested, not a second build.
+      - run: npm run test:pack
+        env:
+          HUNCH_TARBALL_DIR: release
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: package

@@ -258,7 +258,7 @@ export function computePriors(items: readonly CatalogItem[]): number[] {
  * average of at most half of `max` per bucket (one bucket for small groups) and no bucket over
  * `max`. Returns [bucket number, or null for a single bucket; members], empty buckets left out.
  */
-function bucketsOf<T>(
+export function bucketsOf<T>(
   members: readonly T[],
   idOf: (member: T) => string,
   max: number,
