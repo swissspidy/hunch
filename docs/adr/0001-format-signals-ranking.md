@@ -4,7 +4,8 @@
   the profile). Amended by [ADR 0003](0003-personalization-client.md): followed items count as
   seen, and the cold start keeps the site's order exactly. Its shard
   layout was replaced before the first release by [ADR 0011](0011-shard-columns.md): the
-  per-item values in binary columns, the other metadata decoded on demand.
+  per-item values in binary columns, the other metadata decoded on demand. Its shard grouping and
+  priors were amended, also before the first release, by [ADR 0012](0012-stable-shards.md).
 - Date: 2026-11-04
 
 ## Context

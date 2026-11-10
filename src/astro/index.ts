@@ -79,7 +79,7 @@ export interface HunchAstroOptions {
   quantization?: Quantization;
   /** One shard per section (default), or a single shard. */
   shardBy?: 'section' | 'none';
-  /** Split shards larger than this (default 2000 items). */
+  /** Most items in a shard (default 2000); larger sections are spread over several. */
   maxShardItems?: number;
   /** Characters of item text embedded (default 4000). */
   maxTextChars?: number;

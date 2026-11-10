@@ -15,7 +15,9 @@
  *
  * State: `data-hunch-state` is `loading`, `ready` or `error` (the fallback stays). Events:
  * `hunch:ready` (detail: `{ recommendations }`) and `hunch:error` (detail: `{ error }`). A
- * click on a slot whose `data-hunch-id` is set records a `click` signal (with consent).
+ * click on a slot whose `data-hunch-id` is set records a `click` signal (with consent) and fires
+ * `hunch:click`, which bubbles (detail: `{ id, url, position, list, personalized }`).
+ * `<hunch-for-you>` also fires `hunch:hide`, and `<hunch-digest>` `hunch:summary`.
  *
  * @module @swissspidy/hunch/elements
  */

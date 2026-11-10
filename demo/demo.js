@@ -146,7 +146,7 @@ if (searchForm) {
   const loadEmbedder = (hunch) => {
     embedder ??= (async () => {
       const { createQueryEmbedder } = await import(new URL('hunch-query.js', assets).href);
-      // q4 weights: a fifth of the download of q8, with the same results (ADR 0005).
+      // q4 weights: about two thirds of the download of q8, with the same results (ADR 0005).
       return createQueryEmbedder(hunch.manifest, {
         transformers: () => import(TRANSFORMERS),
         dtype: 'q4',

@@ -1,7 +1,7 @@
 /**
  * `npm run demo`: builds the demo site in demo/dist from demo/feed.xml.
  *
- *   node scripts/demo.ts [--base /] [--out demo/dist] [--provider transformers|hash] [--serve [port]]
+ *   node scripts/demo.ts [--base /] [--out demo/dist] [--provider transformers|hash] [--serve] [--port 4173]
  *
  * The site is static HTML. Each article page server-renders a "Related" list of the latest
  * articles in its section; `<hunch-related>` rewrites those slots in place with the items

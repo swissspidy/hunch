@@ -20,7 +20,7 @@ node bin/hunch.js --help      # the CLI, from the sources
 
 | Command                | What it checks                                                                                                                                        |
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run typecheck`    | TypeScript 7 over `src`, `test` and `scripts`                                                                                                         |
+| `npm run typecheck`    | TypeScript 7 over `src`, `test`, `scripts` and `eval`                                                                                                 |
 | `npm run lint`         | oxlint (type-aware) and knip (unused files, exports, dependencies)                                                                                    |
 | `npm run format:check` | oxfmt (`npm run format` fixes it)                                                                                                                     |
 | `npm test`             | Unit tests in `test/unit`                                                                                                                             |

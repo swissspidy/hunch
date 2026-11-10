@@ -9,7 +9,7 @@
  *   node scripts/bench.ts [--items 10000[,50000,…]] [--dims 256] [--sections 10] [--browser]
  */
 
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -95,7 +95,6 @@ async function browser(): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), 'hunch-bench-'));
   const script = join(dir, 'hunch.js');
   await bundleGlobal(script);
-  const { readFile } = await import('node:fs/promises');
   const bundle = await readFile(script);
   const server = createServer((req, res) => {
     const path = (req.url ?? '/').slice(1);
