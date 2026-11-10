@@ -19,6 +19,8 @@ export function parseFeed(xml: string): CatalogItem[] {
     textNodeName: '#text',
     // Entities are decoded by htmlToText/decodeEntities, once: feeds often double-encode HTML.
     processEntities: false,
+    // Text as it is written: a title `007` or a guid `0042` is not a number.
+    parseTagValue: false,
     isArray: (name) => ARRAYS.has(name),
   });
   const doc = parser.parse(xml) as Node;

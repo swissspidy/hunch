@@ -144,7 +144,10 @@ test('eval run: rejects an empty --variants list and writes results for a single
       join(out, 'cache'),
       ...args,
     ]);
-  await assert.rejects(run('--variants', ','), /--variants/);
+  // The error itself: the rejection's message also holds the command line.
+  await assert.rejects(run('--variants', ','), (error: { stderr?: string }) =>
+    /--variants: give at least one variant/.test(error.stderr ?? ''),
+  );
   await run('--variants', 'default', '--impressions', '1', '--name', 'one');
   const result = JSON.parse(await readFile(join(out, 'one.json'), 'utf8')) as Result;
   assert.equal(result.impressions, 1);

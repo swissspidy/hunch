@@ -217,7 +217,7 @@ test('PHP keeps generatedAt and prunes shards as the Node build does', { skip },
   const options: Options = { dims: 256, quantization: 'int8' };
   const nodeDir = await tempDir();
   const phpDir = await tempDir();
-  // Three builds: the same catalog twice, then one item changed, then another change.
+  // Four builds: the same catalog twice, then one item changed, then another change.
   const changed = items.map((item, i) => (i === 0 ? { ...item, title: 'Rye, revised' } : item));
   vectors.set(documentInput(model.documentPrompt, changed[0]!.title, changed[0]!.text), vector(99));
   const again = changed.map((item, i) => (i === 4 ? { ...item, section: 'Food' } : item));
@@ -250,6 +250,8 @@ test(
       { title: 'Long 2', text: `${'é'.repeat(4100)}` },
       // Not replacement patterns: PHP's str_replace() has none.
       { title: 'Make $$$ fast, $& all', text: "From $1 to $' and $`." },
+      // One pass: a placeholder in a title or text is text, not filled in turn.
+      { title: 'About {text} and {title}', text: 'Body with {title}.' },
     ];
     const result = runPhp(
       await tempDir(),

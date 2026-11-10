@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { tempDir } from '../helpers.ts';
@@ -37,6 +37,21 @@ test('RSS: content:encoded wins over description, CDATA and entities are decoded
   assert.equal(item!.title, 'Fish & chips');
   assert.equal(item!.text, 'The full text & more.');
   assert.equal(item!.image, 'https://e.com/a.jpg');
+});
+
+test('feed text that looks like a number stays as it is written', () => {
+  const [item] = parseFeed(`<rss version="2.0"><channel><item>
+    <title>007</title><guid isPermaLink="false">0042</guid><link>https://e.com/a</link>
+    <description>1.50</description><category>2026</category>
+  </item></channel></rss>`);
+  assert.deepEqual(item, {
+    id: '0042',
+    url: 'https://e.com/a',
+    title: '007',
+    text: '1.50',
+    section: '2026',
+    tags: ['2026'],
+  });
 });
 
 test('Atom entries become catalog items', async () => {
@@ -162,7 +177,6 @@ test('a local sitemap index can name local sitemaps', async () => {
     `<sitemapindex><sitemap><loc>${child}</loc></sitemap></sitemapindex>`,
   );
   await writeFile(join(dir, 'pages.xml'), '<urlset><url><loc>https://e.com/a</loc></url></urlset>');
-  await mkdir(join(dir, 'x'), { recursive: true });
   const fetched: string[] = [];
   const original = globalThis.fetch;
   globalThis.fetch = (input: string | URL | Request) => {

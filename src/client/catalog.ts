@@ -148,8 +148,15 @@ export class Catalog {
 
   /** Loads the shards of the given sections (all shards when `sections` is omitted). */
   async loadSections(sections?: readonly string[]): Promise<void> {
-    const refs = this.manifest.shards.filter(
-      (ref) => !sections || (ref.section !== null && sections.includes(ref.section)),
+    const { shards } = this.manifest;
+    // A section no shard is named for is in the shards without one, if anywhere: a catalog
+    // built as a single shard (`shardBy: 'none'`) has only those.
+    const unsharded = sections?.some(
+      (name) => this.sectionIndex.has(name) && !shards.some((ref) => ref.section === name),
+    );
+    const refs = shards.filter(
+      (ref) =>
+        !sections || (ref.section === null ? unsharded === true : sections.includes(ref.section)),
     );
     await Promise.all(refs.map((ref) => this.loadShard(ref)));
   }

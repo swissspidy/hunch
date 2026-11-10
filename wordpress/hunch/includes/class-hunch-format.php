@@ -76,7 +76,14 @@ final class Hunch_Format {
 	 */
 	public static function document_input( $prompt, $title, $text, $max_chars = 4000 ) {
 		$text = self::utf16_slice( $text, $max_chars );
-		return str_replace( array( '{title}', '{text}' ), array( '' === $title ? 'none' : $title, $text ), $prompt );
+		// One pass, as the Node build does: a `{text}` in a title stays as it is.
+		return strtr(
+			$prompt,
+			array(
+				'{title}' => '' === $title ? 'none' : $title,
+				'{text}'  => $text,
+			)
+		);
 	}
 
 	/**

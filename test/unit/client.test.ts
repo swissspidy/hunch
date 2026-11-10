@@ -55,6 +55,22 @@ test('only the shards needed are fetched', async () => {
   assert.equal(log.length, 5, log.join(', '));
 });
 
+test('a catalog in one shard is filtered by section too', async () => {
+  const out = await tempDir();
+  await build({
+    items: await loadSource('demo/feed.xml'),
+    outDir: join(out, 'hunch'),
+    provider: hashProvider(),
+    shardBy: 'none',
+    cacheDir: false,
+  });
+  // A fresh client: nothing else has loaded the shard.
+  const hunch = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(out), now });
+  const food = await hunch.recommend({ sections: ['Food'], n: 3 });
+  assert.equal(food.length, 3);
+  assert.ok(food.every((r) => r.section === 'Food'));
+});
+
 test('exclusions, unknown items and n', async () => {
   const ink = await Hunch.load({ manifest: MANIFEST, fetch: dirFetch(dir), now });
   const all = await ink.related('cold-brew', { n: 100 });
