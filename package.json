@@ -103,7 +103,7 @@
     "oxlint-tsgolint": "^7.0.2005",
     "playwright-core": "1.63.0",
     "typescript": "^7.0.2",
-    "wabt": "^1.0.37"
+    "wabt": "^1.0.39"
   },
   "peerDependencies": {
     "@huggingface/transformers": "^4.3.2",
