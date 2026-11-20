@@ -1,6 +1,6 @@
 {
   "name": "@swissspidy/hunch",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "First-party, on-device personalization for websites: the visitor's interests stay in their browser.",
   "keywords": [
     "embeddings",
