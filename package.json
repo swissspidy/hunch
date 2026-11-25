@@ -87,7 +87,7 @@
     "kernel": "node scripts/kernel.ts"
   },
   "dependencies": {
-    "fast-xml-parser": "^5.12.0"
+    "fast-xml-parser": "^5.12.1"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^1.0.1",
